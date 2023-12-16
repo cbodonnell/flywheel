@@ -1,6 +1,7 @@
 package servers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 
@@ -14,6 +15,7 @@ type UDPServer struct {
 	ClientManager *clients.ClientManager
 	MessageQueue  *queue.MemoryQueue
 	Port          string
+	UDPConn       *net.UDPConn
 }
 
 // NewUDPServer creates a new UDP server.
@@ -35,15 +37,15 @@ func (s *UDPServer) Start() {
 
 	fmt.Println("UDP server listening on", udpAddr.String())
 
-	udpConn, err := net.ListenUDP("udp", udpAddr)
+	s.UDPConn, err = net.ListenUDP("udp", udpAddr)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
-	defer udpConn.Close()
+	defer s.UDPConn.Close()
 
 	for {
-		message, addr, err := messages.ReadMessageFromUDP(udpConn)
+		message, addr, err := ReadMessageFromUDP(s.UDPConn)
 		if err != nil {
 			fmt.Println("Error:", err)
 			continue
@@ -57,4 +59,36 @@ func (s *UDPServer) Start() {
 		s.ClientManager.SetUDPAddress(message.ClientID, addr)
 		s.MessageQueue.Enqueue(message)
 	}
+}
+
+// WriteMessageToUDP writes a Message to a UDP connection
+func WriteMessageToUDP(conn *net.UDPConn, addr *net.UDPAddr, msg *messages.Message) error {
+	jsonData, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to serialize message: %v", err)
+	}
+
+	_, err = conn.WriteToUDP(jsonData, addr)
+	if err != nil {
+		return fmt.Errorf("failed to write message to UDP connection: %v", err)
+	}
+
+	return nil
+}
+
+// ReadMessageFromUDP reads a Message from a UDP connection
+func ReadMessageFromUDP(conn *net.UDPConn) (*messages.Message, *net.UDPAddr, error) {
+	jsonData := make([]byte, messages.MessageBufferSize) // Adjust buffer size based on your needs
+	n, addr, err := conn.ReadFromUDP(jsonData)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read message from UDP connection: %v", err)
+	}
+
+	msg := &messages.Message{}
+	err = json.Unmarshal(jsonData[:n], msg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to deserialize message: %v", err)
+	}
+
+	return msg, addr, nil
 }

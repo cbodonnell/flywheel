@@ -6,7 +6,8 @@ import (
 
 	"github.com/cbodonnell/flywheel/pkg/clients"
 	"github.com/cbodonnell/flywheel/pkg/messages"
-	"github.com/cbodonnell/flywheel/pkg/queue" // Import the path to your queue package
+	"github.com/cbodonnell/flywheel/pkg/queue"
+	"github.com/cbodonnell/flywheel/pkg/servers"
 )
 
 // GameState represents the generic game state (to be implemented based on your needs)
@@ -61,7 +62,7 @@ func (gm *GameManager) StopGameLoop() {
 func (gm *GameManager) processMessages() {
 	pendingMessages := gm.messageQueue.ReadAllMessages()
 	for _, item := range pendingMessages {
-		message, ok := item.(messages.Message)
+		message, ok := item.(*messages.Message)
 		if !ok {
 			fmt.Println("Error: failed to cast message to messages.Message")
 			continue
@@ -76,18 +77,18 @@ func (gm *GameManager) processMessages() {
 func (gm *GameManager) broadcastGameState() {
 	clients := gm.clientManager.GetClients()
 	for _, client := range clients {
-		message := messages.Message{
-			ClientID: client.ID,
-			Type:     messages.MessageTypeClientUpdate,
+		message := &messages.Message{
+			ClientID: 0,
+			Type:     messages.MessageTypeServerUpdate,
 			Payload:  gm.gameState,
 		}
 
-		if client.UDPConn == nil {
-			fmt.Printf("Error: client %d does not have a UDP connection\n", client.ID)
+		if client.UDPAddress == nil {
+			fmt.Printf("Error: client %d does not have a UDP address\n", client.ID)
 			continue
 		}
 		// TODO: some messages will be over UDP, some over TCP
-		err := messages.WriteMessageToUDP(client.UDPConn, message)
+		err := servers.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
 		if err != nil {
 			fmt.Printf("Error: failed to write message to UDP connection for client %d: %v\n", client.ID, err)
 		}

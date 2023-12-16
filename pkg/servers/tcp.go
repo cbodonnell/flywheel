@@ -3,6 +3,7 @@
 package servers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 
@@ -75,12 +76,58 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 
 	for {
 		// TODO: handle a client disconnecting
-		message, err := messages.ReadMessageFromTCP(conn)
+		message, err := ReadMessageFromTCP(conn)
 		if err != nil {
+			if _, ok := err.(*ErrConnectionClosed); ok {
+				fmt.Printf("Client %d disconnected\n", clientID)
+				return
+			}
 			fmt.Printf("Error reading TCP message from client %d: %v\n", clientID, err)
 			continue
 		}
 		fmt.Printf("Received TCP message of type %s from client %d: %x\n", message.Type, message.ClientID, message.Payload)
 		s.MessageQueue.Enqueue(message)
 	}
+}
+
+// WriteMessageToTCP writes a Message to a TCP connection
+func WriteMessageToTCP(conn net.Conn, msg *messages.Message) error {
+	jsonData, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to serialize message: %v", err)
+	}
+
+	_, err = conn.Write(jsonData)
+	if err != nil {
+		return fmt.Errorf("failed to write message to TCP connection: %v", err)
+	}
+
+	return nil
+}
+
+// ErrConnectionClosed is returned when the TCP connection is closed
+type ErrConnectionClosed struct{}
+
+func (e *ErrConnectionClosed) Error() string {
+	return "connection closed"
+}
+
+// ReadMessageFromTCP reads a Message from a TCP connection
+func ReadMessageFromTCP(conn net.Conn) (*messages.Message, error) {
+	jsonData := make([]byte, messages.MessageBufferSize)
+	n, err := conn.Read(jsonData)
+	if err != nil {
+		if err.Error() == "EOF" {
+			return nil, &ErrConnectionClosed{}
+		}
+		return nil, fmt.Errorf("failed to read message from TCP connection: %v", err)
+	}
+
+	msg := &messages.Message{}
+	err = json.Unmarshal(jsonData[:n], msg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize message: %v", err)
+	}
+
+	return msg, nil
 }

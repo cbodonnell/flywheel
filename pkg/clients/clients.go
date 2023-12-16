@@ -16,7 +16,6 @@ type Client struct {
 	ID         uint32
 	TCPConn    net.Conn
 	UDPAddress *net.UDPAddr
-	UDPConn    *net.UDPConn
 }
 
 // ClientManager manages connected clients
@@ -24,6 +23,8 @@ type ClientManager struct {
 	clients     map[uint32]*Client
 	clientsLock sync.RWMutex
 	nextID      uint32
+	// listener UDP connection used for broadcasting
+	udpConn *net.UDPConn
 }
 
 // NewClientManager creates a new ClientManager
@@ -32,6 +33,19 @@ func NewClientManager() *ClientManager {
 		clients: make(map[uint32]*Client),
 		nextID:  1,
 	}
+}
+
+// SetUDPConn sets the UDP listener connection for all clients
+func (cm *ClientManager) SetUDPConn(conn *net.UDPConn) {
+	cm.udpConn = conn
+}
+
+// GetUDPConn returns the UDP listener connection for all clients
+func (cm *ClientManager) GetUDPConn() *net.UDPConn {
+	if cm.udpConn == nil {
+		panic("UDP connection is not set")
+	}
+	return cm.udpConn
 }
 
 // GetClients returns a list of all connected clients
@@ -78,12 +92,6 @@ func (cm *ClientManager) SetUDPAddress(clientID uint32, addr *net.UDPAddr) {
 		return
 	}
 
-	conn, err := net.DialUDP("udp", nil, addr)
-	if err != nil {
-		fmt.Printf("Failed to dial UDP address when setting for client %d: %v\n", clientID, err)
-		return
-	}
-	cm.clients[clientID].UDPConn = conn
 	cm.clients[clientID].UDPAddress = addr
 }
 
