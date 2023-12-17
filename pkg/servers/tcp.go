@@ -1,5 +1,3 @@
-// servers package
-
 package servers
 
 import (
@@ -73,6 +71,17 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 
 	fmt.Printf("TCP Connection established for client %d\n", clientID)
 
+	// Send the client its ID
+	message := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerAssignID,
+		Payload:  []byte(fmt.Sprintf(`{"clientID":%d}`, clientID)),
+	}
+	if err := WriteMessageToTCP(conn, message); err != nil {
+		fmt.Printf("Error writing TCP message of type %s to client %d: %v\n", message.Type, clientID, err)
+		return
+	}
+
 	for {
 		message, err := ReadMessageFromTCP(conn)
 		if err != nil {
@@ -83,7 +92,9 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 			fmt.Printf("Error reading TCP message from client %d: %v\n", clientID, err)
 			continue
 		}
-		fmt.Printf("Received TCP message of type %s from client %d", message.Type, message.ClientID)
+		fmt.Printf("Received TCP message of type %s from client %d\n", message.Type, message.ClientID)
+
+		// TODO: some messages might not make sense to queue for the game loop (e.g. a message to disconnect)
 		s.MessageQueue.Enqueue(message)
 	}
 }
