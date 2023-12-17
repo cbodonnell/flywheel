@@ -58,7 +58,6 @@ func (s *TCPServer) Start() {
 
 // handleTCPConnection handles a TCP connection.
 func (s *TCPServer) handleTCPConnection(conn net.Conn) {
-	fmt.Println("TCP Connection established")
 	clientID, err := s.ClientManager.AddClient(conn)
 	if err != nil {
 		fmt.Printf("Error adding client: %v\n", err)
@@ -75,7 +74,6 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 	fmt.Printf("TCP Connection established for client %d\n", clientID)
 
 	for {
-		// TODO: handle a client disconnecting
 		message, err := ReadMessageFromTCP(conn)
 		if err != nil {
 			if _, ok := err.(*ErrConnectionClosed); ok {
@@ -85,13 +83,13 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 			fmt.Printf("Error reading TCP message from client %d: %v\n", clientID, err)
 			continue
 		}
-		fmt.Printf("Received TCP message of type %s from client %d: %x\n", message.Type, message.ClientID, message.Payload)
+		fmt.Printf("Received TCP message of type %s from client %d", message.Type, message.ClientID)
 		s.MessageQueue.Enqueue(message)
 	}
 }
 
 // WriteMessageToTCP writes a Message to a TCP connection
-func WriteMessageToTCP(conn net.Conn, msg *messages.Message) error {
+func WriteMessageToTCP(conn net.Conn, msg interface{}) error {
 	jsonData, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to serialize message: %v", err)

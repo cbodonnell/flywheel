@@ -23,7 +23,7 @@ type ClientManager struct {
 	clients     map[uint32]*Client
 	clientsLock sync.RWMutex
 	nextID      uint32
-	// listener UDP connection used for broadcasting
+	// UDP connection for broadcasting to clients
 	udpConn *net.UDPConn
 }
 
@@ -43,7 +43,7 @@ func (cm *ClientManager) SetUDPConn(conn *net.UDPConn) {
 // GetUDPConn returns the UDP listener connection for all clients
 func (cm *ClientManager) GetUDPConn() *net.UDPConn {
 	if cm.udpConn == nil {
-		panic("UDP connection is not set")
+		panic("UDP connection is not set on ClientManager")
 	}
 	return cm.udpConn
 }
@@ -128,6 +128,5 @@ func (cm *ClientManager) GenerateUniqueID(maxRetries int) (uint32, error) {
 		cm.nextID++
 	}
 
-	// Return an error or a sentinel value when maximum retries are reached
 	return 0, fmt.Errorf("failed to generate a unique ID after %d attempts", maxRetries)
 }

@@ -1,6 +1,7 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -10,12 +11,20 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/servers"
 )
 
-// GameState represents the generic game state (to be implemented based on your needs)
 type GameState struct {
-	// Add fields based on your game's state
+	// Players maps client IDs to player states
+	Players map[uint32]*PlayerState `json:"players"`
 }
 
-// GameManager represents the game manager.
+type PlayerState struct {
+	P Position `json:"p"`
+}
+
+type Position struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
 type GameManager struct {
 	clientManager *clients.ClientManager
 	messageQueue  *queue.MemoryQueue
@@ -29,9 +38,11 @@ func NewGameManager(clientManager *clients.ClientManager, messageQueue *queue.Me
 	return &GameManager{
 		clientManager: clientManager,
 		messageQueue:  messageQueue,
-		gameState:     &GameState{}, // Initialize your game state here
-		loopInterval:  loopInterval,
-		stopChannel:   make(chan struct{}),
+		gameState: &GameState{
+			Players: make(map[uint32]*PlayerState),
+		},
+		loopInterval: loopInterval,
+		stopChannel:  make(chan struct{}),
 	}
 }
 
@@ -69,25 +80,44 @@ func (gm *GameManager) processMessages() {
 		}
 		fmt.Printf("Received message: %+v\n", message)
 
-		// TODO: handle message based on its type
-		// this will update the game state
+		switch message.Type {
+		case messages.MessageTypeClientPlayerUpdate:
+			playerState := &PlayerState{}
+			err := json.Unmarshal(message.Payload, playerState)
+			if err != nil {
+				fmt.Printf("Error: failed to unmarshal player state: %v\n", err)
+				continue
+			}
+			fmt.Printf("Received client player update: %+v\n", playerState)
+			gm.gameState.Players[message.ClientID] = playerState
+		default:
+			fmt.Printf("Error: unhandled message type: %s\n", message.Type)
+		}
+
 	}
 }
 
 func (gm *GameManager) broadcastGameState() {
+	payload, err := json.Marshal(gm.gameState)
+	if err != nil {
+		fmt.Printf("Error: failed to marshal game state: %v\n", err)
+		return
+	}
+
 	clients := gm.clientManager.GetClients()
 	for _, client := range clients {
 		message := &messages.Message{
-			ClientID: 0,
-			Type:     messages.MessageTypeServerUpdate,
-			Payload:  gm.gameState,
+			ClientID: client.ID,
+			Type:     messages.MessageTypeServerGameUpdate,
+			Payload:  payload,
 		}
 
 		if client.UDPAddress == nil {
-			fmt.Printf("Error: client %d does not have a UDP address\n", client.ID)
+			// TODO: trace logging for stuff like this
+			// fmt.Printf("Error: client %d does not have a UDP address\n", client.ID)
 			continue
 		}
-		// TODO: some messages will be over UDP, some over TCP
+		// TODO: realiable vs unreliable messages
 		err := servers.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
 		if err != nil {
 			fmt.Printf("Error: failed to write message to UDP connection for client %d: %v\n", client.ID, err)

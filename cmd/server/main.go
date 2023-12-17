@@ -11,9 +11,13 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/game"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/servers"
+	"github.com/cbodonnell/flywheel/pkg/version"
 )
 
 func main() {
+	// TODO: real logging
+	fmt.Printf("Starting server version %s\n", version.Get())
+
 	tcpPort := "8888"
 	udpPort := "8889"
 
@@ -25,11 +29,9 @@ func main() {
 	go tcpServer.Start()
 	go udpServer.Start()
 
-	// Start the game loop
-	gameManager := game.NewGameManager(clientManager, messageQueue, 100*time.Millisecond)
+	gameLoopInterval := 100 * time.Millisecond // 10 FPS
+	gameManager := game.NewGameManager(clientManager, messageQueue, gameLoopInterval)
 	go gameManager.StartGameLoop()
-
-	fmt.Println("Server started.")
 
 	// Gracefully handle Ctrl+C to stop the program
 	stopSignal := make(chan os.Signal, 1)
