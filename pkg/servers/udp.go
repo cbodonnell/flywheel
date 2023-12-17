@@ -57,13 +57,14 @@ func (s *UDPServer) Start() {
 			continue
 		}
 
+		// TODO: right now a client could easily spoof another client's ID
 		s.ClientManager.SetUDPAddress(message.ClientID, addr)
 		s.MessageQueue.Enqueue(message)
 	}
 }
 
 // WriteMessageToUDP writes a Message to a UDP connection
-func WriteMessageToUDP(conn *net.UDPConn, addr *net.UDPAddr, msg interface{}) error {
+func WriteMessageToUDP(conn *net.UDPConn, addr *net.UDPAddr, msg *messages.Message) error {
 	jsonData, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to serialize message: %v", err)

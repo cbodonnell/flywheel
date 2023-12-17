@@ -107,7 +107,7 @@ func (gm *GameManager) broadcastGameState() {
 	clients := gm.clientManager.GetClients()
 	for _, client := range clients {
 		message := &messages.Message{
-			ClientID: client.ID,
+			ClientID: 0, // ClientID 0 means the message is from the server
 			Type:     messages.MessageTypeServerGameUpdate,
 			Payload:  payload,
 		}
