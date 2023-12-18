@@ -57,9 +57,22 @@ func (s *UDPServer) Start() {
 			continue
 		}
 
-		// TODO: right now a client could easily spoof another client's ID
+		// TODO: real identity verification
 		s.ClientManager.SetUDPAddress(message.ClientID, addr)
-		s.MessageQueue.Enqueue(message)
+
+		switch message.Type {
+		case messages.MessageTypeClientPing:
+			m := &messages.Message{
+				ClientID: 0,
+				Type:     messages.MessageTypeServerPong,
+				Payload:  nil,
+			}
+			if err := WriteMessageToUDP(udpConn, addr, m); err != nil {
+				fmt.Println("Failed to send server pong:", err)
+			}
+		default:
+			s.MessageQueue.Enqueue(message)
+		}
 	}
 }
 

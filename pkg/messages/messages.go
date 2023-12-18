@@ -10,6 +10,8 @@ const (
 // Message types
 const (
 	MessageTypeServerAssignID     = "aid"
+	MessageTypeClientPing         = "cp"
+	MessageTypeServerPong         = "sp"
 	MessageTypeClientPlayerUpdate = "cpu"
 	MessageTypeServerGameUpdate   = "sgu"
 )
