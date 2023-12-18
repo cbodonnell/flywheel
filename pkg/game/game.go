@@ -12,6 +12,8 @@ import (
 )
 
 type GameState struct {
+	// Timestamp is the time at which the game state was generated
+	Timestamp int64 `json:"timestamp"`
 	// Players maps client IDs to player states
 	Players map[uint32]*PlayerState `json:"players"`
 }
@@ -53,9 +55,9 @@ func (gm *GameManager) StartGameLoop() {
 
 	for {
 		select {
-		case <-ticker.C:
-			// Game loop logic here
-			gm.processMessages()
+		case t := <-ticker.C:
+			timestamp := t.UnixMilli()
+			gm.processMessages(timestamp)
 			gm.broadcastGameState()
 
 		case <-gm.stopChannel:
@@ -70,7 +72,7 @@ func (gm *GameManager) StopGameLoop() {
 	close(gm.stopChannel)
 }
 
-func (gm *GameManager) processMessages() {
+func (gm *GameManager) processMessages(timestamp int64) {
 	pendingMessages := gm.messageQueue.ReadAllMessages()
 	for _, item := range pendingMessages {
 		message, ok := item.(*messages.Message)
@@ -93,8 +95,9 @@ func (gm *GameManager) processMessages() {
 		default:
 			fmt.Printf("Error: unhandled message type: %s\n", message.Type)
 		}
-
 	}
+
+	gm.gameState.Timestamp = timestamp
 }
 
 func (gm *GameManager) broadcastGameState() {
