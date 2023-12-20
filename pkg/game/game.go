@@ -62,6 +62,7 @@ func (gm *GameManager) StartGameLoop() {
 		select {
 		case t := <-ticker.C:
 			timestamp := t.UnixMilli()
+			// fmt.Printf("Game tick at %d\n", timestamp) // Log statement to indicate a tick has occurred
 			gm.processMessages(timestamp)
 			gm.broadcastGameState()
 
@@ -122,6 +123,9 @@ func (gm *GameManager) broadcastGameState() {
 			Type:     messages.MessageTypeServerGameUpdate,
 			Payload:  payload,
 		}
+
+		// Log the payload for debugging
+		// fmt.Printf("Broadcasting game state: %s\n", string(payload))
 
 		if client.UDPAddress == nil {
 			// TODO: trace logging for stuff like this
