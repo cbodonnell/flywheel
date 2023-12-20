@@ -12,7 +12,6 @@ const (
 	MessageTypeServerAssignID     = "aid"
 	MessageTypeClientPing         = "cp"
 	MessageTypeServerPong         = "sp"
-	MessageTypeClientPlayerInput = "cpi"
 	MessageTypeClientPlayerUpdate = "cpu"
 	MessageTypeServerGameUpdate   = "sgu"
 )

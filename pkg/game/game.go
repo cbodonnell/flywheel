@@ -27,12 +27,6 @@ type Position struct {
 	Y float64 `json:"y"`
 }
 
-type ClientPlayerInput struct {
-    Horizontal float64 `json:"horizontal"`
-    Vertical   float64 `json:"vertical"`
-    Jump       bool    `json:"jump"`
-}
-
 type GameManager struct {
 	clientManager *clients.ClientManager
 	messageQueue  *queue.MemoryQueue
@@ -89,16 +83,6 @@ func (gm *GameManager) processMessages(timestamp int64) {
 		fmt.Printf("Received message: %+v\n", message)
 
 		switch message.Type {
-
-		case messages.MessageTypeClientPlayerInput:
-			clientPlayerInput := &ClientPlayerInput{}
-			if err := json.Unmarshal(message.Payload, clientPlayerInput); err != nil {
-				fmt.Printf("Error unmarshalling player input: %v\n", err)
-				continue
-			}
-			fmt.Printf("Received client player input: %+v\n", clientPlayerInput)
-			gm.handlePlayerInput(message.ClientID, *clientPlayerInput)		
-		
 		case messages.MessageTypeClientPlayerUpdate:
 			playerState := &PlayerState{}
 			err := json.Unmarshal(message.Payload, playerState)
@@ -114,25 +98,6 @@ func (gm *GameManager) processMessages(timestamp int64) {
 	}
 
 	gm.gameState.Timestamp = timestamp
-}
-
-func (gm *GameManager) handlePlayerInput(clientID uint32, input ClientPlayerInput) {
-    // Log the received input for testing
-    fmt.Printf("Received input from client %d: horizontal=%f, vertical=%f, jump=%v\n",
-               clientID, input.Horizontal, input.Vertical, input.Jump)
-	
-	playerState, exists := gm.gameState.Players[clientID]
-    if !exists {
-        playerState = &PlayerState{/* initialize with default state */}
-        gm.gameState.Players[clientID] = playerState
-    }
-
-    // Update player state based on received input
-    // Example: Adjust player's position, handle jumping, etc.
-    // ...
-
-    // Implement necessary physics or game logic here
-    // ...
 }
 
 func (gm *GameManager) broadcastGameState() {
