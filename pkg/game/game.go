@@ -17,6 +17,11 @@ type GameState struct {
 	// Players maps client IDs to player states
 	Players map[uint32]*PlayerState `json:"players"`
 }
+type ClientPlayerUpdate struct {
+	// Timestamp is the client time at which position is recorded
+    Timestamp   int64       `json:"timestamp"`
+    PlayerState PlayerState `json:"playerState"`
+}
 
 type PlayerState struct {
 	P Position `json:"p"`
@@ -73,30 +78,33 @@ func (gm *GameManager) StopGameLoop() {
 }
 
 func (gm *GameManager) processMessages(timestamp int64) {
-	pendingMessages := gm.messageQueue.ReadAllMessages()
-	for _, item := range pendingMessages {
-		message, ok := item.(*messages.Message)
-		if !ok {
-			fmt.Println("Error: failed to cast message to messages.Message")
-			continue
-		}
-		fmt.Printf("Received message: %+v\n", message)
+    pendingMessages := gm.messageQueue.ReadAllMessages()
+    for _, item := range pendingMessages {
+        message, ok := item.(*messages.Message)
+        if !ok {
+            fmt.Println("Error: failed to cast message to messages.Message")
+            continue
+        }
+        fmt.Printf("Received message: %+v\n", message)
 
-		switch message.Type {
-		case messages.MessageTypeClientPlayerUpdate:
-			playerState := &PlayerState{}
-			err := json.Unmarshal(message.Payload, playerState)
-			if err != nil {
-				fmt.Printf("Error: failed to unmarshal player state: %v\n", err)
-				continue
-			}
-			fmt.Printf("Received client player update: %+v\n", playerState)
-			gm.gameState.Players[message.ClientID] = playerState
+        switch message.Type {
+        case messages.MessageTypeClientPlayerUpdate:
+            var clientPlayerUpdate ClientPlayerUpdate
+            fmt.Printf("Raw JSON payload: %s\n", string(message.Payload))
+            err := json.Unmarshal(message.Payload, &clientPlayerUpdate)
+            if err != nil {
+                fmt.Printf("Error: failed to unmarshal player state: %v\n", err)
+                continue
+            }
+            fmt.Printf("Received client player update - Timestamp: %d, Position: {X: %f, Y: %f}\n", 
+				clientPlayerUpdate.Timestamp, 
+				clientPlayerUpdate.PlayerState.P.X, 
+				clientPlayerUpdate.PlayerState.P.Y)
+            gm.gameState.Players[message.ClientID] = &clientPlayerUpdate.PlayerState
 		default:
 			fmt.Printf("Error: unhandled message type: %s\n", message.Type)
 		}
 	}
-
 	gm.gameState.Timestamp = timestamp
 }
 
