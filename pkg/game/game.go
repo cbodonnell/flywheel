@@ -96,6 +96,7 @@ func (gm *GameManager) processMessages(timestamp int64) {
 				fmt.Printf("Error unmarshalling player input: %v\n", err)
 				continue
 			}
+			fmt.Printf("Received client player input: %+v\n", clientPlayerInput)
 			gm.handlePlayerInput(message.ClientID, *clientPlayerInput)		
 		
 		case messages.MessageTypeClientPlayerUpdate:
