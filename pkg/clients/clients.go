@@ -75,7 +75,7 @@ func (cm *ClientManager) AddClient(tcpConn net.Conn) (uint32, error) {
 	return clientID, nil
 }
 
-// RemoveClient removes a client from the manager.
+// RemoveClient removes a client from the manager
 func (cm *ClientManager) RemoveClient(clientID uint32) {
 	cm.clientsLock.Lock()
 	defer cm.clientsLock.Unlock()

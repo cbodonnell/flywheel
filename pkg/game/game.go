@@ -45,7 +45,7 @@ type GameManager struct {
 
 // NewGameManager creates a new game manager.
 func NewGameManager(clientManager *clients.ClientManager, messageQueue *queue.MemoryQueue, loopInterval time.Duration) *GameManager {
-	gm := &GameManager{
+	return &GameManager{
 		clientManager: clientManager,
 		messageQueue:  messageQueue,
 		gameState: &GameState{
@@ -55,8 +55,6 @@ func NewGameManager(clientManager *clients.ClientManager, messageQueue *queue.Me
 		stopChannel:      make(chan struct{}),
 		disconnectEvents: make(chan uint32),
 	}
-
-	return gm
 }
 
 // StartGameLoop starts the game loop.
