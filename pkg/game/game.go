@@ -100,6 +100,7 @@ func (gm *GameManager) processMessages(timestamp int64) {
 			fmt.Printf("Error: unhandled message type: %s\n", message.Type)
 		}
 	}
+
 	gm.gameState.Timestamp = timestamp
 }
 
@@ -117,6 +118,7 @@ func (gm *GameManager) broadcastGameState() {
 			Type:     messages.MessageTypeServerGameUpdate,
 			Payload:  payload,
 		}
+
 		if client.UDPAddress == nil {
 			// TODO: trace logging for stuff like this
 			// fmt.Printf("Error: client %d does not have a UDP address\n", client.ID)
