@@ -17,6 +17,11 @@ type GameState struct {
 	// Players maps client IDs to player states
 	Players map[uint32]*PlayerState `json:"players"`
 }
+type ClientPlayerUpdate struct {
+	// Timestamp is the client time at which position is recorded
+	Timestamp   int64       `json:"timestamp"`
+	PlayerState PlayerState `json:"playerState"`
+}
 
 type PlayerState struct {
 	P Position `json:"p"`
@@ -80,18 +85,17 @@ func (gm *GameManager) processMessages(timestamp int64) {
 			fmt.Println("Error: failed to cast message to messages.Message")
 			continue
 		}
-		fmt.Printf("Received message: %+v\n", message)
+		fmt.Printf("Received message: %+v\n", message.Type)
 
 		switch message.Type {
 		case messages.MessageTypeClientPlayerUpdate:
-			playerState := &PlayerState{}
-			err := json.Unmarshal(message.Payload, playerState)
+			clientPlayerUpdate := &ClientPlayerUpdate{}
+			err := json.Unmarshal(message.Payload, &clientPlayerUpdate)
 			if err != nil {
 				fmt.Printf("Error: failed to unmarshal player state: %v\n", err)
 				continue
 			}
-			fmt.Printf("Received client player update: %+v\n", playerState)
-			gm.gameState.Players[message.ClientID] = playerState
+			gm.gameState.Players[message.ClientID] = &clientPlayerUpdate.PlayerState
 		default:
 			fmt.Printf("Error: unhandled message type: %s\n", message.Type)
 		}
@@ -124,6 +128,8 @@ func (gm *GameManager) broadcastGameState() {
 		err := servers.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
 		if err != nil {
 			fmt.Printf("Error: failed to write message to UDP connection for client %d: %v\n", client.ID, err)
+		} else {
+			fmt.Printf("Sent message: %s\n", message.Type)
 		}
 	}
 }
