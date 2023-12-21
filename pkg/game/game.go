@@ -62,7 +62,6 @@ func (gm *GameManager) StartGameLoop() {
 		select {
 		case t := <-ticker.C:
 			timestamp := t.UnixMilli()
-			// fmt.Printf("Game tick at %d\n", timestamp) // Log statement to indicate a tick has occurred
 			gm.processMessages(timestamp)
 			gm.broadcastGameState()
 
@@ -90,17 +89,12 @@ func (gm *GameManager) processMessages(timestamp int64) {
 
 		switch message.Type {
 		case messages.MessageTypeClientPlayerUpdate:
-			var clientPlayerUpdate ClientPlayerUpdate
-			// fmt.Printf("Raw JSON payload: %s\n", string(message.Payload))
+			clientPlayerUpdate := &ClientPlayerUpdate{}
 			err := json.Unmarshal(message.Payload, &clientPlayerUpdate)
 			if err != nil {
 				fmt.Printf("Error: failed to unmarshal player state: %v\n", err)
 				continue
 			}
-			// fmt.Printf("Received client player update - Timestamp: %d, Position: {X: %f, Y: %f}\n",
-			//  	clientPlayerUpdate.Timestamp,
-			//  	clientPlayerUpdate.PlayerState.P.X,
-			//  	clientPlayerUpdate.PlayerState.P.Y)
 			gm.gameState.Players[message.ClientID] = &clientPlayerUpdate.PlayerState
 		default:
 			fmt.Printf("Error: unhandled message type: %s\n", message.Type)
