@@ -104,7 +104,6 @@ func (gm *GameManager) processMessages(timestamp int64) {
 }
 
 func (gm *GameManager) broadcastGameState() {
-	fmt.Printf("Preparing to broadcast game state: %+v\n", gm.gameState)
 	payload, err := json.Marshal(gm.gameState)
 	if err != nil {
 		fmt.Printf("Error: failed to marshal game state: %v\n", err)
@@ -118,10 +117,6 @@ func (gm *GameManager) broadcastGameState() {
 			Type:     messages.MessageTypeServerGameUpdate,
 			Payload:  payload,
 		}
-
-		// Log the payload for debugging
-		fmt.Printf("Broadcasting game state: %s\n", string(payload))
-
 		if client.UDPAddress == nil {
 			// TODO: trace logging for stuff like this
 			// fmt.Printf("Error: client %d does not have a UDP address\n", client.ID)
