@@ -79,10 +79,7 @@ func (cm *ClientManager) AddClient(tcpConn net.Conn) (uint32, error) {
 func (cm *ClientManager) RemoveClient(clientID uint32) {
 	cm.clientsLock.Lock()
 	defer cm.clientsLock.Unlock()
-
-	if _, exists := cm.clients[clientID]; exists {
-		delete(cm.clients, clientID)
-	}
+	delete(cm.clients, clientID)
 }
 
 // SetUDPAddress sets the UDP address of a client
