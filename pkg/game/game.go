@@ -106,13 +106,29 @@ func (gm *GameManager) processMessages(timestamp int64) {
 }
 
 func (gm *GameManager) broadcastGameState() {
-	payload, err := json.Marshal(gm.getConnectedPlayersGameState())
+	// Modify the gm.gameState to include only connected players
+	connectedPlayers := make(map[uint32]*PlayerState)
+
+	// Declare the clients variable outside of the loop
+	clients := gm.clientManager.GetClients()
+
+	// Iterate through connected clients and add their player states to the map
+	for _, client := range clients {
+		playerState, exists := gm.gameState.Players[client.ID]
+		if exists {
+			connectedPlayers[client.ID] = playerState
+		}
+	}
+
+	// Update the gm.gameState.Players map
+	gm.gameState.Players = connectedPlayers
+
+	payload, err := json.Marshal(gm.gameState)
 	if err != nil {
 		fmt.Printf("Error: failed to marshal game state: %v\n", err)
 		return
 	}
 
-	clients := gm.clientManager.GetClients()
 	for _, client := range clients {
 		message := &messages.Message{
 			ClientID: 0, // ClientID 0 means the message is from the server
@@ -132,23 +148,5 @@ func (gm *GameManager) broadcastGameState() {
 		} else {
 			fmt.Printf("Sent message: %s\n", message.Type)
 		}
-	}
-}
-
-func (gm *GameManager) getConnectedPlayersGameState() *GameState {
-	connectedPlayers := make(map[uint32]*PlayerState)
-
-	// Iterate through connected clients and add their player states to the map
-	clients := gm.clientManager.GetClients()
-	for _, client := range clients {
-		playerState, exists := gm.gameState.Players[client.ID]
-		if exists {
-			connectedPlayers[client.ID] = playerState
-		}
-	}
-
-	return &GameState{
-		Timestamp: gm.gameState.Timestamp,
-		Players:   connectedPlayers,
 	}
 }
