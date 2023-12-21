@@ -33,14 +33,12 @@ type Position struct {
 	Y float64 `json:"y"`
 }
 
-// GameManager manages the game state and handles client disconnections.
 type GameManager struct {
-	clientManager    *clients.ClientManager
-	messageQueue     *queue.MemoryQueue
-	gameState        *GameState
-	loopInterval     time.Duration
-	stopChannel      chan struct{}
-	disconnectEvents chan uint32 // Channel to receive client disconnection events
+	clientManager *clients.ClientManager
+	messageQueue  *queue.MemoryQueue
+	gameState     *GameState
+	loopInterval  time.Duration
+	stopChannel   chan struct{}
 }
 
 // NewGameManager creates a new game manager.
@@ -51,9 +49,8 @@ func NewGameManager(clientManager *clients.ClientManager, messageQueue *queue.Me
 		gameState: &GameState{
 			Players: make(map[uint32]*PlayerState),
 		},
-		loopInterval:     loopInterval,
-		stopChannel:      make(chan struct{}),
-		disconnectEvents: make(chan uint32),
+		loopInterval: loopInterval,
+		stopChannel:  make(chan struct{}),
 	}
 }
 
