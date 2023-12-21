@@ -53,11 +53,9 @@ func NewGameManager(clientManager *clients.ClientManager, messageQueue *queue.Me
 		},
 		loopInterval:     loopInterval,
 		stopChannel:      make(chan struct{}),
-		disconnectEvents: make(chan uint32), // Initialize the disconnectEvents channel
+		disconnectEvents: make(chan uint32),
 	}
 
-	// Set the disconnection handler to the game manager itself
-	clientManager.SetDisconnectionHandler(gm)
 	return gm
 }
 
