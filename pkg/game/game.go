@@ -112,9 +112,6 @@ func (gm *GameManager) broadcastGameState() {
 		return
 	}
 
-	// Print the JSON payload for debugging
-	fmt.Printf("Broadcasting game state JSON: %s\n", payload)
-
 	clients := gm.clientManager.GetClients()
 	for _, client := range clients {
 		message := &messages.Message{
