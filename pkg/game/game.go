@@ -158,12 +158,3 @@ func (gm *GameManager) getConnectedPlayersGameState() *GameState {
 		Players:   connectedPlayers,
 	}
 }
-
-// ClientDisconnected is called when a client disconnects.
-func (gm *GameManager) ClientDisconnected(clientID uint32) {
-	// Handle client disconnection here
-	fmt.Printf("Client disconnected: %d\n", clientID)
-
-	// Remove the client from the game state
-	delete(gm.gameState.Players, clientID)
-}
