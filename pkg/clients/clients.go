@@ -18,13 +18,19 @@ type Client struct {
 	UDPAddress *net.UDPAddr
 }
 
+// DisconnectionHandler defines an interface for handling client disconnections
+type DisconnectionHandler interface {
+	ClientDisconnected(clientID uint32)
+}
+
 // ClientManager manages connected clients
 type ClientManager struct {
 	clients     map[uint32]*Client
 	clientsLock sync.RWMutex
 	nextID      uint32
 	// UDP connection for broadcasting to clients
-	udpConn *net.UDPConn
+	udpConn           *net.UDPConn
+	disconnectHandler DisconnectionHandler
 }
 
 // NewClientManager creates a new ClientManager
@@ -75,11 +81,23 @@ func (cm *ClientManager) AddClient(tcpConn net.Conn) (uint32, error) {
 	return clientID, nil
 }
 
-// RemoveClient removes a client from the manager
+// SetDisconnectionHandler sets the disconnection handler.
+func (cm *ClientManager) SetDisconnectionHandler(handler DisconnectionHandler) {
+	cm.disconnectHandler = handler
+}
+
+// RemoveClient removes a client from the manager.
 func (cm *ClientManager) RemoveClient(clientID uint32) {
 	cm.clientsLock.Lock()
 	defer cm.clientsLock.Unlock()
-	delete(cm.clients, clientID)
+
+	if _, exists := cm.clients[clientID]; exists {
+		delete(cm.clients, clientID)
+		// Notify about the disconnection
+		if cm.disconnectHandler != nil {
+			cm.disconnectHandler.ClientDisconnected(clientID)
+		}
+	}
 }
 
 // SetUDPAddress sets the UDP address of a client

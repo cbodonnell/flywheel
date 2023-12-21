@@ -17,6 +17,7 @@ type GameState struct {
 	// Players maps client IDs to player states
 	Players map[uint32]*PlayerState `json:"players"`
 }
+
 type ClientPlayerUpdate struct {
 	// Timestamp is the client time at which position is recorded
 	Timestamp   int64       `json:"timestamp"`
@@ -32,25 +33,32 @@ type Position struct {
 	Y float64 `json:"y"`
 }
 
+// GameManager manages the game state and handles client disconnections.
 type GameManager struct {
-	clientManager *clients.ClientManager
-	messageQueue  *queue.MemoryQueue
-	gameState     *GameState
-	loopInterval  time.Duration
-	stopChannel   chan struct{}
+	clientManager    *clients.ClientManager
+	messageQueue     *queue.MemoryQueue
+	gameState        *GameState
+	loopInterval     time.Duration
+	stopChannel      chan struct{}
+	disconnectEvents chan uint32 // Channel to receive client disconnection events
 }
 
 // NewGameManager creates a new game manager.
 func NewGameManager(clientManager *clients.ClientManager, messageQueue *queue.MemoryQueue, loopInterval time.Duration) *GameManager {
-	return &GameManager{
+	gm := &GameManager{
 		clientManager: clientManager,
 		messageQueue:  messageQueue,
 		gameState: &GameState{
 			Players: make(map[uint32]*PlayerState),
 		},
-		loopInterval: loopInterval,
-		stopChannel:  make(chan struct{}),
+		loopInterval:     loopInterval,
+		stopChannel:      make(chan struct{}),
+		disconnectEvents: make(chan uint32), // Initialize the disconnectEvents channel
 	}
+
+	// Set the disconnection handler to the game manager itself
+	clientManager.SetDisconnectionHandler(gm)
+	return gm
 }
 
 // StartGameLoop starts the game loop.
@@ -105,11 +113,14 @@ func (gm *GameManager) processMessages(timestamp int64) {
 }
 
 func (gm *GameManager) broadcastGameState() {
-	payload, err := json.Marshal(gm.gameState)
+	payload, err := json.Marshal(gm.getConnectedPlayersGameState())
 	if err != nil {
 		fmt.Printf("Error: failed to marshal game state: %v\n", err)
 		return
 	}
+
+	// Print the JSON payload for debugging
+	fmt.Printf("Broadcasting game state JSON: %s\n", payload)
 
 	clients := gm.clientManager.GetClients()
 	for _, client := range clients {
@@ -132,4 +143,31 @@ func (gm *GameManager) broadcastGameState() {
 			fmt.Printf("Sent message: %s\n", message.Type)
 		}
 	}
+}
+
+func (gm *GameManager) getConnectedPlayersGameState() *GameState {
+	connectedPlayers := make(map[uint32]*PlayerState)
+
+	// Iterate through connected clients and add their player states to the map
+	clients := gm.clientManager.GetClients()
+	for _, client := range clients {
+		playerState, exists := gm.gameState.Players[client.ID]
+		if exists {
+			connectedPlayers[client.ID] = playerState
+		}
+	}
+
+	return &GameState{
+		Timestamp: gm.gameState.Timestamp,
+		Players:   connectedPlayers,
+	}
+}
+
+// ClientDisconnected is called when a client disconnects.
+func (gm *GameManager) ClientDisconnected(clientID uint32) {
+	// Handle client disconnection here
+	fmt.Printf("Client disconnected: %d\n", clientID)
+
+	// Remove the client from the game state
+	delete(gm.gameState.Players, clientID)
 }
