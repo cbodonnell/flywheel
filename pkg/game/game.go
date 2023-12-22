@@ -17,6 +17,7 @@ type GameState struct {
 	// Players maps client IDs to player states
 	Players map[uint32]*PlayerState `json:"players"`
 }
+
 type ClientPlayerUpdate struct {
 	// Timestamp is the client time at which position is recorded
 	Timestamp   int64       `json:"timestamp"`
@@ -105,13 +106,29 @@ func (gm *GameManager) processMessages(timestamp int64) {
 }
 
 func (gm *GameManager) broadcastGameState() {
+	// Modify the gm.gameState to include only connected players
+	connectedPlayers := make(map[uint32]*PlayerState)
+
+	// Declare the clients variable outside of the loop
+	clients := gm.clientManager.GetClients()
+
+	// Iterate through connected clients and add their player states to the map
+	for _, client := range clients {
+		playerState, exists := gm.gameState.Players[client.ID]
+		if exists {
+			connectedPlayers[client.ID] = playerState
+		}
+	}
+
+	// Update the gm.gameState.Players map
+	gm.gameState.Players = connectedPlayers
+
 	payload, err := json.Marshal(gm.gameState)
 	if err != nil {
 		fmt.Printf("Error: failed to marshal game state: %v\n", err)
 		return
 	}
 
-	clients := gm.clientManager.GetClients()
 	for _, client := range clients {
 		message := &messages.Message{
 			ClientID: 0, // ClientID 0 means the message is from the server
