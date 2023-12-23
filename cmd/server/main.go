@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -16,6 +17,7 @@ import (
 func main() {
 	// TODO: real logging
 	fmt.Printf("Starting server version %s\n", version.Get())
+	ctx := context.Background()
 
 	tcpPort := "8888"
 	udpPort := "8889"
@@ -32,8 +34,8 @@ func main() {
 	if connStr == "" {
 		panic("DATABASE_URL environment variable must be set")
 	}
-	repository := repositories.NewPostgresRepository(connStr)
-	defer repository.Close()
+	repository := repositories.NewPostgresRepository(ctx, connStr)
+	defer repository.Close(ctx)
 
 	gameLoopInterval := 100 * time.Millisecond // 10 FPS
 	gameManager := game.NewGameManager(game.NewGameManagerOptions{
@@ -44,5 +46,5 @@ func main() {
 	})
 
 	fmt.Println("Starting game loop")
-	gameManager.StartGameLoop()
+	gameManager.StartGameLoop(ctx)
 }

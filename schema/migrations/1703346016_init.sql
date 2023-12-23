@@ -23,8 +23,8 @@ CREATE TABLE IF NOT EXISTS player_states (
 CREATE TABLE IF NOT EXISTS player_positions (
     timestamp bigint,
     player_id integer,
-    x_position float NOT NULL,
-    y_position float NOT NULL,
+    x float NOT NULL,
+    y float NOT NULL,
     -- Primary key constraint
     PRIMARY KEY (timestamp, player_id),
     -- Foreign key constraints

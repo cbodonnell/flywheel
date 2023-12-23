@@ -1,44 +1,24 @@
 package game
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/cbodonnell/flywheel/pkg/clients"
+	"github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/servers"
 )
 
-type GameState struct {
-	// Timestamp is the time at which the game state was generated
-	Timestamp int64 `json:"timestamp"`
-	// Players maps client IDs to player states
-	Players map[uint32]*PlayerState `json:"players"`
-}
-
-type ClientPlayerUpdate struct {
-	// Timestamp is the client time at which position is recorded
-	Timestamp   int64        `json:"timestamp"`
-	PlayerState *PlayerState `json:"playerState"`
-}
-
-type PlayerState struct {
-	P Position `json:"p"`
-}
-
-type Position struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
-}
-
 type GameManager struct {
 	clientManager *clients.ClientManager
 	messageQueue  *queue.MemoryQueue
 	repository    repositories.Repository
-	gameState     *GameState
+	gameState     *types.GameState
 	loopInterval  time.Duration
 	stopChannel   chan struct{}
 }
@@ -56,16 +36,16 @@ func NewGameManager(opts NewGameManagerOptions) *GameManager {
 		clientManager: opts.ClientManager,
 		messageQueue:  opts.MessageQueue,
 		repository:    opts.Repository,
-		gameState: &GameState{
-			Players: make(map[uint32]*PlayerState),
-		},
-		loopInterval: opts.LoopInterval,
-		stopChannel:  make(chan struct{}),
+		loopInterval:  opts.LoopInterval,
+		stopChannel:   make(chan struct{}),
 	}
 }
 
 // StartGameLoop starts the game loop.
-func (gm *GameManager) StartGameLoop() {
+func (gm *GameManager) StartGameLoop(ctx context.Context) {
+	// TODO: load player data when they connect
+	gm.loadGameState(ctx)
+
 	ticker := time.NewTicker(gm.loopInterval)
 	defer ticker.Stop()
 
@@ -75,12 +55,32 @@ func (gm *GameManager) StartGameLoop() {
 			gm.gameState.Timestamp = t.UnixMilli()
 			gm.processMessages()
 			gm.removeDisconnectedPlayers()
-			// TODO: save game state to database
+			// TODO: save non-critical data periodically, when the server shuts down, and when a player disconnects.
+			// save critical data when it changes
+			// TODO: save concurrently so it doesn't block the game loop
+			gm.saveGameState(ctx)
 			gm.broadcastGameState()
 
 		case <-gm.stopChannel:
 			fmt.Println("Game loop stopped.")
 			return
+		}
+	}
+}
+
+// loadGameState loads the game state from the repository if it exists.
+// Otherwise, it initializes an empty game state.
+func (gm *GameManager) loadGameState(ctx context.Context) {
+	lastGameState, err := gm.repository.LoadGameState(ctx)
+	if err != nil {
+		fmt.Printf("Error: failed to load game state: %v\n", err)
+	}
+	if lastGameState != nil {
+		gm.gameState = lastGameState
+	} else {
+		fmt.Println("No game state found, initializing empty game state")
+		gm.gameState = &types.GameState{
+			Players: make(map[uint32]*types.PlayerState),
 		}
 	}
 }
@@ -103,7 +103,7 @@ func (gm *GameManager) processMessages() {
 
 		switch message.Type {
 		case messages.MessageTypeClientPlayerUpdate:
-			clientPlayerUpdate := &ClientPlayerUpdate{}
+			clientPlayerUpdate := &messages.ClientPlayerUpdate{}
 			err := json.Unmarshal(message.Payload, clientPlayerUpdate)
 			if err != nil {
 				fmt.Printf("Error: failed to unmarshal player state: %v\n", err)
@@ -123,6 +123,14 @@ func (gm *GameManager) removeDisconnectedPlayers() {
 		if !gm.clientManager.Exists(clientID) {
 			delete(gm.gameState.Players, clientID)
 		}
+	}
+}
+
+// saveGameState saves the game state to the repository.
+func (gm *GameManager) saveGameState(ctx context.Context) {
+	err := gm.repository.SaveGameState(ctx, gm.gameState)
+	if err != nil {
+		fmt.Printf("Error: failed to save game state: %v\n", err)
 	}
 }
 
