@@ -20,8 +20,8 @@ type GameState struct {
 
 type ClientPlayerUpdate struct {
 	// Timestamp is the client time at which position is recorded
-	Timestamp   int64       `json:"timestamp"`
-	PlayerState PlayerState `json:"playerState"`
+	Timestamp   int64        `json:"timestamp"`
+	PlayerState *PlayerState `json:"playerState"`
 }
 
 type PlayerState struct {
@@ -41,7 +41,6 @@ type GameManager struct {
 	stopChannel   chan struct{}
 }
 
-// NewGameManager creates a new game manager.
 func NewGameManager(clientManager *clients.ClientManager, messageQueue *queue.MemoryQueue, loopInterval time.Duration) *GameManager {
 	return &GameManager{
 		clientManager: clientManager,
@@ -62,8 +61,10 @@ func (gm *GameManager) StartGameLoop() {
 	for {
 		select {
 		case t := <-ticker.C:
-			timestamp := t.UnixMilli()
-			gm.processMessages(timestamp)
+			gm.gameState.Timestamp = t.UnixMilli()
+			gm.processMessages()
+			gm.removeDisconnectedPlayers()
+			// TODO: save game state to database
 			gm.broadcastGameState()
 
 		case <-gm.stopChannel:
@@ -78,7 +79,9 @@ func (gm *GameManager) StopGameLoop() {
 	close(gm.stopChannel)
 }
 
-func (gm *GameManager) processMessages(timestamp int64) {
+// processMessages processes all pending messages in the queue
+// and updates the game state accordingly.
+func (gm *GameManager) processMessages() {
 	pendingMessages := gm.messageQueue.ReadAllMessages()
 	for _, item := range pendingMessages {
 		message, ok := item.(*messages.Message)
@@ -86,50 +89,41 @@ func (gm *GameManager) processMessages(timestamp int64) {
 			fmt.Println("Error: failed to cast message to messages.Message")
 			continue
 		}
-		fmt.Printf("Received message: %+v\n", message.Type)
 
 		switch message.Type {
 		case messages.MessageTypeClientPlayerUpdate:
 			clientPlayerUpdate := &ClientPlayerUpdate{}
-			err := json.Unmarshal(message.Payload, &clientPlayerUpdate)
+			err := json.Unmarshal(message.Payload, clientPlayerUpdate)
 			if err != nil {
 				fmt.Printf("Error: failed to unmarshal player state: %v\n", err)
 				continue
 			}
-			gm.gameState.Players[message.ClientID] = &clientPlayerUpdate.PlayerState
+			// TODO: validate the update before applying it
+			gm.gameState.Players[message.ClientID] = clientPlayerUpdate.PlayerState
 		default:
 			fmt.Printf("Error: unhandled message type: %s\n", message.Type)
 		}
 	}
-
-	gm.gameState.Timestamp = timestamp
 }
 
-func (gm *GameManager) broadcastGameState() {
-	// Modify the gm.gameState to include only connected players
-	connectedPlayers := make(map[uint32]*PlayerState)
-
-	// Declare the clients variable outside of the loop
-	clients := gm.clientManager.GetClients()
-
-	// Iterate through connected clients and add their player states to the map
-	for _, client := range clients {
-		playerState, exists := gm.gameState.Players[client.ID]
-		if exists {
-			connectedPlayers[client.ID] = playerState
+// removeDisconnectedPlayers removes disconnected clients from the game state.
+func (gm *GameManager) removeDisconnectedPlayers() {
+	for clientID := range gm.gameState.Players {
+		if !gm.clientManager.Exists(clientID) {
+			delete(gm.gameState.Players, clientID)
 		}
 	}
+}
 
-	// Update the gm.gameState.Players map
-	gm.gameState.Players = connectedPlayers
-
+// broadcastGameState sends the game state to connected clients.
+func (gm *GameManager) broadcastGameState() {
 	payload, err := json.Marshal(gm.gameState)
 	if err != nil {
 		fmt.Printf("Error: failed to marshal game state: %v\n", err)
 		return
 	}
 
-	for _, client := range clients {
+	for _, client := range gm.clientManager.GetClients() {
 		message := &messages.Message{
 			ClientID: 0, // ClientID 0 means the message is from the server
 			Type:     messages.MessageTypeServerGameUpdate,
@@ -141,7 +135,7 @@ func (gm *GameManager) broadcastGameState() {
 			// fmt.Printf("Error: client %d does not have a UDP address\n", client.ID)
 			continue
 		}
-		// TODO: realiable vs unreliable messages
+		// TODO: reliable vs unreliable messages
 		err := servers.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
 		if err != nil {
 			fmt.Printf("Error: failed to write message to UDP connection for client %d: %v\n", client.ID, err)
