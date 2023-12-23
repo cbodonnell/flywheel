@@ -8,6 +8,7 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/clients"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
+	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/servers"
 )
 
@@ -36,19 +37,29 @@ type Position struct {
 type GameManager struct {
 	clientManager *clients.ClientManager
 	messageQueue  *queue.MemoryQueue
+	repository    repositories.Repository
 	gameState     *GameState
 	loopInterval  time.Duration
 	stopChannel   chan struct{}
 }
 
-func NewGameManager(clientManager *clients.ClientManager, messageQueue *queue.MemoryQueue, loopInterval time.Duration) *GameManager {
+// NewGameManagerOptions contains options for creating a new GameManager.
+type NewGameManagerOptions struct {
+	ClientManager *clients.ClientManager
+	MessageQueue  *queue.MemoryQueue
+	Repository    repositories.Repository
+	LoopInterval  time.Duration
+}
+
+func NewGameManager(opts NewGameManagerOptions) *GameManager {
 	return &GameManager{
-		clientManager: clientManager,
-		messageQueue:  messageQueue,
+		clientManager: opts.ClientManager,
+		messageQueue:  opts.MessageQueue,
+		repository:    opts.Repository,
 		gameState: &GameState{
 			Players: make(map[uint32]*PlayerState),
 		},
-		loopInterval: loopInterval,
+		loopInterval: opts.LoopInterval,
 		stopChannel:  make(chan struct{}),
 	}
 }

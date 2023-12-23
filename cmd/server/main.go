@@ -3,13 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/cbodonnell/flywheel/pkg/clients"
 	"github.com/cbodonnell/flywheel/pkg/game"
 	"github.com/cbodonnell/flywheel/pkg/queue"
+	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/servers"
 	"github.com/cbodonnell/flywheel/pkg/version"
 )
@@ -29,16 +28,21 @@ func main() {
 	go tcpServer.Start()
 	go udpServer.Start()
 
+	connStr := os.Getenv("DATABASE_URL")
+	if connStr == "" {
+		panic("DATABASE_URL environment variable must be set")
+	}
+	repository := repositories.NewPostgresRepository(connStr)
+	defer repository.Close()
+
 	gameLoopInterval := 100 * time.Millisecond // 10 FPS
-	gameManager := game.NewGameManager(clientManager, messageQueue, gameLoopInterval)
-	go gameManager.StartGameLoop()
+	gameManager := game.NewGameManager(game.NewGameManagerOptions{
+		ClientManager: clientManager,
+		MessageQueue:  messageQueue,
+		Repository:    repository,
+		LoopInterval:  gameLoopInterval,
+	})
 
-	// Gracefully handle Ctrl+C to stop the program
-	stopSignal := make(chan os.Signal, 1)
-	signal.Notify(stopSignal, os.Interrupt, syscall.SIGTERM)
-	<-stopSignal
-
-	// Perform cleanup or other graceful shutdown tasks here
-
-	fmt.Println("Shutting down...")
+	fmt.Println("Starting game loop")
+	gameManager.StartGameLoop()
 }

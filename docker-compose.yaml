@@ -1,0 +1,41 @@
+version: '3'
+services:
+  flywheel-db:
+    image: postgres
+    environment:
+      POSTGRES_USER: flywheel_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: flywheel_db
+    volumes:
+      - flywheel-db:/var/lib/postgresql/data
+      - ./schema/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "/usr/bin/pg_isready", "-U", "flywheel_user", "-d", "flywheel_db"]
+      interval: 1s
+      timeout: 10s
+      retries: 120
+    ports:
+      - 5432:5432
+    networks:
+      - dg-network
+
+  flywheel:
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://flywheel_user:password@flywheel-db:5432/flywheel_db}
+    ports:
+      - 8888:8888/tcp
+      - 8889:8889/udp
+    networks:
+      - dg-network
+    depends_on:
+      - flywheel-db
+    restart: on-failure
+
+networks:
+  dg-network:
+
+volumes:
+  flywheel-db:

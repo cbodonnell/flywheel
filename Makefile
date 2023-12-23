@@ -17,10 +17,21 @@ run:
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
 	./cmd/server/main.go
 
-.PHONY: run-client-tcp
-run-client-tcp:
-	dotnet run --project ./CSharpClient tcp
+.PHONY: container
+container:
+	docker build \
+	--build-arg VERSION=${VERSION} \
+	-t flywheel:${VERSION} \
+	-f ./deploy/Dockerfile \
+	.
 
-.PHONY: run-client-udp
-run-client-udp:
-	dotnet run --project ./CSharpClient udp
+.PHONY: flywheel-db
+flywheel-db:
+	docker run --rm \
+	--name gamestate-db \
+	-e POSTGRES_PASSWORD=password \
+	-e POSTGRES_USER=flywheel_user \
+	-e POSTGRES_DB=flywheel_db \
+	-v ${PWD}/.db/flywheel:/var/lib/postgresql/data \
+	-v ${PWD}/schema/migrations:/docker-entrypoint-initdb.d \
+	postgres
