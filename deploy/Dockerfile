@@ -14,8 +14,6 @@ COPY . ./
 ARG VERSION
 RUN make build VERSION=$VERSION
 
-RUN make build
-
 # Runtime stage
 FROM alpine:latest
 
