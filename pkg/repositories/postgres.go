@@ -67,35 +67,6 @@ func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gamet
 	return nil
 }
 
-func (r *PostgresRepository) LoadGameState(ctx context.Context) (*gametypes.GameState, error) {
-	gameState := &gametypes.GameState{
-		Players: make(map[uint32]*gametypes.PlayerState),
-	}
-
-	rows, err := r.conn.Query(ctx, "SELECT player_id, x, y FROM players")
-	if err != nil {
-		return nil, fmt.Errorf("failed to query players: %v", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var clientID uint32
-		var x float64
-		var y float64
-		if err := rows.Scan(&clientID, &x, &y); err != nil {
-			return nil, fmt.Errorf("failed to scan player: %v", err)
-		}
-		gameState.Players[clientID] = &gametypes.PlayerState{
-			P: gametypes.Position{
-				X: x,
-				Y: y,
-			},
-		}
-	}
-
-	return gameState, nil
-}
-
 func (r *PostgresRepository) SavePlayerState(ctx context.Context, timestamp int64, clientID uint32, playerState *gametypes.PlayerState) error {
 	q := `
 	INSERT INTO players (player_id, created_at, x, y) VALUES ($1, $2, $3, $4)
