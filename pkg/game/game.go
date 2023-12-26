@@ -146,7 +146,7 @@ func (gm *GameManager) processMessages(gameState *types.GameState) {
 func (gm *GameManager) removeDisconnectedPlayers(ctx context.Context, gameState *types.GameState) {
 	for clientID, playerState := range gameState.Players {
 		if !gm.clientManager.Exists(clientID) {
-			if err := gm.repository.SavePlayerState(ctx, clientID, playerState); err != nil {
+			if err := gm.repository.SavePlayerState(ctx, gameState.Timestamp, clientID, playerState); err != nil {
 				fmt.Printf("Error: failed to save player state for client %d: %v\n", clientID, err)
 				// don't delete the player from the game state if we can't save their state
 				continue

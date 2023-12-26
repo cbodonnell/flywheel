@@ -3,7 +3,6 @@ package repositories
 import (
 	"context"
 	"fmt"
-	"time"
 
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/jackc/pgx/v5"
@@ -97,12 +96,12 @@ func (r *PostgresRepository) LoadGameState(ctx context.Context) (*gametypes.Game
 	return gameState, nil
 }
 
-func (r *PostgresRepository) SavePlayerState(ctx context.Context, clientID uint32, playerState *gametypes.PlayerState) error {
+func (r *PostgresRepository) SavePlayerState(ctx context.Context, timestamp int64, clientID uint32, playerState *gametypes.PlayerState) error {
 	q := `
 	INSERT INTO players (player_id, created_at, x, y) VALUES ($1, $2, $3, $4)
 	ON CONFLICT (player_id) DO UPDATE SET updated_at= $2, x = $3, y = $4;
 	`
-	_, err := r.conn.Exec(ctx, q, clientID, time.Now().UnixMilli(), playerState.P.X, playerState.P.Y)
+	_, err := r.conn.Exec(ctx, q, clientID, timestamp, playerState.P.X, playerState.P.Y)
 	if err != nil {
 		return fmt.Errorf("failed to insert player: %v", err)
 	}
