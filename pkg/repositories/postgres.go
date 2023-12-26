@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"fmt"
+	"time"
 
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/jackc/pgx/v5"
@@ -46,35 +47,83 @@ func (r *PostgresRepository) Close(ctx context.Context) {
 func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gametypes.GameState) error {
 	tx, err := r.conn.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("Failed to begin transaction: %v\n", err)
-	}
-
-	if _, err := tx.Exec(ctx, "INSERT INTO game_states (timestamp) VALUES ($1)", gameState.Timestamp); err != nil {
-		return fmt.Errorf("Failed to insert game state: %v\n", err)
+		return fmt.Errorf("failed to begin transaction: %v", err)
 	}
 
 	for clientID, playerState := range gameState.Players {
-		if _, err = tx.Exec(ctx, "INSERT INTO players (player_id) VALUES ($1) ON CONFLICT (player_id) DO NOTHING", clientID); err != nil {
-			return fmt.Errorf("Failed to insert player: %v\n", err)
-		}
-
-		if _, err = tx.Exec(ctx, "INSERT INTO player_states (timestamp, player_id) VALUES ($1, $2)", gameState.Timestamp, clientID); err != nil {
-			return fmt.Errorf("Failed to insert player state: %v\n", err)
-		}
-
-		if _, err = tx.Exec(ctx, "INSERT INTO player_positions (timestamp, player_id, x, y) VALUES ($1, $2, $3, $4)", gameState.Timestamp, clientID, playerState.P.X, playerState.P.Y); err != nil {
-			return fmt.Errorf("Failed to insert player position: %v\n", err)
+		q := `
+		INSERT INTO players (player_id, created_at, x, y) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (player_id) DO UPDATE SET updated_at= $2, x = $3, y = $4;
+		`
+		_, err = tx.Exec(ctx, q, clientID, gameState.Timestamp, playerState.P.X, playerState.P.Y)
+		if err != nil {
+			return fmt.Errorf("failed to insert player: %v", err)
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("Failed to commit transaction: %v\n", err)
+		return fmt.Errorf("failed to commit transaction: %v", err)
 	}
 
 	return nil
 }
 
 func (r *PostgresRepository) LoadGameState(ctx context.Context) (*gametypes.GameState, error) {
-	// TODO: Implement
-	return nil, nil
+	gameState := &gametypes.GameState{
+		Players: make(map[uint32]*gametypes.PlayerState),
+	}
+
+	rows, err := r.conn.Query(ctx, "SELECT player_id, x, y FROM players")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query players: %v", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var clientID uint32
+		var x float64
+		var y float64
+		if err := rows.Scan(&clientID, &x, &y); err != nil {
+			return nil, fmt.Errorf("failed to scan player: %v", err)
+		}
+		gameState.Players[clientID] = &gametypes.PlayerState{
+			P: gametypes.Position{
+				X: x,
+				Y: y,
+			},
+		}
+	}
+
+	return gameState, nil
+}
+
+func (r *PostgresRepository) SavePlayerState(ctx context.Context, clientID uint32, playerState *gametypes.PlayerState) error {
+	q := `
+	INSERT INTO players (player_id, created_at, x, y) VALUES ($1, $2, $3, $4)
+	ON CONFLICT (player_id) DO UPDATE SET updated_at= $2, x = $3, y = $4;
+	`
+	_, err := r.conn.Exec(ctx, q, clientID, time.Now().UnixMilli(), playerState.P.X, playerState.P.Y)
+	if err != nil {
+		return fmt.Errorf("failed to insert player: %v", err)
+	}
+
+	return nil
+}
+
+func (r *PostgresRepository) LoadPlayerState(ctx context.Context, clientID uint32) (*gametypes.PlayerState, error) {
+	q := `
+	SELECT x, y FROM players WHERE player_id = $1;
+	`
+	var x float64
+	var y float64
+	if err := r.conn.QueryRow(ctx, q, clientID).Scan(&x, &y); err != nil {
+		return nil, fmt.Errorf("failed to scan player: %v", err)
+	}
+
+	return &gametypes.PlayerState{
+		P: gametypes.Position{
+			X: x,
+			Y: y,
+		},
+	}, nil
 }

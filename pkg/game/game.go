@@ -12,87 +12,112 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/servers"
+	"github.com/cbodonnell/flywheel/pkg/state"
 )
 
 type GameManager struct {
-	clientManager *clients.ClientManager
-	messageQueue  *queue.MemoryQueue
-	repository    repositories.Repository
-	gameState     *types.GameState
-	loopInterval  time.Duration
-	stopChannel   chan struct{}
+	clientManager    *clients.ClientManager
+	messageQueue     *queue.MemoryQueue
+	repository       repositories.Repository
+	stateManager     state.StateManager
+	gameLoopInterval time.Duration
+	saveLoopInterval time.Duration
 }
 
 // NewGameManagerOptions contains options for creating a new GameManager.
 type NewGameManagerOptions struct {
-	ClientManager *clients.ClientManager
-	MessageQueue  *queue.MemoryQueue
-	Repository    repositories.Repository
-	LoopInterval  time.Duration
+	ClientManager    *clients.ClientManager
+	MessageQueue     *queue.MemoryQueue
+	Repository       repositories.Repository
+	StateManager     state.StateManager
+	GameLoopInterval time.Duration
+	SaveLoopInterval time.Duration
 }
 
 func NewGameManager(opts NewGameManagerOptions) *GameManager {
 	return &GameManager{
-		clientManager: opts.ClientManager,
-		messageQueue:  opts.MessageQueue,
-		repository:    opts.Repository,
-		loopInterval:  opts.LoopInterval,
-		stopChannel:   make(chan struct{}),
+		clientManager:    opts.ClientManager,
+		messageQueue:     opts.MessageQueue,
+		repository:       opts.Repository,
+		stateManager:     opts.StateManager,
+		gameLoopInterval: opts.GameLoopInterval,
+		saveLoopInterval: opts.SaveLoopInterval,
 	}
 }
 
-// StartGameLoop starts the game loop.
-func (gm *GameManager) StartGameLoop(ctx context.Context) {
-	// TODO: load player data when they connect
-	gm.loadGameState(ctx)
+func (gm *GameManager) Start(ctx context.Context) {
+	// Save loop runs in the background
+	go gm.saveLoop(ctx)
+	// Game loop runs in the foreground
+	gm.gameLoop(ctx)
+}
 
-	ticker := time.NewTicker(gm.loopInterval)
+func (gm *GameManager) Stop() {
+	// TODO: gracefully stop the game and save the game state
+}
+
+// gameLoop starts a loop that runs the game logic.
+func (gm *GameManager) gameLoop(ctx context.Context) {
+	ticker := time.NewTicker(gm.gameLoopInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case t := <-ticker.C:
-			gm.gameState.Timestamp = t.UnixMilli()
-			gm.processMessages()
-			gm.removeDisconnectedPlayers()
-			// TODO: save non-critical data periodically, when the server shuts down, and when a player disconnects.
-			// save critical data when it changes
-			// TODO: save concurrently so it doesn't block the game loop
-			gm.saveGameState(ctx)
-			gm.broadcastGameState()
-
-		case <-gm.stopChannel:
-			fmt.Println("Game loop stopped.")
+		case <-ctx.Done():
 			return
+		case t := <-ticker.C:
+			err := gm.gameTick(ctx, t)
+			if err != nil {
+				fmt.Printf("Error: failed to do game loop: %v\n", err)
+			}
 		}
 	}
 }
 
-// loadGameState loads the game state from the repository if it exists.
-// Otherwise, it initializes an empty game state.
-func (gm *GameManager) loadGameState(ctx context.Context) {
-	lastGameState, err := gm.repository.LoadGameState(ctx)
+// gameTick runs one iteration of the game loop.
+func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
+	gameState, err := gm.stateManager.Get()
 	if err != nil {
-		fmt.Printf("Error: failed to load game state: %v\n", err)
+		return fmt.Errorf("failed to get current game state: %v", err)
 	}
-	if lastGameState != nil {
-		gm.gameState = lastGameState
-	} else {
-		fmt.Println("No game state found, initializing empty game state")
-		gm.gameState = &types.GameState{
-			Players: make(map[uint32]*types.PlayerState),
-		}
+
+	gameState.Timestamp = t.UnixMilli()
+	gm.addConnectedPlayers(ctx, gameState)
+	gm.processMessages(gameState)
+	gm.removeDisconnectedPlayers(ctx, gameState)
+	gm.broadcastGameState(gameState)
+
+	if err := gm.stateManager.Set(gameState); err != nil {
+		return fmt.Errorf("failed to set game state: %v", err)
 	}
+
+	return nil
 }
 
-// StopGameLoop stops the game loop.
-func (gm *GameManager) StopGameLoop() {
-	close(gm.stopChannel)
+// addConnectedPlayers adds connected clients to the game state.
+func (gm *GameManager) addConnectedPlayers(ctx context.Context, gameState *types.GameState) {
+	for _, client := range gm.clientManager.GetClients() {
+		if _, ok := gameState.Players[client.ID]; !ok {
+			lastKnownState, err := gm.repository.LoadPlayerState(ctx, client.ID)
+			if err == nil {
+				gameState.Players[client.ID] = lastKnownState
+			} else {
+				fmt.Printf("Error: failed to get player state for client %d: %v\n", client.ID, err)
+				fmt.Printf("Adding client %d to game state with default values\n", client.ID)
+				gameState.Players[client.ID] = &types.PlayerState{
+					P: types.Position{
+						X: 0,
+						Y: 0,
+					},
+				}
+			}
+		}
+	}
 }
 
 // processMessages processes all pending messages in the queue
 // and updates the game state accordingly.
-func (gm *GameManager) processMessages() {
+func (gm *GameManager) processMessages(gameState *types.GameState) {
 	pendingMessages := gm.messageQueue.ReadAllMessages()
 	for _, item := range pendingMessages {
 		message, ok := item.(*messages.Message)
@@ -110,7 +135,7 @@ func (gm *GameManager) processMessages() {
 				continue
 			}
 			// TODO: validate the update before applying it
-			gm.gameState.Players[message.ClientID] = clientPlayerUpdate.PlayerState
+			gameState.Players[message.ClientID] = clientPlayerUpdate.PlayerState
 		default:
 			fmt.Printf("Error: unhandled message type: %s\n", message.Type)
 		}
@@ -118,25 +143,22 @@ func (gm *GameManager) processMessages() {
 }
 
 // removeDisconnectedPlayers removes disconnected clients from the game state.
-func (gm *GameManager) removeDisconnectedPlayers() {
-	for clientID := range gm.gameState.Players {
+func (gm *GameManager) removeDisconnectedPlayers(ctx context.Context, gameState *types.GameState) {
+	for clientID, playerState := range gameState.Players {
 		if !gm.clientManager.Exists(clientID) {
-			delete(gm.gameState.Players, clientID)
+			if err := gm.repository.SavePlayerState(ctx, clientID, playerState); err != nil {
+				fmt.Printf("Error: failed to save player state for client %d: %v\n", clientID, err)
+				// don't delete the player from the game state if we can't save their state
+				continue
+			}
+			delete(gameState.Players, clientID)
 		}
 	}
 }
 
-// saveGameState saves the game state to the repository.
-func (gm *GameManager) saveGameState(ctx context.Context) {
-	err := gm.repository.SaveGameState(ctx, gm.gameState)
-	if err != nil {
-		fmt.Printf("Error: failed to save game state: %v\n", err)
-	}
-}
-
 // broadcastGameState sends the game state to connected clients.
-func (gm *GameManager) broadcastGameState() {
-	payload, err := json.Marshal(gm.gameState)
+func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
+	payload, err := json.Marshal(gameState)
 	if err != nil {
 		fmt.Printf("Error: failed to marshal game state: %v\n", err)
 		return
@@ -161,5 +183,34 @@ func (gm *GameManager) broadcastGameState() {
 		} else {
 			fmt.Printf("Sent message: %s\n", message.Type)
 		}
+	}
+}
+
+// saveLoop starts a loop that periodically saves the game state.
+func (gm *GameManager) saveLoop(ctx context.Context) {
+	ticker := time.NewTicker(gm.saveLoopInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case t := <-ticker.C:
+			gameState, err := gm.stateManager.Get()
+			if err != nil {
+				fmt.Printf("Error: failed to get current game state: %v\n", err)
+				continue
+			}
+			gameState.Timestamp = t.UnixMilli()
+			gm.saveGameState(ctx, gameState)
+		}
+	}
+}
+
+// saveGameState saves the game state to the repository.
+func (gm *GameManager) saveGameState(ctx context.Context, gameState *types.GameState) {
+	err := gm.repository.SaveGameState(ctx, gameState)
+	if err != nil {
+		fmt.Printf("Error: failed to save game state: %v\n", err)
 	}
 }

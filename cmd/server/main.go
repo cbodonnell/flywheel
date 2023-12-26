@@ -11,6 +11,7 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/servers"
+	"github.com/cbodonnell/flywheel/pkg/state"
 	"github.com/cbodonnell/flywheel/pkg/version"
 )
 
@@ -37,14 +38,19 @@ func main() {
 	repository := repositories.NewPostgresRepository(ctx, connStr)
 	defer repository.Close(ctx)
 
+	stateManager := state.NewMemoryStateManager()
+
 	gameLoopInterval := 100 * time.Millisecond // 10 FPS
+	saveLoopInterval := 5 * time.Second
 	gameManager := game.NewGameManager(game.NewGameManagerOptions{
-		ClientManager: clientManager,
-		MessageQueue:  messageQueue,
-		Repository:    repository,
-		LoopInterval:  gameLoopInterval,
+		ClientManager:    clientManager,
+		MessageQueue:     messageQueue,
+		Repository:       repository,
+		StateManager:     stateManager,
+		GameLoopInterval: gameLoopInterval,
+		SaveLoopInterval: saveLoopInterval,
 	})
 
-	fmt.Println("Starting game loop")
-	gameManager.StartGameLoop(ctx)
+	fmt.Println("Starting game manager")
+	gameManager.Start(ctx)
 }
