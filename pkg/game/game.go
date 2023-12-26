@@ -82,10 +82,11 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 	}
 
 	gameState.Timestamp = t.UnixMilli()
-	gm.addConnectedPlayers(ctx, gameState)
+	clients := gm.clientManager.GetClients()
+	gm.addConnectedPlayers(ctx, clients, gameState)
 	gm.processMessages(gameState)
 	gm.removeDisconnectedPlayers(ctx, gameState)
-	gm.broadcastGameState(gameState)
+	gm.broadcastGameState(clients, gameState)
 
 	if err := gm.stateManager.Set(gameState); err != nil {
 		return fmt.Errorf("failed to set game state: %v", err)
@@ -95,8 +96,8 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 }
 
 // addConnectedPlayers adds connected clients to the game state.
-func (gm *GameManager) addConnectedPlayers(ctx context.Context, gameState *types.GameState) {
-	for _, client := range gm.clientManager.GetClients() {
+func (gm *GameManager) addConnectedPlayers(ctx context.Context, clients []*clients.Client, gameState *types.GameState) {
+	for _, client := range clients {
 		if _, ok := gameState.Players[client.ID]; !ok {
 			lastKnownState, err := gm.repository.LoadPlayerState(ctx, client.ID)
 			if err == nil {
@@ -157,14 +158,14 @@ func (gm *GameManager) removeDisconnectedPlayers(ctx context.Context, gameState 
 }
 
 // broadcastGameState sends the game state to connected clients.
-func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
+func (gm *GameManager) broadcastGameState(clients []*clients.Client, gameState *types.GameState) {
 	payload, err := json.Marshal(gameState)
 	if err != nil {
 		fmt.Printf("Error: failed to marshal game state: %v\n", err)
 		return
 	}
 
-	for _, client := range gm.clientManager.GetClients() {
+	for _, client := range clients {
 		message := &messages.Message{
 			ClientID: 0, // ClientID 0 means the message is from the server
 			Type:     messages.MessageTypeServerGameUpdate,
