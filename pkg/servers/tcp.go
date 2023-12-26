@@ -13,12 +13,12 @@ import (
 // TCPServer represents a TCP server.
 type TCPServer struct {
 	ClientManager *clients.ClientManager
-	MessageQueue  *queue.MemoryQueue
+	MessageQueue  *queue.InMemoryQueue
 	Port          string
 }
 
 // NewTCPServer creates a new TCP server.
-func NewTCPServer(clientManager *clients.ClientManager, messageQueue *queue.MemoryQueue, port string) *TCPServer {
+func NewTCPServer(clientManager *clients.ClientManager, messageQueue *queue.InMemoryQueue, port string) *TCPServer {
 	return &TCPServer{
 		ClientManager: clientManager,
 		MessageQueue:  messageQueue,

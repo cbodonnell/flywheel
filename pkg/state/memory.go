@@ -6,20 +6,20 @@ import (
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 )
 
-type MemoryStateManager struct {
+type InMemoryStateManager struct {
 	lock      sync.RWMutex
 	gameState *gametypes.GameState
 }
 
-func NewMemoryStateManager() *MemoryStateManager {
-	return &MemoryStateManager{
+func NewInMemoryStateManager() *InMemoryStateManager {
+	return &InMemoryStateManager{
 		gameState: &gametypes.GameState{
 			Players: make(map[uint32]*gametypes.PlayerState),
 		},
 	}
 }
 
-func (m *MemoryStateManager) Get() (*gametypes.GameState, error) {
+func (m *InMemoryStateManager) Get() (*gametypes.GameState, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	copy := &gametypes.GameState{
@@ -37,7 +37,7 @@ func (m *MemoryStateManager) Get() (*gametypes.GameState, error) {
 	return copy, nil
 }
 
-func (m *MemoryStateManager) Set(gameState *gametypes.GameState) error {
+func (m *InMemoryStateManager) Set(gameState *gametypes.GameState) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	m.gameState = gameState

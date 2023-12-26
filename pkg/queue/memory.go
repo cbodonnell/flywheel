@@ -9,42 +9,42 @@ const (
 	QueueBufferSize = 1024
 )
 
-// MemoryQueue represents a basic queue.
-type MemoryQueue struct {
+// InMemoryQueue implements an in-memory queue.
+type InMemoryQueue struct {
 	ch   chan interface{}
 	lock sync.RWMutex
 }
 
-// NewMemoryQueue creates a new queue.
-func NewMemoryQueue() *MemoryQueue {
-	return &MemoryQueue{
+// NewInMemoryQueue creates a new queue.
+func NewInMemoryQueue() *InMemoryQueue {
+	return &InMemoryQueue{
 		ch: make(chan interface{}, QueueBufferSize),
 	}
 }
 
 // Enqueue adds an item to the end of the queue.
-func (q *MemoryQueue) Enqueue(item interface{}) {
+func (q *InMemoryQueue) Enqueue(item interface{}) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	q.ch <- item
 }
 
 // Dequeue removes and returns the item from the front of the queue.
-func (q *MemoryQueue) Dequeue() interface{} {
+func (q *InMemoryQueue) Dequeue() interface{} {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	return <-q.ch
 }
 
 // Size returns the current size of the queue.
-func (q *MemoryQueue) Size() int {
+func (q *InMemoryQueue) Size() int {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
 	return len(q.ch)
 }
 
 // ReadAllMessages reads all pending messages in the queue
-func (q *MemoryQueue) ReadAllMessages() []interface{} {
+func (q *InMemoryQueue) ReadAllMessages() []interface{} {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -57,7 +57,7 @@ func (q *MemoryQueue) ReadAllMessages() []interface{} {
 }
 
 // ClearQueue clears all messages from the queue.
-func (q *MemoryQueue) ClearQueue() {
+func (q *InMemoryQueue) ClearQueue() {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 

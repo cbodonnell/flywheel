@@ -17,7 +17,7 @@ import (
 
 type GameManager struct {
 	clientManager    *clients.ClientManager
-	messageQueue     *queue.MemoryQueue
+	messageQueue     *queue.InMemoryQueue
 	repository       repositories.Repository
 	stateManager     state.StateManager
 	gameLoopInterval time.Duration
@@ -27,7 +27,7 @@ type GameManager struct {
 // NewGameManagerOptions contains options for creating a new GameManager.
 type NewGameManagerOptions struct {
 	ClientManager    *clients.ClientManager
-	MessageQueue     *queue.MemoryQueue
+	MessageQueue     *queue.InMemoryQueue
 	Repository       repositories.Repository
 	StateManager     state.StateManager
 	GameLoopInterval time.Duration

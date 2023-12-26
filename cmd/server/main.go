@@ -24,7 +24,7 @@ func main() {
 	udpPort := "8889"
 
 	clientManager := clients.NewClientManager()
-	messageQueue := queue.NewMemoryQueue()
+	messageQueue := queue.NewInMemoryQueue()
 
 	tcpServer := servers.NewTCPServer(clientManager, messageQueue, tcpPort)
 	udpServer := servers.NewUDPServer(clientManager, messageQueue, udpPort)
@@ -38,7 +38,7 @@ func main() {
 	repository := repositories.NewPostgresRepository(ctx, connStr)
 	defer repository.Close(ctx)
 
-	stateManager := state.NewMemoryStateManager()
+	stateManager := state.NewInMemoryStateManager()
 
 	gameLoopInterval := 100 * time.Millisecond // 10 FPS
 	saveLoopInterval := 5 * time.Second
