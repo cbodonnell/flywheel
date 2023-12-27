@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"fmt"
+	"time"
 
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/jackc/pgx/v5"
@@ -13,30 +14,56 @@ type PostgresRepository struct {
 }
 
 // NewPostgresRepository creates a new PSQLRepository.
-// It panics if it is unable to connect to the database.
+// It panics if it is unable to connect to the database after 2 minutes.
 // The caller is responsible for calling Close() on the repository.
 func NewPostgresRepository(ctx context.Context, connStr string) Repository {
+	const maxRetry = 24
+	const retryInterval = time.Second * 5
+
+	var conn *pgx.Conn
+	var err error
+
+	for attempt := 1; attempt <= maxRetry; attempt++ {
+		conn, err = connectDb(ctx, connStr)
+		if err == nil {
+			break
+		}
+
+		fmt.Printf("Error connecting to the database (attempt %d): %v\n", attempt, err)
+
+		select {
+		case <-ctx.Done():
+			panic("Context canceled, cannot establish database connection")
+		case <-time.After(retryInterval):
+			// retry
+		}
+	}
+
+	if err != nil {
+		panic(fmt.Sprintf("Failed to establish database connection after %d attempts: %v", maxRetry, err))
+	}
+
 	return &PostgresRepository{
-		conn: connectDb(ctx, connStr),
+		conn: conn,
 	}
 }
 
-func connectDb(ctx context.Context, connStr string) *pgx.Conn {
+func connectDb(ctx context.Context, connStr string) (*pgx.Conn, error) {
 	conn, err := pgx.Connect(ctx, connStr)
 	if err != nil {
-		panic(fmt.Sprintf("Unable to connect to database: %v\n", err))
+		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
 
 	var username string
 	var database string
 	err = conn.QueryRow(ctx, "SELECT current_user, current_database()").Scan(&username, &database)
 	if err != nil {
-		panic(fmt.Sprintf("Unable to query database: %v\n", err))
+		return nil, fmt.Errorf("failed to query database: %v", err)
 	}
 
 	fmt.Printf("Connected to %s as %s\n", database, username)
 
-	return conn
+	return conn, nil
 }
 
 func (r *PostgresRepository) Close(ctx context.Context) {
