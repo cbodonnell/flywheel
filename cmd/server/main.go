@@ -20,6 +20,7 @@ func main() {
 	fmt.Printf("Starting server version %s\n", version.Get())
 	ctx := context.Background()
 
+	// TODO: don't hard code these
 	tcpPort := "8888"
 	udpPort := "8889"
 
