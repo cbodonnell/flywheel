@@ -17,7 +17,7 @@ services:
     ports:
       - 5432:5432
     networks:
-      - dg-network
+      - flywheel-network
 
   flywheel:
     build:
@@ -29,13 +29,13 @@ services:
       - 8888:8888/tcp
       - 8889:8889/udp
     networks:
-      - dg-network
+      - flywheel-network
     depends_on:
       - flywheel-db
     restart: on-failure
 
 networks:
-  dg-network:
+  flywheel-network:
 
 volumes:
   flywheel-db:
