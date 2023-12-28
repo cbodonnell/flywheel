@@ -132,14 +132,10 @@ func (cm *ClientManager) generateUniqueID(maxRetries int) (uint32, error) {
 	return 0, fmt.Errorf("failed to generate a unique ID after %d attempts", maxRetries)
 }
 
-// RegisterConnectHandler registers a handler for client connect events.
-// The handler will be called in a goroutine.
 func (cm *ClientManager) RegisterConnectHandler(handler ClientEventHandler) {
 	cm.connectEventManager.RegisterHandler(handler)
 }
 
-// RegisterDisconnectHandler registers a handler for client disconnect events.
-// The handler will be called in a goroutine.
 func (cm *ClientManager) RegisterDisconnectHandler(handler ClientEventHandler) {
 	cm.disconnectEventManager.RegisterHandler(handler)
 }
