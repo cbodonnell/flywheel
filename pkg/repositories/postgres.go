@@ -114,6 +114,9 @@ func (r *PostgresRepository) LoadPlayerState(ctx context.Context, clientID uint3
 	var x float64
 	var y float64
 	if err := r.conn.QueryRow(ctx, q, clientID).Scan(&x, &y); err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, &ErrNotFound{}
+		}
 		return nil, fmt.Errorf("failed to scan player: %v", err)
 	}
 

@@ -16,36 +16,46 @@ import (
 )
 
 type GameManager struct {
-	clientManager    *clients.ClientManager
-	messageQueue     *queue.InMemoryQueue
-	repository       repositories.Repository
-	stateManager     state.StateManager
-	gameLoopInterval time.Duration
-	saveLoopInterval time.Duration
+	clientManager          *clients.ClientManager
+	clientMessageQueue     queue.Queue
+	addPlayerEventQueue    queue.Queue
+	removePlayerEventQueue queue.Queue
+	repository             repositories.Repository
+	stateManager           state.StateManager
+	gameLoopInterval       time.Duration
+	saveLoopInterval       time.Duration
 }
 
 // NewGameManagerOptions contains options for creating a new GameManager.
 type NewGameManagerOptions struct {
-	ClientManager    *clients.ClientManager
-	MessageQueue     *queue.InMemoryQueue
-	Repository       repositories.Repository
-	StateManager     state.StateManager
-	GameLoopInterval time.Duration
-	SaveLoopInterval time.Duration
+	ClientManager              *clients.ClientManager
+	ClientMessageQueue         queue.Queue
+	ClientConnectEventQueue    queue.Queue
+	ClientDisconnectEventQueue queue.Queue
+	Repository                 repositories.Repository
+	StateManager               state.StateManager
+	GameLoopInterval           time.Duration
+	SaveLoopInterval           time.Duration
 }
 
 func NewGameManager(opts NewGameManagerOptions) *GameManager {
 	return &GameManager{
-		clientManager:    opts.ClientManager,
-		messageQueue:     opts.MessageQueue,
-		repository:       opts.Repository,
-		stateManager:     opts.StateManager,
-		gameLoopInterval: opts.GameLoopInterval,
-		saveLoopInterval: opts.SaveLoopInterval,
+		clientManager:          opts.ClientManager,
+		clientMessageQueue:     opts.ClientMessageQueue,
+		addPlayerEventQueue:    opts.ClientConnectEventQueue,
+		removePlayerEventQueue: opts.ClientDisconnectEventQueue,
+		repository:             opts.Repository,
+		stateManager:           opts.StateManager,
+		gameLoopInterval:       opts.GameLoopInterval,
+		saveLoopInterval:       opts.SaveLoopInterval,
 	}
 }
 
 func (gm *GameManager) Start(ctx context.Context) {
+	// register client connect/disconnect handlers
+	gm.clientManager.RegisterConnectHandler(gm.onClientConnect)
+	gm.clientManager.RegisterDisconnectHandler(gm.onClientDisconnect)
+
 	// Save loop runs in the background
 	go gm.saveLoop(ctx)
 	// Game loop runs in the foreground
@@ -54,6 +64,35 @@ func (gm *GameManager) Start(ctx context.Context) {
 
 func (gm *GameManager) Stop() {
 	// TODO: gracefully stop the game and save the game state
+}
+
+func (gm *GameManager) onClientConnect(event clients.ClientEvent) {
+	var playerState *types.PlayerState
+	if lastKnownState, err := gm.repository.LoadPlayerState(context.Background(), event.ClientID); err == nil {
+		playerState = lastKnownState
+	} else {
+		if !repositories.IsNotFound(err) {
+			fmt.Printf("Error: failed to get player state for client %d: %v\n", event.ClientID, err)
+		}
+		fmt.Printf("Adding client %d with default values\n", event.ClientID)
+		playerState = &types.PlayerState{
+			P: types.Position{
+				X: 0,
+				Y: 0,
+			},
+		}
+	}
+
+	gm.addPlayerEventQueue.Enqueue(&types.AddPlayerEvent{
+		ClientID:    event.ClientID,
+		PlayerState: playerState,
+	})
+}
+
+func (gm *GameManager) onClientDisconnect(event clients.ClientEvent) {
+	gm.removePlayerEventQueue.Enqueue(&types.RemovePlayerEvent{
+		ClientID: event.ClientID,
+	})
 }
 
 // gameLoop starts a loop that runs the game logic.
@@ -82,11 +121,10 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 	}
 
 	gameState.Timestamp = t.UnixMilli()
-	clients := gm.clientManager.GetClients()
-	gm.addConnectedPlayers(ctx, clients, gameState)
-	gm.processMessages(gameState)
-	gm.removeDisconnectedPlayers(ctx, gameState)
-	gm.broadcastGameState(clients, gameState)
+	gm.processAddPlayerEvents(gameState)
+	gm.processClientMessages(gameState)
+	gm.processRemovePlayerEvents(gameState)
+	gm.broadcastGameState(gameState)
 
 	if err := gm.stateManager.Set(gameState); err != nil {
 		return fmt.Errorf("failed to set game state: %v", err)
@@ -95,31 +133,24 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 	return nil
 }
 
-// addConnectedPlayers adds connected clients to the game state.
-func (gm *GameManager) addConnectedPlayers(ctx context.Context, clients []*clients.Client, gameState *types.GameState) {
-	for _, client := range clients {
-		if _, ok := gameState.Players[client.ID]; !ok {
-			lastKnownState, err := gm.repository.LoadPlayerState(ctx, client.ID)
-			if err == nil {
-				gameState.Players[client.ID] = lastKnownState
-			} else {
-				fmt.Printf("Error: failed to get player state for client %d: %v\n", client.ID, err)
-				fmt.Printf("Adding client %d to game state with default values\n", client.ID)
-				gameState.Players[client.ID] = &types.PlayerState{
-					P: types.Position{
-						X: 0,
-						Y: 0,
-					},
-				}
-			}
+// processAddPlayerEvents processes all pending add player events.
+func (gm *GameManager) processAddPlayerEvents(gameState *types.GameState) {
+	pendingEvents := gm.addPlayerEventQueue.ReadAllMessages()
+	for _, item := range pendingEvents {
+		event, ok := item.(*types.AddPlayerEvent)
+		if !ok {
+			fmt.Println("Error: failed to cast message to types.AddPlayerEvent")
+			continue
 		}
+
+		gameState.Players[event.ClientID] = event.PlayerState
 	}
 }
 
-// processMessages processes all pending messages in the queue
+// processClientMessages processes all pending messages in the queue
 // and updates the game state accordingly.
-func (gm *GameManager) processMessages(gameState *types.GameState) {
-	pendingMessages := gm.messageQueue.ReadAllMessages()
+func (gm *GameManager) processClientMessages(gameState *types.GameState) {
+	pendingMessages := gm.clientMessageQueue.ReadAllMessages()
 	for _, item := range pendingMessages {
 		message, ok := item.(*messages.Message)
 		if !ok {
@@ -143,29 +174,29 @@ func (gm *GameManager) processMessages(gameState *types.GameState) {
 	}
 }
 
-// removeDisconnectedPlayers removes disconnected clients from the game state.
-func (gm *GameManager) removeDisconnectedPlayers(ctx context.Context, gameState *types.GameState) {
-	for clientID, playerState := range gameState.Players {
-		if !gm.clientManager.Exists(clientID) {
-			if err := gm.repository.SavePlayerState(ctx, gameState.Timestamp, clientID, playerState); err != nil {
-				fmt.Printf("Error: failed to save player state for client %d: %v\n", clientID, err)
-				// don't delete the player from the game state if we can't save their state
-				continue
-			}
-			delete(gameState.Players, clientID)
+// processRemovePlayerEvents removes players from the game state.
+func (gm *GameManager) processRemovePlayerEvents(gameState *types.GameState) {
+	pendingEvents := gm.removePlayerEventQueue.ReadAllMessages()
+	for _, item := range pendingEvents {
+		event, ok := item.(*types.RemovePlayerEvent)
+		if !ok {
+			fmt.Println("Error: failed to cast message to types.RemovePlayerEvent")
+			continue
 		}
+
+		delete(gameState.Players, event.ClientID)
 	}
 }
 
 // broadcastGameState sends the game state to connected clients.
-func (gm *GameManager) broadcastGameState(clients []*clients.Client, gameState *types.GameState) {
+func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
 	payload, err := json.Marshal(gameState)
 	if err != nil {
 		fmt.Printf("Error: failed to marshal game state: %v\n", err)
 		return
 	}
 
-	for _, client := range clients {
+	for _, client := range gm.clientManager.GetClients() {
 		message := &messages.Message{
 			ClientID: 0, // ClientID 0 means the message is from the server
 			Type:     messages.MessageTypeServerGameUpdate,
@@ -181,9 +212,11 @@ func (gm *GameManager) broadcastGameState(clients []*clients.Client, gameState *
 		err := servers.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
 		if err != nil {
 			fmt.Printf("Error: failed to write message to UDP connection for client %d: %v\n", client.ID, err)
-		} else {
-			fmt.Printf("Sent message: %s\n", message.Type)
+			continue
 		}
+
+		// TODO: trace logging for stuff like this
+		// fmt.Printf("Sent message: %s\n", message.Type)
 	}
 }
 
