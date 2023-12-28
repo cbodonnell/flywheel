@@ -25,10 +25,10 @@ func main() {
 	udpPort := "8889"
 
 	clientManager := clients.NewClientManager()
-	messageQueue := queue.NewInMemoryQueue()
+	clientMessageQueue := queue.NewInMemoryQueue()
 
-	tcpServer := servers.NewTCPServer(clientManager, messageQueue, tcpPort)
-	udpServer := servers.NewUDPServer(clientManager, messageQueue, udpPort)
+	tcpServer := servers.NewTCPServer(clientManager, clientMessageQueue, tcpPort)
+	udpServer := servers.NewUDPServer(clientManager, clientMessageQueue, udpPort)
 	go tcpServer.Start()
 	go udpServer.Start()
 
@@ -39,17 +39,17 @@ func main() {
 	repository := repositories.NewPostgresRepository(ctx, connStr)
 	defer repository.Close(ctx)
 
-	stateManager := state.NewInMemoryStateManager()
-
 	gameLoopInterval := 100 * time.Millisecond // 10 FPS
 	saveLoopInterval := 5 * time.Second
 	gameManager := game.NewGameManager(game.NewGameManagerOptions{
-		ClientManager:    clientManager,
-		MessageQueue:     messageQueue,
-		Repository:       repository,
-		StateManager:     stateManager,
-		GameLoopInterval: gameLoopInterval,
-		SaveLoopInterval: saveLoopInterval,
+		ClientManager:              clientManager,
+		ClientMessageQueue:         clientMessageQueue,
+		ClientConnectEventQueue:    queue.NewInMemoryQueue(),
+		ClientDisconnectEventQueue: queue.NewInMemoryQueue(),
+		Repository:                 repository,
+		StateManager:               state.NewInMemoryStateManager(),
+		GameLoopInterval:           gameLoopInterval,
+		SaveLoopInterval:           saveLoopInterval,
 	})
 
 	fmt.Println("Starting game manager")

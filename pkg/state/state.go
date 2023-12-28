@@ -5,6 +5,7 @@ import (
 )
 
 // StateManager provides shared access to the game state.
+// Implementations must be thread-safe.
 type StateManager interface {
 	// Get returns a copy of the current game state.
 	Get() (*gametypes.GameState, error)
