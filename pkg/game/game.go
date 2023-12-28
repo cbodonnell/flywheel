@@ -72,7 +72,7 @@ func (gm *GameManager) onClientConnect(event clients.ClientEvent) {
 	if err == nil {
 		playerState = lastKnownState
 	} else {
-		if repositories.IsNotFound(err) {
+		if !repositories.IsNotFound(err) {
 			fmt.Printf("Error: failed to get player state for client %d: %v\n", event.ClientID, err)
 		}
 		fmt.Printf("Adding client %d with default values\n", event.ClientID)
