@@ -68,8 +68,7 @@ func (gm *GameManager) Stop() {
 
 func (gm *GameManager) onClientConnect(event clients.ClientEvent) {
 	var playerState *types.PlayerState
-	lastKnownState, err := gm.repository.LoadPlayerState(context.Background(), event.ClientID)
-	if err == nil {
+	if lastKnownState, err := gm.repository.LoadPlayerState(context.Background(), event.ClientID); err == nil {
 		playerState = lastKnownState
 	} else {
 		if !repositories.IsNotFound(err) {
