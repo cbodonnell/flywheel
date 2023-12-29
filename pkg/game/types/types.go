@@ -16,11 +16,11 @@ type Position struct {
 	Y float64 `json:"y"`
 }
 
-type AddPlayerEvent struct {
+type ConnectPlayerEvent struct {
 	ClientID    uint32
 	PlayerState *PlayerState
 }
 
-type RemovePlayerEvent struct {
+type DisconnectPlayerEvent struct {
 	ClientID uint32
 }

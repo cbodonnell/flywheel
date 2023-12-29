@@ -13,90 +13,44 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/servers"
 	"github.com/cbodonnell/flywheel/pkg/state"
+	"github.com/cbodonnell/flywheel/pkg/workers"
 )
 
 type GameManager struct {
-	clientManager          *clients.ClientManager
-	clientMessageQueue     queue.Queue
-	addPlayerEventQueue    queue.Queue
-	removePlayerEventQueue queue.Queue
-	repository             repositories.Repository
-	stateManager           state.StateManager
-	gameLoopInterval       time.Duration
-	saveLoopInterval       time.Duration
+	clientManager        *clients.ClientManager
+	clientMessageQueue   queue.Queue
+	connectionEventQueue queue.Queue
+	repository           repositories.Repository
+	stateManager         state.StateManager
+	savePlayerStateChan  chan<- workers.SavePlayerStateRequest
+	gameLoopInterval     time.Duration
 }
 
 // NewGameManagerOptions contains options for creating a new GameManager.
 type NewGameManagerOptions struct {
-	ClientManager              *clients.ClientManager
-	ClientMessageQueue         queue.Queue
-	ClientConnectEventQueue    queue.Queue
-	ClientDisconnectEventQueue queue.Queue
-	Repository                 repositories.Repository
-	StateManager               state.StateManager
-	GameLoopInterval           time.Duration
-	SaveLoopInterval           time.Duration
+	ClientManager        *clients.ClientManager
+	ClientMessageQueue   queue.Queue
+	ConnectionEventQueue queue.Queue
+	Repository           repositories.Repository
+	StateManager         state.StateManager
+	SavePlayerStateChan  chan<- workers.SavePlayerStateRequest
+	GameLoopInterval     time.Duration
 }
 
 func NewGameManager(opts NewGameManagerOptions) *GameManager {
 	return &GameManager{
-		clientManager:          opts.ClientManager,
-		clientMessageQueue:     opts.ClientMessageQueue,
-		addPlayerEventQueue:    opts.ClientConnectEventQueue,
-		removePlayerEventQueue: opts.ClientDisconnectEventQueue,
-		repository:             opts.Repository,
-		stateManager:           opts.StateManager,
-		gameLoopInterval:       opts.GameLoopInterval,
-		saveLoopInterval:       opts.SaveLoopInterval,
+		clientManager:        opts.ClientManager,
+		clientMessageQueue:   opts.ClientMessageQueue,
+		connectionEventQueue: opts.ConnectionEventQueue,
+		repository:           opts.Repository,
+		stateManager:         opts.StateManager,
+		savePlayerStateChan:  opts.SavePlayerStateChan,
+		gameLoopInterval:     opts.GameLoopInterval,
 	}
 }
 
+// Start starts the game loop.
 func (gm *GameManager) Start(ctx context.Context) {
-	// register client connect/disconnect handlers
-	gm.clientManager.RegisterConnectHandler(gm.onClientConnect)
-	gm.clientManager.RegisterDisconnectHandler(gm.onClientDisconnect)
-
-	// Save loop runs in the background
-	go gm.saveLoop(ctx)
-	// Game loop runs in the foreground
-	gm.gameLoop(ctx)
-}
-
-func (gm *GameManager) Stop() {
-	// TODO: gracefully stop the game and save the game state
-}
-
-func (gm *GameManager) onClientConnect(event clients.ClientEvent) {
-	var playerState *types.PlayerState
-	if lastKnownState, err := gm.repository.LoadPlayerState(context.Background(), event.ClientID); err == nil {
-		playerState = lastKnownState
-	} else {
-		if !repositories.IsNotFound(err) {
-			fmt.Printf("Error: failed to get player state for client %d: %v\n", event.ClientID, err)
-		}
-		fmt.Printf("Adding client %d with default values\n", event.ClientID)
-		playerState = &types.PlayerState{
-			P: types.Position{
-				X: 0,
-				Y: 0,
-			},
-		}
-	}
-
-	gm.addPlayerEventQueue.Enqueue(&types.AddPlayerEvent{
-		ClientID:    event.ClientID,
-		PlayerState: playerState,
-	})
-}
-
-func (gm *GameManager) onClientDisconnect(event clients.ClientEvent) {
-	gm.removePlayerEventQueue.Enqueue(&types.RemovePlayerEvent{
-		ClientID: event.ClientID,
-	})
-}
-
-// gameLoop starts a loop that runs the game logic.
-func (gm *GameManager) gameLoop(ctx context.Context) {
 	ticker := time.NewTicker(gm.gameLoopInterval)
 	defer ticker.Stop()
 
@@ -113,6 +67,10 @@ func (gm *GameManager) gameLoop(ctx context.Context) {
 	}
 }
 
+func (gm *GameManager) Stop() {
+	// TODO: gracefully stop the game and save the game state
+}
+
 // gameTick runs one iteration of the game loop.
 func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 	gameState, err := gm.stateManager.Get()
@@ -121,9 +79,8 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 	}
 
 	gameState.Timestamp = t.UnixMilli()
-	gm.processAddPlayerEvents(gameState)
+	gm.processConnectionEvents(gameState)
 	gm.processClientMessages(gameState)
-	gm.processRemovePlayerEvents(gameState)
 	gm.broadcastGameState(gameState)
 
 	if err := gm.stateManager.Set(gameState); err != nil {
@@ -133,21 +90,30 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 	return nil
 }
 
-// processAddPlayerEvents processes all pending add player events.
-func (gm *GameManager) processAddPlayerEvents(gameState *types.GameState) {
-	pendingEvents := gm.addPlayerEventQueue.ReadAllMessages()
+// processConnectionEvents processes all pending connection events in the queue
+// and updates the game state accordingly.
+func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
+	pendingEvents := gm.connectionEventQueue.ReadAllMessages()
 	for _, item := range pendingEvents {
-		event, ok := item.(*types.AddPlayerEvent)
-		if !ok {
-			fmt.Println("Error: failed to cast message to types.AddPlayerEvent")
-			continue
+		switch event := item.(type) {
+		case *types.ConnectPlayerEvent:
+			gameState.Players[event.ClientID] = event.PlayerState
+		case *types.DisconnectPlayerEvent:
+			// send a request to save the player state before deleting it
+			saveRequest := workers.SavePlayerStateRequest{
+				Timestamp:   gameState.Timestamp,
+				ClientID:    event.ClientID,
+				PlayerState: gameState.Players[event.ClientID],
+			}
+			gm.savePlayerStateChan <- saveRequest
+			delete(gameState.Players, event.ClientID)
+		default:
+			fmt.Printf("Error: unhandled connection event type: %T\n", event)
 		}
-
-		gameState.Players[event.ClientID] = event.PlayerState
 	}
 }
 
-// processClientMessages processes all pending messages in the queue
+// processClientMessages processes all pending client messages in the queue
 // and updates the game state accordingly.
 func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 	pendingMessages := gm.clientMessageQueue.ReadAllMessages()
@@ -166,25 +132,15 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 				fmt.Printf("Error: failed to unmarshal player state: %v\n", err)
 				continue
 			}
+			if _, ok := gameState.Players[message.ClientID]; !ok {
+				fmt.Printf("Error: client %d does not have a player state\n", message.ClientID)
+				continue
+			}
 			// TODO: validate the update before applying it
 			gameState.Players[message.ClientID] = clientPlayerUpdate.PlayerState
 		default:
 			fmt.Printf("Error: unhandled message type: %s\n", message.Type)
 		}
-	}
-}
-
-// processRemovePlayerEvents removes players from the game state.
-func (gm *GameManager) processRemovePlayerEvents(gameState *types.GameState) {
-	pendingEvents := gm.removePlayerEventQueue.ReadAllMessages()
-	for _, item := range pendingEvents {
-		event, ok := item.(*types.RemovePlayerEvent)
-		if !ok {
-			fmt.Println("Error: failed to cast message to types.RemovePlayerEvent")
-			continue
-		}
-
-		delete(gameState.Players, event.ClientID)
 	}
 }
 
@@ -217,34 +173,5 @@ func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
 
 		// TODO: trace logging for stuff like this
 		// fmt.Printf("Sent message: %s\n", message.Type)
-	}
-}
-
-// saveLoop starts a loop that periodically saves the game state.
-func (gm *GameManager) saveLoop(ctx context.Context) {
-	ticker := time.NewTicker(gm.saveLoopInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case t := <-ticker.C:
-			gameState, err := gm.stateManager.Get()
-			if err != nil {
-				fmt.Printf("Error: failed to get current game state: %v\n", err)
-				continue
-			}
-			gameState.Timestamp = t.UnixMilli()
-			gm.saveGameState(ctx, gameState)
-		}
-	}
-}
-
-// saveGameState saves the game state to the repository.
-func (gm *GameManager) saveGameState(ctx context.Context, gameState *types.GameState) {
-	err := gm.repository.SaveGameState(ctx, gameState)
-	if err != nil {
-		fmt.Printf("Error: failed to save game state: %v\n", err)
 	}
 }
