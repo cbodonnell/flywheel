@@ -9,6 +9,8 @@ import (
 const (
 	// ClientIDMaxRetries represents the maximum number of retries when generating a unique ID
 	ClientIDMaxRetries = 1024
+	// ClientEventChannelSize represents the size of the client event channel
+	ClientEventChannelSize = 1024
 )
 
 // Client represents a connected client
@@ -18,25 +20,42 @@ type Client struct {
 	UDPAddress *net.UDPAddr
 }
 
+// ClientEvent represents an event that happened to a client
+type ClientEvent struct {
+	ClientID uint32
+	Type     ClientEventType
+}
+
+// ClientEventType represents the type of a client event
+type ClientEventType int
+
+const (
+	ClientEventTypeConnect ClientEventType = iota
+	ClientEventTypeDisconnect
+)
+
 // ClientManager manages connected clients
 type ClientManager struct {
 	clients     map[uint32]*Client
 	clientsLock sync.RWMutex
 	nextID      uint32
 	// UDP connection for broadcasting to clients
-	udpConn                *net.UDPConn
-	connectEventManager    *ClientEventManager
-	disconnectEventManager *ClientEventManager
+	udpConn         *net.UDPConn
+	clientEventChan chan ClientEvent
 }
 
 // NewClientManager creates a new ClientManager
 func NewClientManager() *ClientManager {
 	return &ClientManager{
-		clients:                make(map[uint32]*Client),
-		nextID:                 1,
-		connectEventManager:    NewClientEventManager(),
-		disconnectEventManager: NewClientEventManager(),
+		clients:         make(map[uint32]*Client),
+		nextID:          1,
+		clientEventChan: make(chan ClientEvent, ClientEventChannelSize),
 	}
+}
+
+// GetClientEventChan returns a one-way channel for receiving client events
+func (cm *ClientManager) GetClientEventChan() <-chan ClientEvent {
+	return cm.clientEventChan
 }
 
 // SetUDPConn sets the UDP listener connection for all clients
@@ -72,10 +91,11 @@ func (cm *ClientManager) GetClients() []*Client {
 	return clients
 }
 
-// AddClient adds a new client to the manager and returns its ID
-func (cm *ClientManager) AddClient(tcpConn net.Conn) (uint32, error) {
+// ConnectClient adds a new client to the manager and returns its ID
+func (cm *ClientManager) ConnectClient(tcpConn net.Conn) (uint32, error) {
 	cm.clientsLock.Lock()
 	defer cm.clientsLock.Unlock()
+
 	clientID, err := cm.generateUniqueID(ClientIDMaxRetries)
 	if err != nil {
 		return 0, fmt.Errorf("failed to generate a unique ID: %v", err)
@@ -85,15 +105,27 @@ func (cm *ClientManager) AddClient(tcpConn net.Conn) (uint32, error) {
 		TCPConn: tcpConn,
 	}
 	cm.clients[clientID] = client
-	cm.connectEventManager.Trigger(ClientEvent{ClientID: clientID})
+
+	event := ClientEvent{
+		ClientID: clientID,
+		Type:     ClientEventTypeConnect,
+	}
+	cm.clientEventChan <- event
+
 	return clientID, nil
 }
 
-// RemoveClient removes a client from the manager
-func (cm *ClientManager) RemoveClient(clientID uint32) {
+// DisconnectClient removes a client from the manager
+func (cm *ClientManager) DisconnectClient(clientID uint32) {
 	cm.clientsLock.Lock()
 	defer cm.clientsLock.Unlock()
-	cm.disconnectEventManager.Trigger(ClientEvent{ClientID: clientID})
+
+	event := ClientEvent{
+		ClientID: clientID,
+		Type:     ClientEventTypeDisconnect,
+	}
+	cm.clientEventChan <- event
+
 	delete(cm.clients, clientID)
 }
 
@@ -130,12 +162,4 @@ func (cm *ClientManager) generateUniqueID(maxRetries int) (uint32, error) {
 	}
 
 	return 0, fmt.Errorf("failed to generate a unique ID after %d attempts", maxRetries)
-}
-
-func (cm *ClientManager) RegisterConnectHandler(handler ClientEventHandler) {
-	cm.connectEventManager.RegisterHandler(handler)
-}
-
-func (cm *ClientManager) RegisterDisconnectHandler(handler ClientEventHandler) {
-	cm.disconnectEventManager.RegisterHandler(handler)
 }

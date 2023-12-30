@@ -13,6 +13,7 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/servers"
 	"github.com/cbodonnell/flywheel/pkg/state"
 	"github.com/cbodonnell/flywheel/pkg/version"
+	"github.com/cbodonnell/flywheel/pkg/workers"
 )
 
 func main() {
@@ -39,17 +40,37 @@ func main() {
 	repository := repositories.NewPostgresRepository(ctx, connStr)
 	defer repository.Close(ctx)
 
+	connectionEventQueue := queue.NewInMemoryQueue()
+
+	clientEventWorker := workers.NewClientEventWorker(workers.NewClientEventWorkerOptions{
+		ClientManager:        clientManager,
+		Repository:           repository,
+		ConnectionEventQueue: connectionEventQueue,
+	})
+	go clientEventWorker.Start()
+
+	stateManager := state.NewInMemoryStateManager()
+	savePlayerStateChannelSize := 100
+	savePlayerStateChan := make(chan workers.SavePlayerStateRequest, savePlayerStateChannelSize)
+
+	saveLoopInterval := 10 * time.Second
+	saveGameStateWorker := workers.NewSaveGameStateWorker(workers.NewSaveGameStateWorkerOptions{
+		Repository:          repository,
+		SavePlayerStateChan: savePlayerStateChan,
+		StateManager:        stateManager,
+		Interval:            saveLoopInterval,
+	})
+	go saveGameStateWorker.Start(ctx)
+
 	gameLoopInterval := 100 * time.Millisecond // 10 FPS
-	saveLoopInterval := 5 * time.Second
 	gameManager := game.NewGameManager(game.NewGameManagerOptions{
-		ClientManager:              clientManager,
-		ClientMessageQueue:         clientMessageQueue,
-		ClientConnectEventQueue:    queue.NewInMemoryQueue(),
-		ClientDisconnectEventQueue: queue.NewInMemoryQueue(),
-		Repository:                 repository,
-		StateManager:               state.NewInMemoryStateManager(),
-		GameLoopInterval:           gameLoopInterval,
-		SaveLoopInterval:           saveLoopInterval,
+		ClientManager:        clientManager,
+		ClientMessageQueue:   clientMessageQueue,
+		ConnectionEventQueue: connectionEventQueue,
+		Repository:           repository,
+		StateManager:         stateManager,
+		SavePlayerStateChan:  savePlayerStateChan,
+		GameLoopInterval:     gameLoopInterval,
 	})
 
 	fmt.Println("Starting game manager")

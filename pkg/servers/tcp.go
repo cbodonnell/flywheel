@@ -56,7 +56,7 @@ func (s *TCPServer) Start() {
 
 // handleTCPConnection handles a TCP connection.
 func (s *TCPServer) handleTCPConnection(conn net.Conn) {
-	clientID, err := s.ClientManager.AddClient(conn)
+	clientID, err := s.ClientManager.ConnectClient(conn)
 	if err != nil {
 		fmt.Printf("Error adding client: %v\n", err)
 		conn.Close()
@@ -65,7 +65,7 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 
 	defer func() {
 		fmt.Printf("TCP Connection closed for client %d\n", clientID)
-		s.ClientManager.RemoveClient(clientID)
+		s.ClientManager.DisconnectClient(clientID)
 		conn.Close()
 	}()
 
