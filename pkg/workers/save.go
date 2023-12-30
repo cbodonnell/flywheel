@@ -2,10 +2,10 @@ package workers
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/state"
 )
@@ -55,7 +55,7 @@ func (w *SaveGameStateWorker) Start(ctx context.Context) {
 		case t := <-ticker.C:
 			gameState, err := w.stateManager.Get()
 			if err != nil {
-				fmt.Printf("Error: failed to get current game state: %v\n", err)
+				log.Error("Failed to get current game state: %v", err)
 				continue
 			}
 			gameState.Timestamp = t.UnixMilli()
@@ -67,13 +67,13 @@ func (w *SaveGameStateWorker) Start(ctx context.Context) {
 func (w *SaveGameStateWorker) savePlayerState(ctx context.Context, saveRequest SavePlayerStateRequest) {
 	err := w.repository.SavePlayerState(ctx, saveRequest.Timestamp, saveRequest.ClientID, saveRequest.PlayerState)
 	if err != nil {
-		fmt.Printf("Error: failed to save player state: %v\n", err)
+		log.Error("Failed to save player state: %v", err)
 	}
 }
 
 func (w *SaveGameStateWorker) saveGameState(ctx context.Context, gameState *types.GameState) {
 	err := w.repository.SaveGameState(ctx, gameState)
 	if err != nil {
-		fmt.Printf("Error: failed to save game state: %v\n", err)
+		log.Error("Failed to save game state: %v", err)
 	}
 }

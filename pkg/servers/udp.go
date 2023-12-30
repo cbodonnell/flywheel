@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/cbodonnell/flywheel/pkg/clients"
+	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 )
@@ -30,15 +31,15 @@ func NewUDPServer(clientManager *clients.ClientManager, messageQueue *queue.InMe
 func (s *UDPServer) Start() {
 	udpAddr, err := net.ResolveUDPAddr("udp", ":"+s.Port)
 	if err != nil {
-		fmt.Println("Error:", err)
+		log.Error("Failed to resolve UDP address: %v", err)
 		return
 	}
 
-	fmt.Println("UDP server listening on", udpAddr.String())
+	log.Info("UDP server listening on %s", udpAddr.String())
 
 	udpConn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		fmt.Println("Error:", err)
+		log.Error("Failed to listen on UDP address: %v", err)
 		return
 	}
 	defer udpConn.Close()
@@ -48,14 +49,16 @@ func (s *UDPServer) Start() {
 	for {
 		message, addr, err := ReadMessageFromUDP(udpConn)
 		if err != nil {
-			fmt.Println("Error:", err)
+			log.Error("Failed to read message from UDP connection: %v", err)
 			continue
 		}
 
 		if !s.ClientManager.Exists(message.ClientID) {
-			fmt.Printf("Received UDP packet from %d, but client is not connected\n", message.ClientID)
+			log.Warn("Received UDP message from %d, but client is not connected", message.ClientID)
 			continue
 		}
+
+		log.Trace("Received UDP message of type %s from %d", message.Type, message.ClientID)
 
 		// TODO: real identity verification
 		s.ClientManager.SetUDPAddress(message.ClientID, addr)
@@ -68,7 +71,7 @@ func (s *UDPServer) Start() {
 				Payload:  nil,
 			}
 			if err := WriteMessageToUDP(udpConn, addr, m); err != nil {
-				fmt.Println("Failed to send server pong:", err)
+				log.Error("Failed to send server pong: %v", err)
 			}
 		default:
 			s.MessageQueue.Enqueue(message)

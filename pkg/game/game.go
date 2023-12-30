@@ -8,6 +8,7 @@ import (
 
 	"github.com/cbodonnell/flywheel/pkg/clients"
 	"github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
@@ -61,7 +62,7 @@ func (gm *GameManager) Start(ctx context.Context) {
 		case t := <-ticker.C:
 			err := gm.gameTick(ctx, t)
 			if err != nil {
-				fmt.Printf("Error: failed to do game loop: %v\n", err)
+				log.Error("Failed to do game loop: %v", err)
 			}
 		}
 	}
@@ -108,7 +109,7 @@ func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
 			gm.savePlayerStateChan <- saveRequest
 			delete(gameState.Players, event.ClientID)
 		default:
-			fmt.Printf("Error: unhandled connection event type: %T\n", event)
+			log.Error("unhandled connection event type: %T", event)
 		}
 	}
 }
@@ -120,7 +121,7 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 	for _, item := range pendingMessages {
 		message, ok := item.(*messages.Message)
 		if !ok {
-			fmt.Println("Error: failed to cast message to messages.Message")
+			log.Error("Failed to cast message to messages.Message")
 			continue
 		}
 
@@ -129,17 +130,17 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 			clientPlayerUpdate := &messages.ClientPlayerUpdate{}
 			err := json.Unmarshal(message.Payload, clientPlayerUpdate)
 			if err != nil {
-				fmt.Printf("Error: failed to unmarshal player state: %v\n", err)
+				log.Error("Failed to unmarshal player state: %v", err)
 				continue
 			}
 			if _, ok := gameState.Players[message.ClientID]; !ok {
-				fmt.Printf("Error: client %d does not have a player state\n", message.ClientID)
+				log.Error("Client %d does not have a player state", message.ClientID)
 				continue
 			}
 			// TODO: validate the update before applying it
 			gameState.Players[message.ClientID] = clientPlayerUpdate.PlayerState
 		default:
-			fmt.Printf("Error: unhandled message type: %s\n", message.Type)
+			log.Error("Unhandled message type: %s", message.Type)
 		}
 	}
 }
@@ -148,7 +149,7 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
 	payload, err := json.Marshal(gameState)
 	if err != nil {
-		fmt.Printf("Error: failed to marshal game state: %v\n", err)
+		log.Error("Failed to marshal game state: %v", err)
 		return
 	}
 
@@ -160,18 +161,16 @@ func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
 		}
 
 		if client.UDPAddress == nil {
-			// TODO: trace logging for stuff like this
-			// fmt.Printf("Error: client %d does not have a UDP address\n", client.ID)
+			log.Trace("Client %d does not have a UDP address", client.ID)
 			continue
 		}
 		// TODO: reliable vs unreliable messages
 		err := servers.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
 		if err != nil {
-			fmt.Printf("Error: failed to write message to UDP connection for client %d: %v\n", client.ID, err)
+			log.Error("Failed to write message to UDP connection for client %d: %v", client.ID, err)
 			continue
 		}
 
-		// TODO: trace logging for stuff like this
-		// fmt.Printf("Sent message: %s\n", message.Type)
+		log.Trace("Sent message: %s", message.Type)
 	}
 }

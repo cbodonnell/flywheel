@@ -6,6 +6,7 @@ import (
 	"time"
 
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -29,7 +30,7 @@ func NewPostgresRepository(ctx context.Context, connStr string) Repository {
 			break
 		}
 
-		fmt.Printf("Error connecting to the database (attempt %d): %v\n", attempt, err)
+		log.Warn("Unable to connect to the database (attempt %d): %v", attempt, err)
 
 		select {
 		case <-ctx.Done():
@@ -61,7 +62,7 @@ func connectDb(ctx context.Context, connStr string) (*pgx.Conn, error) {
 		return nil, fmt.Errorf("failed to query database: %v", err)
 	}
 
-	fmt.Printf("Connected to %s as %s\n", database, username)
+	log.Info("Connected to %s as %s", database, username)
 
 	return conn, nil
 }

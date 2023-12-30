@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/cbodonnell/flywheel/pkg/clients"
+	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 )
@@ -30,15 +31,15 @@ func NewTCPServer(clientManager *clients.ClientManager, messageQueue *queue.InMe
 func (s *TCPServer) Start() {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", ":"+s.Port)
 	if err != nil {
-		fmt.Println("Error:", err)
+		log.Error("Failed to resolve TCP address: %v", err)
 		return
 	}
 
-	fmt.Println("TCP server listening on", tcpAddr.String())
+	log.Info("TCP server listening on %s", tcpAddr.String())
 
 	tcpListener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
-		fmt.Println("Error:", err)
+		log.Error("Failed to listen on TCP address: %v", err)
 		return
 	}
 	defer tcpListener.Close()
@@ -46,7 +47,7 @@ func (s *TCPServer) Start() {
 	for {
 		conn, err := tcpListener.Accept()
 		if err != nil {
-			fmt.Println("Error:", err)
+			log.Error("Failed to accept TCP connection: %v", err)
 			continue
 		}
 
@@ -58,18 +59,18 @@ func (s *TCPServer) Start() {
 func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 	clientID, err := s.ClientManager.ConnectClient(conn)
 	if err != nil {
-		fmt.Printf("Error adding client: %v\n", err)
+		log.Error("Failed to add client: %v", err)
 		conn.Close()
 		return
 	}
 
 	defer func() {
-		fmt.Printf("TCP Connection closed for client %d\n", clientID)
+		log.Debug("TCP Connection closed for client %d", clientID)
 		s.ClientManager.DisconnectClient(clientID)
 		conn.Close()
 	}()
 
-	fmt.Printf("TCP Connection established for client %d\n", clientID)
+	log.Debug("TCP Connection established for client %d", clientID)
 
 	// Send the client its ID
 	message := &messages.Message{
@@ -78,7 +79,7 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 		Payload:  []byte(fmt.Sprintf(`{"clientID":%d}`, clientID)),
 	}
 	if err := WriteMessageToTCP(conn, message); err != nil {
-		fmt.Printf("Error writing TCP message of type %s to client %d: %v\n", message.Type, clientID, err)
+		log.Error("Error writing TCP message of type %s to client %d: %v", message.Type, clientID, err)
 		return
 	}
 
@@ -86,13 +87,13 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 		message, err := ReadMessageFromTCP(conn)
 		if err != nil {
 			if _, ok := err.(*ErrConnectionClosed); ok {
-				fmt.Printf("Client %d disconnected\n", clientID)
+				log.Debug("Client %d disconnected", clientID)
 				return
 			}
-			fmt.Printf("Error reading TCP message from client %d: %v\n", clientID, err)
+			log.Error("Error reading TCP message from client %d: %v", clientID, err)
 			continue
 		}
-		fmt.Printf("Received TCP message of type %s from client %d\n", message.Type, message.ClientID)
+		log.Trace("Received TCP message of type %s from client %d", message.Type, message.ClientID)
 
 		// TODO: some messages might not make sense to queue for the game loop (e.g. a message to disconnect)
 		s.MessageQueue.Enqueue(message)
