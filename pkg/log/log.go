@@ -1,7 +1,6 @@
 package log
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -88,16 +87,8 @@ func (l *Logger) SetLevel(level LogLevel) {
 
 func (l *Logger) logf(level LogLevel, format string, args ...interface{}) {
 	if level <= l.level {
-		logEntry := map[string]interface{}{
-			"level": level.String(),
-			"msg":   fmt.Sprintf(format, args...),
-		}
-		msgBytes, err := json.Marshal(logEntry)
-		if err != nil {
-			l.logger.Printf("Failed to marshal log entry: %v", err)
-			return
-		}
-		l.logger.Print(string(msgBytes))
+		s := fmt.Sprintf("[%s] %s", level, fmt.Sprintf(format, args...))
+		l.logger.Print(s)
 	}
 }
 
