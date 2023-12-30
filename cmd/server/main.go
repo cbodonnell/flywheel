@@ -28,7 +28,10 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to parse log level: %v", err))
 	}
-	log.SetLevel(parsedLogLevel)
+
+	logger := log.New(os.Stdout, "", log.DefaultLoggerFlag, parsedLogLevel)
+	log.SetDefaultLogger(logger)
+	log.Info("Log level set to %s", parsedLogLevel)
 
 	log.Info("Starting server version %s", version.Get())
 	ctx := context.Background()

@@ -3,20 +3,21 @@ package log
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"sync"
 )
 
 var (
 	defaultLogger *Logger
-	once          sync.Once
+)
+
+const (
+	DefaultLoggerFlag = log.Ldate | log.Ltime | log.Lmicroseconds
 )
 
 func init() {
-	once.Do(func() {
-		defaultLogger = New(os.Stdout, "", log.Ldate|log.Ltime, LogLevelDebug)
-	})
+	defaultLogger = New(os.Stdout, "", DefaultLoggerFlag, LogLevelInfo)
 }
 
 type LogLevel int
@@ -50,24 +51,23 @@ func (level LogLevel) String() string {
 // Valid log levels are: error, warn, info, debug, trace.
 func ParseLogLevel(level string) (LogLevel, error) {
 	switch level {
-	case "error":
+	case LogLevelError.String():
 		return LogLevelError, nil
-	case "warn":
+	case LogLevelWarn.String():
 		return LogLevelWarn, nil
-	case "info":
+	case LogLevelInfo.String():
 		return LogLevelInfo, nil
-	case "debug":
+	case LogLevelDebug.String():
 		return LogLevelDebug, nil
-	case "trace":
+	case LogLevelTrace.String():
 		return LogLevelTrace, nil
 	default:
 		return LogLevelError, fmt.Errorf("unknown log level: %s", level)
 	}
 }
 
-func SetLevel(level LogLevel) {
-	defaultLogger.SetLevel(level)
-	defaultLogger.Info("Log level set to %s", level)
+func SetDefaultLogger(logger *Logger) {
+	defaultLogger = logger
 }
 
 type Logger struct {
@@ -75,7 +75,7 @@ type Logger struct {
 	level  LogLevel
 }
 
-func New(out *os.File, prefix string, flag int, level LogLevel) *Logger {
+func New(out io.Writer, prefix string, flag int, level LogLevel) *Logger {
 	return &Logger{
 		logger: log.New(out, prefix, flag),
 		level:  level,
@@ -92,7 +92,11 @@ func (l *Logger) logf(level LogLevel, format string, args ...interface{}) {
 			"level": level.String(),
 			"msg":   fmt.Sprintf(format, args...),
 		}
-		msgBytes, _ := json.Marshal(logEntry)
+		msgBytes, err := json.Marshal(logEntry)
+		if err != nil {
+			l.logger.Printf("Failed to marshal log entry: %v", err)
+			return
+		}
 		l.logger.Print(string(msgBytes))
 	}
 }
