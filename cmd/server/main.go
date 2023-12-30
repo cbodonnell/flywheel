@@ -37,7 +37,7 @@ func main() {
 	ctx := context.Background()
 
 	clientManager := clients.NewClientManager()
-	clientMessageQueue := queue.NewInMemoryQueue()
+	clientMessageQueue := queue.NewInMemoryQueue(10000)
 
 	tcpServer := servers.NewTCPServer(clientManager, clientMessageQueue, *tcpPort)
 	udpServer := servers.NewUDPServer(clientManager, clientMessageQueue, *udpPort)
@@ -51,7 +51,7 @@ func main() {
 	repository := repositories.NewPostgresRepository(ctx, connStr)
 	defer repository.Close(ctx)
 
-	connectionEventQueue := queue.NewInMemoryQueue()
+	connectionEventQueue := queue.NewInMemoryQueue(1000)
 
 	clientEventWorker := workers.NewClientEventWorker(workers.NewClientEventWorkerOptions{
 		ClientManager:        clientManager,
