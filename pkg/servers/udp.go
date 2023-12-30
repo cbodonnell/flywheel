@@ -74,7 +74,9 @@ func (s *UDPServer) Start() {
 				log.Error("Failed to send server pong: %v", err)
 			}
 		default:
-			s.MessageQueue.Enqueue(message)
+			if err := s.MessageQueue.Enqueue(message); err != nil {
+				log.Error("Failed to enqueue message: %v", err)
+			}
 		}
 	}
 }
