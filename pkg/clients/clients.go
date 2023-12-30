@@ -80,11 +80,13 @@ func (cm *ClientManager) GetClients() []*Client {
 		copy := &Client{
 			ID:      client.ID,
 			TCPConn: client.TCPConn,
-			UDPAddress: &net.UDPAddr{
+		}
+		if client.UDPAddress != nil {
+			copy.UDPAddress = &net.UDPAddr{
 				IP:   client.UDPAddress.IP,
 				Port: client.UDPAddress.Port,
 				Zone: client.UDPAddress.Zone,
-			},
+			}
 		}
 		clients = append(clients, copy)
 	}
