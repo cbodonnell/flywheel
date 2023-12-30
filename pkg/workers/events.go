@@ -2,10 +2,10 @@ package workers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cbodonnell/flywheel/pkg/clients"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 )
@@ -41,7 +41,7 @@ func (w *ClientEventWorker) Start() {
 		case clients.ClientEventTypeDisconnect:
 			w.handleClientDisconnect(event)
 		default:
-			fmt.Printf("Error: unknown client event type: %v\n", event.Type)
+			log.Error("Unknown client event type: %v", event.Type)
 			continue
 		}
 	}
@@ -53,9 +53,9 @@ func (w *ClientEventWorker) handleClientConnect(event clients.ClientEvent) {
 		playerState = lastKnownState
 	} else {
 		if !repositories.IsNotFound(err) {
-			fmt.Printf("Error: failed to get player state for client %d: %v\n", event.ClientID, err)
+			log.Error("Failed to get player state for client %d: %v", event.ClientID, err)
 		}
-		fmt.Printf("Adding client %d with default values\n", event.ClientID)
+		log.Debug("Adding client %d with default values", event.ClientID)
 		playerState = &gametypes.PlayerState{
 			P: gametypes.Position{
 				X: 0,

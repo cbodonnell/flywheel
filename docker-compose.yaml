@@ -23,6 +23,7 @@ services:
     build:
       context: .
       dockerfile: ./deploy/Dockerfile
+    command: ["./flywheel" , "-log-level", "debug"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql://flywheel_user:password@flywheel-db:5432/flywheel_db}
     ports:

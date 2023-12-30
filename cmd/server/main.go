@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/cbodonnell/flywheel/pkg/clients"
 	"github.com/cbodonnell/flywheel/pkg/game"
+	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/servers"
@@ -17,19 +19,28 @@ import (
 )
 
 func main() {
-	// TODO: real logging
-	fmt.Printf("Starting server version %s\n", version.Get())
-	ctx := context.Background()
+	tcpPort := flag.String("tcp-port", "8888", "TCP port to listen on")
+	udpPort := flag.String("udp-port", "8889", "UDP port to listen on")
+	logLevel := flag.String("log-level", "info", "Log level")
+	flag.Parse()
 
-	// TODO: don't hard code these
-	tcpPort := "8888"
-	udpPort := "8889"
+	parsedLogLevel, err := log.ParseLogLevel(*logLevel)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to parse log level: %v", err))
+	}
+
+	logger := log.New(os.Stdout, "", log.DefaultLoggerFlag, parsedLogLevel)
+	log.SetDefaultLogger(logger)
+	log.Info("Log level set to %s", parsedLogLevel)
+
+	log.Info("Starting server version %s", version.Get())
+	ctx := context.Background()
 
 	clientManager := clients.NewClientManager()
 	clientMessageQueue := queue.NewInMemoryQueue()
 
-	tcpServer := servers.NewTCPServer(clientManager, clientMessageQueue, tcpPort)
-	udpServer := servers.NewUDPServer(clientManager, clientMessageQueue, udpPort)
+	tcpServer := servers.NewTCPServer(clientManager, clientMessageQueue, *tcpPort)
+	udpServer := servers.NewUDPServer(clientManager, clientMessageQueue, *udpPort)
 	go tcpServer.Start()
 	go udpServer.Start()
 
@@ -73,6 +84,6 @@ func main() {
 		GameLoopInterval:     gameLoopInterval,
 	})
 
-	fmt.Println("Starting game manager")
+	log.Info("Starting game manager")
 	gameManager.Start(ctx)
 }
