@@ -14,12 +14,12 @@ import (
 // UDPServer represents a UDP server.
 type UDPServer struct {
 	ClientManager *clients.ClientManager
-	MessageQueue  *queue.InMemoryQueue
+	MessageQueue  queue.Queue
 	Port          string
 }
 
 // NewUDPServer creates a new UDP server.
-func NewUDPServer(clientManager *clients.ClientManager, messageQueue *queue.InMemoryQueue, port string) *UDPServer {
+func NewUDPServer(clientManager *clients.ClientManager, messageQueue queue.Queue, port string) *UDPServer {
 	return &UDPServer{
 		ClientManager: clientManager,
 		MessageQueue:  messageQueue,
@@ -74,7 +74,9 @@ func (s *UDPServer) Start() {
 				log.Error("Failed to send server pong: %v", err)
 			}
 		default:
-			s.MessageQueue.Enqueue(message)
+			if err := s.MessageQueue.Enqueue(message); err != nil {
+				log.Error("Failed to enqueue message: %v", err)
+			}
 		}
 	}
 }

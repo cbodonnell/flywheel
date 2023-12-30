@@ -94,7 +94,11 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 // processConnectionEvents processes all pending connection events in the queue
 // and updates the game state accordingly.
 func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
-	pendingEvents := gm.connectionEventQueue.ReadAllMessages()
+	pendingEvents, err := gm.connectionEventQueue.ReadAllMessages()
+	if err != nil {
+		log.Error("Failed to read connection events: %v", err)
+		return
+	}
 	for _, item := range pendingEvents {
 		switch event := item.(type) {
 		case *types.ConnectPlayerEvent:
@@ -117,7 +121,11 @@ func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
 // processClientMessages processes all pending client messages in the queue
 // and updates the game state accordingly.
 func (gm *GameManager) processClientMessages(gameState *types.GameState) {
-	pendingMessages := gm.clientMessageQueue.ReadAllMessages()
+	pendingMessages, err := gm.clientMessageQueue.ReadAllMessages()
+	if err != nil {
+		log.Error("Failed to read client messages: %v", err)
+		return
+	}
 	for _, item := range pendingMessages {
 		message, ok := item.(*messages.Message)
 		if !ok {
@@ -134,7 +142,7 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 				continue
 			}
 			if _, ok := gameState.Players[message.ClientID]; !ok {
-				log.Error("Client %d does not have a player state", message.ClientID)
+				log.Warn("Client %d is not in the game state", message.ClientID)
 				continue
 			}
 			// TODO: validate the update before applying it

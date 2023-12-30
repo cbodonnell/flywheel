@@ -14,12 +14,12 @@ import (
 // TCPServer represents a TCP server.
 type TCPServer struct {
 	ClientManager *clients.ClientManager
-	MessageQueue  *queue.InMemoryQueue
+	MessageQueue  queue.Queue
 	Port          string
 }
 
 // NewTCPServer creates a new TCP server.
-func NewTCPServer(clientManager *clients.ClientManager, messageQueue *queue.InMemoryQueue, port string) *TCPServer {
+func NewTCPServer(clientManager *clients.ClientManager, messageQueue queue.Queue, port string) *TCPServer {
 	return &TCPServer{
 		ClientManager: clientManager,
 		MessageQueue:  messageQueue,
@@ -96,7 +96,9 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 		log.Trace("Received TCP message of type %s from client %d", message.Type, message.ClientID)
 
 		// TODO: some messages might not make sense to queue for the game loop (e.g. a message to disconnect)
-		s.MessageQueue.Enqueue(message)
+		if err := s.MessageQueue.Enqueue(message); err != nil {
+			log.Error("Failed to enqueue message: %v", err)
+		}
 	}
 }
 

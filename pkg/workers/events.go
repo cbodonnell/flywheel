@@ -64,14 +64,18 @@ func (w *ClientEventWorker) handleClientConnect(event clients.ClientEvent) {
 		}
 	}
 
-	w.connectionEventQueue.Enqueue(&gametypes.ConnectPlayerEvent{
+	if err := w.connectionEventQueue.Enqueue(&gametypes.ConnectPlayerEvent{
 		ClientID:    event.ClientID,
 		PlayerState: playerState,
-	})
+	}); err != nil {
+		log.Error("Failed to enqueue connect player event: %v", err)
+	}
 }
 
 func (w *ClientEventWorker) handleClientDisconnect(event clients.ClientEvent) {
-	w.connectionEventQueue.Enqueue(&gametypes.DisconnectPlayerEvent{
+	if err := w.connectionEventQueue.Enqueue(&gametypes.DisconnectPlayerEvent{
 		ClientID: event.ClientID,
-	})
+	}); err != nil {
+		log.Error("Failed to enqueue disconnect player event: %v", err)
+	}
 }

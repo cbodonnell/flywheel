@@ -1,67 +1,69 @@
-// queue package
-
 package queue
 
-import "sync"
-
-const (
-	// QueueBufferSize represents the maximum size of a queue
-	QueueBufferSize = 1024
+import (
+	"fmt"
+	"sync"
 )
 
-// InMemoryQueue implements an in-memory queue.
 type InMemoryQueue struct {
-	ch   chan interface{}
-	lock sync.RWMutex
+	items    []interface{}
+	capacity int
+	lock     sync.RWMutex
 }
 
 // NewInMemoryQueue creates a new queue.
-func NewInMemoryQueue() *InMemoryQueue {
+func NewInMemoryQueue(capacity int) Queue {
 	return &InMemoryQueue{
-		ch: make(chan interface{}, QueueBufferSize),
+		items:    make([]interface{}, 0),
+		capacity: capacity,
 	}
 }
 
-// Enqueue adds an item to the end of the queue.
-func (q *InMemoryQueue) Enqueue(item interface{}) {
+func (q *InMemoryQueue) Enqueue(item interface{}) error {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	q.ch <- item
+
+	if len(q.items) == q.capacity {
+		return fmt.Errorf("queue is full")
+	}
+
+	q.items = append(q.items, item)
+	return nil
 }
 
-// Dequeue removes and returns the item from the front of the queue.
-func (q *InMemoryQueue) Dequeue() interface{} {
+func (q *InMemoryQueue) Dequeue() (interface{}, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	return <-q.ch
+
+	if len(q.items) == 0 {
+		return nil, fmt.Errorf("queue is empty")
+	}
+
+	item := q.items[0]
+	q.items = q.items[1:]
+	return item, nil
 }
 
-// Size returns the current size of the queue.
-func (q *InMemoryQueue) Size() int {
+func (q *InMemoryQueue) Size() (int, error) {
 	q.lock.RLock()
 	defer q.lock.RUnlock()
-	return len(q.ch)
+	return len(q.items), nil
 }
 
-// ReadAllMessages reads all pending messages in the queue
-func (q *InMemoryQueue) ReadAllMessages() []interface{} {
+func (q *InMemoryQueue) ReadAllMessages() ([]interface{}, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	var messages []interface{}
-	for len(q.ch) > 0 {
-		messages = append(messages, <-q.ch)
-	}
-
-	return messages
+	messages := make([]interface{}, len(q.items))
+	copy(messages, q.items)
+	q.items = make([]interface{}, 0)
+	return messages, nil
 }
 
-// ClearQueue clears all messages from the queue.
-func (q *InMemoryQueue) ClearQueue() {
+func (q *InMemoryQueue) ClearQueue() error {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	for len(q.ch) > 0 {
-		<-q.ch
-	}
+	q.items = make([]interface{}, 0)
+	return nil
 }
