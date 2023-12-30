@@ -11,6 +11,7 @@ RUN go mod download
 
 COPY . ./
 
+ARG VERSION
 RUN make build
 
 # Runtime stage
