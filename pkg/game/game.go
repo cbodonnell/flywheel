@@ -142,7 +142,7 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 				continue
 			}
 			if _, ok := gameState.Players[message.ClientID]; !ok {
-				log.Error("Client %d does not have a player state", message.ClientID)
+				log.Warn("Client %d is not in the game state", message.ClientID)
 				continue
 			}
 			// TODO: validate the update before applying it
