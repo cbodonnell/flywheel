@@ -58,7 +58,7 @@ func main() {
 	var repository repositories.Repository
 	switch u.Scheme {
 	case "sqlite":
-		repository, err = repositories.NewSQLiteRepository(ctx, u.Host, "./schema/migrations/sqlite")
+		repository, err = repositories.NewSQLiteRepository(ctx, u.Host, "./migrations/sqlite")
 		if err != nil {
 			panic(fmt.Sprintf("Failed to create SQLite repository: %v", err))
 		}

@@ -8,7 +8,7 @@ services:
       POSTGRES_DB: flywheel_db
     volumes:
       - flywheel-db:/var/lib/postgresql/data
-      - ./schema/migrations/postgres:/docker-entrypoint-initdb.d
+      - ./migrations/postgres:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD", "/usr/bin/pg_isready", "-U", "flywheel_user", "-d", "flywheel_db"]
       interval: 1s

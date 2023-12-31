@@ -34,6 +34,6 @@ postgres:
 	-e POSTGRES_USER=flywheel_user \
 	-e POSTGRES_DB=flywheel_db \
 	-v ${PWD}/.db/flywheel:/var/lib/postgresql/data \
-	-v ${PWD}/schema/migrations/postgres:/docker-entrypoint-initdb.d \
+	-v ${PWD}/migrations/postgres:/docker-entrypoint-initdb.d \
 	-p 5432:5432 \
 	postgres
