@@ -13,10 +13,10 @@ build:
 
 .PHONY: run
 run:
-	DATABASE_URL=postgres://flywheel_user:password@localhost:5432/flywheel_db \
 	go run \
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
-	./cmd/server/main.go
+	./cmd/server/main.go \
+	-log-level=debug
 
 .PHONY: container
 container:
@@ -26,14 +26,14 @@ container:
 	-f ./deploy/Dockerfile \
 	.
 
-.PHONY: flywheel-db
-flywheel-db:
+.PHONY: postgres
+postgres:
 	docker run --rm \
 	--name flywheel-db \
 	-e POSTGRES_PASSWORD=password \
 	-e POSTGRES_USER=flywheel_user \
 	-e POSTGRES_DB=flywheel_db \
 	-v ${PWD}/.db/flywheel:/var/lib/postgresql/data \
-	-v ${PWD}/schema/migrations:/docker-entrypoint-initdb.d \
+	-v ${PWD}/schema/migrations/postgres:/docker-entrypoint-initdb.d \
 	-p 5432:5432 \
 	postgres

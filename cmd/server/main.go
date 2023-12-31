@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"time"
 
@@ -44,11 +45,31 @@ func main() {
 	go tcpServer.Start()
 	go udpServer.Start()
 
-	connStr := os.Getenv("DATABASE_URL")
+	connStr := os.Getenv("FLYWHEEL_DATABASE_URL")
 	if connStr == "" {
-		panic("DATABASE_URL environment variable must be set")
+		connStr = "sqlite://flywheel.db"
 	}
-	repository := repositories.NewPostgresRepository(ctx, connStr)
+
+	u, err := url.Parse(connStr)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to parse connection string: %v", err))
+	}
+
+	var repository repositories.Repository
+	switch u.Scheme {
+	case "sqlite":
+		repository, err = repositories.NewSQLiteRepository(ctx, u.Host, "./schema/migrations/sqlite")
+		if err != nil {
+			panic(fmt.Sprintf("Failed to create SQLite repository: %v", err))
+		}
+	case "postgresql":
+		repository, err = repositories.NewPostgresRepository(ctx, u.String())
+		if err != nil {
+			panic(fmt.Sprintf("Failed to create Postgres repository: %v", err))
+		}
+	default:
+		panic(fmt.Sprintf("Unknown database type %s", u.Scheme))
+	}
 	defer repository.Close(ctx)
 
 	connectionEventQueue := queue.NewInMemoryQueue(1000)
