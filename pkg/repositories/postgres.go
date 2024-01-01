@@ -17,7 +17,7 @@ type PostgresRepository struct {
 // NewPostgresRepository creates a new PSQLRepository.
 // It panics if it is unable to connect to the database after 2 minutes.
 // The caller is responsible for calling Close() on the repository.
-func NewPostgresRepository(ctx context.Context, connStr string) Repository {
+func NewPostgresRepository(ctx context.Context, connStr string) (Repository, error) {
 	const maxRetry = 24
 	const retryInterval = time.Second * 5
 
@@ -34,19 +34,19 @@ func NewPostgresRepository(ctx context.Context, connStr string) Repository {
 
 		select {
 		case <-ctx.Done():
-			panic("Context canceled, cannot establish database connection")
+			return nil, fmt.Errorf("context cancelled while connecting to database: %v", ctx.Err())
 		case <-time.After(retryInterval):
-			// retry
+			continue
 		}
 	}
 
 	if err != nil {
-		panic(fmt.Sprintf("Failed to establish database connection after %d attempts: %v", maxRetry, err))
+		return nil, fmt.Errorf("failed to establish database connection after %d attempts: %v", maxRetry, err)
 	}
 
 	return &PostgresRepository{
 		conn: conn,
-	}
+	}, nil
 }
 
 func connectDb(ctx context.Context, connStr string) (*pgx.Conn, error) {
@@ -67,8 +67,8 @@ func connectDb(ctx context.Context, connStr string) (*pgx.Conn, error) {
 	return conn, nil
 }
 
-func (r *PostgresRepository) Close(ctx context.Context) {
-	r.conn.Close(ctx)
+func (r *PostgresRepository) Close(ctx context.Context) error {
+	return r.conn.Close(ctx)
 }
 
 func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gametypes.GameState) error {
@@ -79,8 +79,8 @@ func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gamet
 
 	for clientID, playerState := range gameState.Players {
 		q := `
-		INSERT INTO players (player_id, created_at, x, y) VALUES ($1, $2, $3, $4)
-		ON CONFLICT (player_id) DO UPDATE SET updated_at= $2, x = $3, y = $4;
+		INSERT INTO players (player_id, timestamp, x, y) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (player_id) DO UPDATE SET timestamp = $2, x = $3, y = $4;
 		`
 		_, err = tx.Exec(ctx, q, clientID, gameState.Timestamp, playerState.P.X, playerState.P.Y)
 		if err != nil {
@@ -97,8 +97,8 @@ func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gamet
 
 func (r *PostgresRepository) SavePlayerState(ctx context.Context, timestamp int64, clientID uint32, playerState *gametypes.PlayerState) error {
 	q := `
-	INSERT INTO players (player_id, created_at, x, y) VALUES ($1, $2, $3, $4)
-	ON CONFLICT (player_id) DO UPDATE SET updated_at= $2, x = $3, y = $4;
+	INSERT INTO players (player_id, timestamp, x, y) VALUES ($1, $2, $3, $4)
+	ON CONFLICT (player_id) DO UPDATE SET timestamp = $2, x = $3, y = $4;
 	`
 	_, err := r.conn.Exec(ctx, q, clientID, timestamp, playerState.P.X, playerState.P.Y)
 	if err != nil {
