@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/cbodonnell/flywheel/pkg/clients"
+	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	"github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/kinematic"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -145,8 +147,29 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 				log.Warn("Client %d is not in the game state", message.ClientID)
 				continue
 			}
+
+			playerState := gameState.Players[message.ClientID]
+
 			// TODO: validate the update before applying it
-			gameState.Players[message.ClientID] = clientPlayerUpdate.PlayerState
+
+			// Player Movement
+			// TODO: check if on ground, do collisions, etc...
+
+			// X-axis
+			// Apply input
+			vx := kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+			dx := kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+			playerState.Velocity.X = vx
+			playerState.Position.X += dx
+
+			// Y-axis
+			// Apply gravity
+			vy := kinematic.FinalVelocity(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
+			dy := kinematic.Displacement(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
+			playerState.Velocity.Y = vy
+			playerState.Position.Y += dy
+
+			gameState.Players[message.ClientID] = playerState
 		default:
 			log.Error("Unhandled message type: %s", message.Type)
 		}

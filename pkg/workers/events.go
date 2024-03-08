@@ -57,7 +57,7 @@ func (w *ClientEventWorker) handleClientConnect(event clients.ClientEvent) {
 		}
 		log.Debug("Adding client %d with default values", event.ClientID)
 		playerState = &gametypes.PlayerState{
-			P: gametypes.Position{
+			Position: gametypes.Position{
 				X: 0,
 				Y: 0,
 			},

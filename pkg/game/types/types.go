@@ -8,10 +8,16 @@ type GameState struct {
 }
 
 type PlayerState struct {
-	P Position `json:"p"`
+	Position Position `json:"position"`
+	Velocity Velocity `json:"velocity"`
 }
 
 type Position struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type Velocity struct {
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 }

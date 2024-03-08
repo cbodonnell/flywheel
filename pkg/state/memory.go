@@ -29,9 +29,9 @@ func (m *InMemoryStateManager) Get() (*gametypes.GameState, error) {
 	}
 	for k, v := range m.gameState.Players {
 		copy.Players[k] = &gametypes.PlayerState{
-			P: gametypes.Position{
-				X: v.P.X,
-				Y: v.P.Y,
+			Position: gametypes.Position{
+				X: v.Position.X,
+				Y: v.Position.Y,
 			},
 		}
 	}

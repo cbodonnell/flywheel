@@ -62,7 +62,7 @@ func (r *SQLiteRepository) SaveGameState(ctx context.Context, gameState *gametyp
 		INSERT OR REPLACE INTO players (player_id, timestamp, x, y)
 		VALUES (?, ?, ?, ?);
 		`
-		_, err = tx.ExecContext(ctx, q, clientID, gameState.Timestamp, playerState.P.X, playerState.P.Y)
+		_, err = tx.ExecContext(ctx, q, clientID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y)
 		if err != nil {
 			return fmt.Errorf("failed to insert player: %v", err)
 		}
@@ -80,7 +80,7 @@ func (r *SQLiteRepository) SavePlayerState(ctx context.Context, timestamp int64,
 	INSERT OR REPLACE INTO players (player_id, timestamp, x, y)
 	VALUES (?, ?, ?, ?);
 	`
-	_, err := r.db.ExecContext(ctx, q, clientID, timestamp, playerState.P.X, playerState.P.Y)
+	_, err := r.db.ExecContext(ctx, q, clientID, timestamp, playerState.Position.X, playerState.Position.Y)
 	if err != nil {
 		return fmt.Errorf("failed to insert player: %v", err)
 	}
@@ -102,7 +102,7 @@ func (r *SQLiteRepository) LoadPlayerState(ctx context.Context, clientID uint32)
 	}
 
 	return &gametypes.PlayerState{
-		P: gametypes.Position{
+		Position: gametypes.Position{
 			X: x,
 			Y: y,
 		},

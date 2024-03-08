@@ -82,7 +82,7 @@ func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gamet
 		INSERT INTO players (player_id, timestamp, x, y) VALUES ($1, $2, $3, $4)
 		ON CONFLICT (player_id) DO UPDATE SET timestamp = $2, x = $3, y = $4;
 		`
-		_, err = tx.Exec(ctx, q, clientID, gameState.Timestamp, playerState.P.X, playerState.P.Y)
+		_, err = tx.Exec(ctx, q, clientID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y)
 		if err != nil {
 			return fmt.Errorf("failed to insert player: %v", err)
 		}
@@ -100,7 +100,7 @@ func (r *PostgresRepository) SavePlayerState(ctx context.Context, timestamp int6
 	INSERT INTO players (player_id, timestamp, x, y) VALUES ($1, $2, $3, $4)
 	ON CONFLICT (player_id) DO UPDATE SET timestamp = $2, x = $3, y = $4;
 	`
-	_, err := r.conn.Exec(ctx, q, clientID, timestamp, playerState.P.X, playerState.P.Y)
+	_, err := r.conn.Exec(ctx, q, clientID, timestamp, playerState.Position.X, playerState.Position.Y)
 	if err != nil {
 		return fmt.Errorf("failed to insert player: %v", err)
 	}
@@ -122,7 +122,7 @@ func (r *PostgresRepository) LoadPlayerState(ctx context.Context, clientID uint3
 	}
 
 	return &gametypes.PlayerState{
-		P: gametypes.Position{
+		Position: gametypes.Position{
 			X: x,
 			Y: y,
 		},
