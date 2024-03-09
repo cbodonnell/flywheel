@@ -160,47 +160,53 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 				continue
 			}
 
-			playerState := gameState.Players[message.ClientID]
+			if gameState.Players[message.ClientID].LastProcessedTimestamp > clientPlayerUpdate.Timestamp {
+				log.Warn("Client %d sent an outdated player update", message.ClientID)
+				continue
+			}
 
 			// TODO: validate the update before applying it
-
-			// Player Movement
-
-			// X-axis
-			// Apply input
-			dx := kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
-			vx := kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
-
-			// Check for collisions
-			if collision := playerState.Object.Check(dx, 0); collision != nil {
-				dx = collision.ContactWithObject(collision.Objects[0]).X
-				vx = 0
-			}
-
-			// Update player state
-			playerState.Position.X += dx
-			playerState.Velocity.X = vx
-
-			// Y-axis
-			// Apply gravity if not on ground
-			dy := kinematic.Displacement(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
-			vy := kinematic.FinalVelocity(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
-
-			// Check for collisions
-			if collision := playerState.Object.Check(0, dy); collision != nil {
-				dy = collision.ContactWithObject(collision.Objects[0]).Y
-				vy = 0
-			}
-
-			// Update player state
-			playerState.Position.Y += dy
-			playerState.Velocity.Y = vy
-
-			gameState.Players[message.ClientID] = playerState
+			updatePlayerState(gameState.Players[message.ClientID], clientPlayerUpdate)
 		default:
 			log.Error("Unhandled message type: %s", message.Type)
 		}
 	}
+}
+
+// updatePlayerState updates the player's position and velocity based on the
+// client's input and the game state.
+// The player state is updated in place.
+func updatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messages.ClientPlayerUpdate) {
+	// X-axis
+	// Apply input
+	dx := kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+	vx := kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+
+	// Check for collisions
+	if collision := playerState.Object.Check(dx, 0); collision != nil {
+		dx = collision.ContactWithObject(collision.Objects[0]).X
+		vx = 0
+	}
+
+	// Update player state
+	playerState.Position.X += dx
+	playerState.Velocity.X = vx
+
+	// Y-axis
+	// Apply gravity if not on ground
+	dy := kinematic.Displacement(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
+	vy := kinematic.FinalVelocity(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
+
+	// Check for collisions
+	if collision := playerState.Object.Check(0, dy); collision != nil {
+		dy = collision.ContactWithObject(collision.Objects[0]).Y
+		vy = 0
+	}
+
+	// Update player state
+	playerState.Position.Y += dy
+	playerState.Velocity.Y = vy
+	playerState.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
 }
 
 // broadcastGameState sends the game state to connected clients.

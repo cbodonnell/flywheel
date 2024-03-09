@@ -9,6 +9,10 @@ endif
 mocks:
 	docker run -v "${PWD}":/src -w /src vektra/mockery --all
 
+.PHONY: test
+test:
+	go test -v -cover ./...
+
 .PHONY: build
 build:
 	go build \

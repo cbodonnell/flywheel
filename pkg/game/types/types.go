@@ -10,9 +10,10 @@ type GameState struct {
 }
 
 type PlayerState struct {
-	Position Position       `json:"position"`
-	Velocity Velocity       `json:"velocity"`
-	Object   *resolv.Object `json:"-"`
+	LastProcessedTimestamp int64          `json:"lastProcessedTimestamp"`
+	Position               Position       `json:"position"`
+	Velocity               Velocity       `json:"velocity"`
+	Object                 *resolv.Object `json:"-"`
 }
 
 type Position struct {

@@ -4,17 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
-	"time"
 
 	mocks "github.com/cbodonnell/flywheel/mocks/github.com/cbodonnell/flywheel/pkg/queue"
-	"github.com/cbodonnell/flywheel/pkg/clients"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	"github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
-	"github.com/cbodonnell/flywheel/pkg/repositories"
-	"github.com/cbodonnell/flywheel/pkg/state"
-	"github.com/cbodonnell/flywheel/pkg/workers"
 	"github.com/solarlune/resolv"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,14 +18,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 	mockQueue := mocks.NewQueue(t)
 
 	type fields struct {
-		clientManager        *clients.ClientManager
-		clientMessageQueue   queue.Queue
-		connectionEventQueue queue.Queue
-		repository           repositories.Repository
-		stateManager         state.StateManager
-		savePlayerStateChan  chan<- workers.SavePlayerStateRequest
-		gameLoopInterval     time.Duration
-		collisionSpace       *resolv.Space
+		clientMessageQueue queue.Queue
 	}
 	type args struct {
 		gameState *types.GameState
@@ -73,6 +61,114 @@ func TestGameManager_processClientMessages(t *testing.T) {
 						DeltaTime: 0.1,
 					},
 					{
+						Timestamp: 2,
+						InputX:    1,
+						InputY:    0,
+						DeltaTime: 0.1,
+					},
+				}
+				testMessages := make([]interface{}, len(testClientPlayerUpdates))
+
+				for i, update := range testClientPlayerUpdates {
+					payload, err := json.Marshal(update)
+					if err != nil {
+						t.Fatalf("failed to marshal payload: %v", err)
+					}
+					testMessages[i] = &messages.Message{
+						ClientID: 1,
+						Type:     messages.MessageTypeClientPlayerUpdate,
+						Payload:  payload,
+					}
+				}
+
+				mockQueue.EXPECT().ReadAllMessages().Return(testMessages, nil).Once()
+			},
+			want: &types.GameState{
+				Players: map[uint32]*types.PlayerState{
+					1: {
+						Position: types.Position{
+							X: 0.5,
+							Y: -0.19600000000000004,
+						},
+						Velocity: types.Velocity{
+							X: 5,
+							Y: -1.9600000000000002,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "no messages",
+			fields: fields{
+				clientMessageQueue: mockQueue,
+			},
+			args: args{
+				gameState: &types.GameState{
+					Players: map[uint32]*types.PlayerState{
+						1: {
+							Position: types.Position{
+								X: 0,
+								Y: 0,
+							},
+							Velocity: types.Velocity{
+								X: 0,
+								Y: 0,
+							},
+							Object: resolv.NewObject(constants.PlayerStartingX, constants.PlayerStartingY, constants.PlayerWidth, constants.PlayerHeight),
+						},
+					},
+				},
+			},
+			setup: func() {
+				mockQueue.EXPECT().ReadAllMessages().Return([]interface{}{}, nil).Once()
+			},
+			want: &types.GameState{
+				Players: map[uint32]*types.PlayerState{
+					1: {
+						Position: types.Position{
+							X: 0,
+							Y: 0,
+						},
+						Velocity: types.Velocity{
+							X: 0,
+							Y: 0,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "out of order messages",
+			fields: fields{
+				clientMessageQueue: mockQueue,
+			},
+			args: args{
+				gameState: &types.GameState{
+					Players: map[uint32]*types.PlayerState{
+						1: {
+							Position: types.Position{
+								X: 0,
+								Y: 0,
+							},
+							Velocity: types.Velocity{
+								X: 0,
+								Y: 0,
+							},
+							Object: resolv.NewObject(constants.PlayerStartingX, constants.PlayerStartingY, constants.PlayerWidth, constants.PlayerHeight),
+						},
+					},
+				},
+			},
+			setup: func() {
+				testClientPlayerUpdates := []messages.ClientPlayerUpdate{
+					{
+						Timestamp: 2,
+						InputX:    0,
+						InputY:    0,
+						DeltaTime: 0.1,
+					},
+					{
 						Timestamp: 1,
 						InputX:    1,
 						InputY:    0,
@@ -93,18 +189,18 @@ func TestGameManager_processClientMessages(t *testing.T) {
 					}
 				}
 
-				mockQueue.EXPECT().ReadAllMessages().Return(testMessages, nil)
+				mockQueue.EXPECT().ReadAllMessages().Return(testMessages, nil).Once()
 			},
 			want: &types.GameState{
 				Players: map[uint32]*types.PlayerState{
 					1: {
 						Position: types.Position{
-							X: 0.5,
-							Y: -0.19600000000000004,
+							X: 0.0,
+							Y: -0.049000000000000016,
 						},
 						Velocity: types.Velocity{
-							X: 5,
-							Y: -1.9600000000000002,
+							X: 0,
+							Y: -0.9800000000000001,
 						},
 					},
 				},
@@ -117,14 +213,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 				tt.setup()
 			}
 			gm := &GameManager{
-				clientManager:        tt.fields.clientManager,
-				clientMessageQueue:   tt.fields.clientMessageQueue,
-				connectionEventQueue: tt.fields.connectionEventQueue,
-				repository:           tt.fields.repository,
-				stateManager:         tt.fields.stateManager,
-				savePlayerStateChan:  tt.fields.savePlayerStateChan,
-				gameLoopInterval:     tt.fields.gameLoopInterval,
-				collisionSpace:       tt.fields.collisionSpace,
+				clientMessageQueue: tt.fields.clientMessageQueue,
 			}
 			gm.processClientMessages(tt.args.gameState)
 			if tt.want != nil {
