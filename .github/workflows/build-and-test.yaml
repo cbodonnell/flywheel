@@ -1,0 +1,32 @@
+name: Build and Test
+
+on:
+  push:
+
+jobs:
+  build-binary:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: 1.22
+    - name: build go binary
+      run: make build
+
+  build-image:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: build image
+      run: make container
+
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: 1.22
+    - name: run unit tests
+      run: make test
