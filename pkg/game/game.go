@@ -188,12 +188,8 @@ func updatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messa
 		vx = 0
 	}
 
-	// Update player state
-	playerState.Position.X += dx
-	playerState.Velocity.X = vx
-
 	// Y-axis
-	// Apply gravity if not on ground
+	// Apply gravity (TODO: if not on ground)
 	dy := kinematic.Displacement(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
 	vy := kinematic.FinalVelocity(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
 
@@ -204,9 +200,15 @@ func updatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messa
 	}
 
 	// Update player state
+	playerState.Position.X += dx
+	playerState.Velocity.X = vx
 	playerState.Position.Y += dy
 	playerState.Velocity.Y = vy
 	playerState.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
+
+	playerState.Object.Position.X += playerState.Position.X
+	playerState.Object.Position.Y += playerState.Position.Y
+	playerState.Object.Update()
 }
 
 // broadcastGameState sends the game state to connected clients.
