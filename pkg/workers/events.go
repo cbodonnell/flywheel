@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cbodonnell/flywheel/pkg/clients"
+	gameconstants "github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -58,8 +59,8 @@ func (w *ClientEventWorker) handleClientConnect(event clients.ClientEvent) {
 		log.Debug("Adding client %d with default values", event.ClientID)
 		playerState = &gametypes.PlayerState{
 			Position: gametypes.Position{
-				X: 0,
-				Y: 0,
+				X: gameconstants.PlayerStartingX,
+				Y: gameconstants.PlayerStartingY,
 			},
 		}
 	}

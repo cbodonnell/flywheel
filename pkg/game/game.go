@@ -17,6 +17,7 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/servers"
 	"github.com/cbodonnell/flywheel/pkg/state"
 	"github.com/cbodonnell/flywheel/pkg/workers"
+	"github.com/solarlune/resolv"
 )
 
 type GameManager struct {
@@ -27,6 +28,7 @@ type GameManager struct {
 	stateManager         state.StateManager
 	savePlayerStateChan  chan<- workers.SavePlayerStateRequest
 	gameLoopInterval     time.Duration
+	collisionSpace       *resolv.Space
 }
 
 // NewGameManagerOptions contains options for creating a new GameManager.
@@ -38,6 +40,7 @@ type NewGameManagerOptions struct {
 	StateManager         state.StateManager
 	SavePlayerStateChan  chan<- workers.SavePlayerStateRequest
 	GameLoopInterval     time.Duration
+	CollisionSpace       *resolv.Space
 }
 
 func NewGameManager(opts NewGameManagerOptions) *GameManager {
@@ -49,6 +52,7 @@ func NewGameManager(opts NewGameManagerOptions) *GameManager {
 		stateManager:         opts.StateManager,
 		savePlayerStateChan:  opts.SavePlayerStateChan,
 		gameLoopInterval:     opts.GameLoopInterval,
+		collisionSpace:       opts.CollisionSpace,
 	}
 }
 
@@ -104,7 +108,12 @@ func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
 	for _, item := range pendingEvents {
 		switch event := item.(type) {
 		case *types.ConnectPlayerEvent:
-			gameState.Players[event.ClientID] = event.PlayerState
+			playerState := event.PlayerState
+			playerState.Object = resolv.NewObject(playerState.Position.X, playerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight)
+			// add the player to the game state
+			gameState.Players[event.ClientID] = playerState
+			// add the player object to the collision space
+			gm.collisionSpace.Add(playerState.Object)
 		case *types.DisconnectPlayerEvent:
 			// send a request to save the player state before deleting it
 			saveRequest := workers.SavePlayerStateRequest{
@@ -113,6 +122,9 @@ func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
 				PlayerState: gameState.Players[event.ClientID],
 			}
 			gm.savePlayerStateChan <- saveRequest
+			// remove the player object from the collision space
+			gm.collisionSpace.Remove(gameState.Players[event.ClientID].Object)
+			// delete the player from the game state
 			delete(gameState.Players, event.ClientID)
 		default:
 			log.Error("unhandled connection event type: %T", event)
@@ -153,21 +165,36 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 			// TODO: validate the update before applying it
 
 			// Player Movement
-			// TODO: check if on ground, do collisions, etc...
 
 			// X-axis
 			// Apply input
-			vx := kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
 			dx := kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
-			playerState.Velocity.X = vx
+			vx := kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+
+			// Check for collisions
+			if collision := playerState.Object.Check(dx, 0); collision != nil {
+				dx = collision.ContactWithObject(collision.Objects[0]).X
+				vx = 0
+			}
+
+			// Update player state
 			playerState.Position.X += dx
+			playerState.Velocity.X = vx
 
 			// Y-axis
-			// Apply gravity
-			vy := kinematic.FinalVelocity(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
+			// Apply gravity if not on ground
 			dy := kinematic.Displacement(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
-			playerState.Velocity.Y = vy
+			vy := kinematic.FinalVelocity(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
+
+			// Check for collisions
+			if collision := playerState.Object.Check(0, dy); collision != nil {
+				dy = collision.ContactWithObject(collision.Objects[0]).Y
+				vy = 0
+			}
+
+			// Update player state
 			playerState.Position.Y += dy
+			playerState.Velocity.Y = vy
 
 			gameState.Players[message.ClientID] = playerState
 		default:

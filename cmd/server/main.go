@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cbodonnell/flywheel/pkg/clients"
+	"github.com/cbodonnell/flywheel/pkg/collisions"
 	"github.com/cbodonnell/flywheel/pkg/game"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -103,6 +104,7 @@ func main() {
 		StateManager:         stateManager,
 		SavePlayerStateChan:  savePlayerStateChan,
 		GameLoopInterval:     gameLoopInterval,
+		CollisionSpace:       collisions.NewCollisionSpace(),
 	})
 
 	log.Info("Starting game manager")
