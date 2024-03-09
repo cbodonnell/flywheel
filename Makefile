@@ -5,6 +5,10 @@ ifneq ($(shell git status --porcelain),)
 	VERSION := $(VERSION)-dirty
 endif
 
+.PHONY: mocks
+mocks:
+	docker run -v "${PWD}":/src -w /src vektra/mockery --all
+
 .PHONY: build
 build:
 	go build \
