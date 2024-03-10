@@ -87,11 +87,11 @@ func TestGameManager_processClientMessages(t *testing.T) {
 				Players: map[uint32]*types.PlayerState{
 					1: {
 						Position: types.Position{
-							X: 0.5,
+							X: 5,
 							Y: -0.19600000000000004,
 						},
 						Velocity: types.Velocity{
-							X: 5,
+							X: 50,
 							Y: -1.9600000000000002,
 						},
 					},
