@@ -190,8 +190,8 @@ func updatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messa
 
 	// Y-axis
 	// Apply gravity (TODO: if not on ground)
-	dy := kinematic.Displacement(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
-	vy := kinematic.FinalVelocity(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity)
+	dy := kinematic.Displacement(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
+	vy := kinematic.FinalVelocity(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
 
 	// Check for collisions
 	if collision := playerState.Object.Check(0, dy); collision != nil {
@@ -206,8 +206,8 @@ func updatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messa
 	playerState.Velocity.Y = vy
 	playerState.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
 
-	playerState.Object.Position.X += playerState.Position.X
-	playerState.Object.Position.Y += playerState.Position.Y
+	playerState.Object.Position.X = playerState.Position.X
+	playerState.Object.Position.Y = playerState.Position.Y
 	playerState.Object.Update()
 }
 
