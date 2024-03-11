@@ -38,7 +38,8 @@ func (m *InMemoryStateManager) Get() (*gametypes.GameState, error) {
 				X: v.Velocity.X,
 				Y: v.Velocity.Y,
 			},
-			Object: v.Object,
+			IsOnGround: v.IsOnGround,
+			Object:     v.Object,
 		}
 	}
 

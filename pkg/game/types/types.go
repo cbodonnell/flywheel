@@ -14,6 +14,7 @@ type PlayerState struct {
 	Position               Position       `json:"position"`
 	Velocity               Velocity       `json:"velocity"`
 	Object                 *resolv.Object `json:"-"`
+	IsOnGround             bool           `json:"isOnGround"`
 }
 
 type Position struct {

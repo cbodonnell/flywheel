@@ -166,6 +166,7 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 			}
 
 			// TODO: validate the update before applying it
+			log.Trace("Player %d initial position: %v, velocity: %v, isOnGround: %v", message.ClientID, gameState.Players[message.ClientID].Position, gameState.Players[message.ClientID].Velocity, gameState.Players[message.ClientID].IsOnGround)
 			updatePlayerState(gameState.Players[message.ClientID], clientPlayerUpdate)
 		default:
 			log.Error("Unhandled message type: %s", message.Type)
@@ -189,22 +190,31 @@ func updatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messa
 	}
 
 	// Y-axis
-	// Apply gravity (TODO: if not on ground)
-	dy := kinematic.Displacement(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
-	vy := kinematic.FinalVelocity(playerState.Velocity.Y, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
+	// Apply input
+	vy := playerState.Velocity.Y
+	if playerState.IsOnGround && clientPlayerUpdate.InputJump {
+		vy = constants.PlayerJumpSpeed
+	}
+
+	// Apply gravity
+	dy := kinematic.Displacement(vy, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
+	vy = kinematic.FinalVelocity(vy, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
 
 	// Check for collisions
+	isOnGround := false
 	if collision := playerState.Object.Check(0, dy); collision != nil {
 		dy = collision.ContactWithObject(collision.Objects[0]).Y
 		vy = 0
+		isOnGround = true
 	}
 
 	// Update player state
+	playerState.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
 	playerState.Position.X += dx
 	playerState.Velocity.X = vx
 	playerState.Position.Y += dy
 	playerState.Velocity.Y = vy
-	playerState.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
+	playerState.IsOnGround = isOnGround
 
 	playerState.Object.Position.X = playerState.Position.X
 	playerState.Object.Position.Y = playerState.Position.Y

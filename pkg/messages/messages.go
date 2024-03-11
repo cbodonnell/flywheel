@@ -32,6 +32,8 @@ type ClientPlayerUpdate struct {
 	InputX float64 `json:"inputX"`
 	// InputY is the y-axis input from the client ranging from -1 to 1
 	InputY float64 `json:"inputY"`
+	// InputJump is the jump input from the client
+	InputJump bool `json:"inputJump"`
 	// DeltaTime is the time since the last update as recorded by the client
 	DeltaTime float64 `json:"deltaTime"`
 }
