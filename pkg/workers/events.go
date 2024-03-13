@@ -3,22 +3,22 @@ package workers
 import (
 	"context"
 
-	"github.com/cbodonnell/flywheel/pkg/clients"
 	gameconstants "github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
+	"github.com/cbodonnell/flywheel/pkg/network"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 )
 
 type ClientEventWorker struct {
-	clientManager        *clients.ClientManager
+	clientManager        *network.ClientManager
 	repository           repositories.Repository
 	connectionEventQueue queue.Queue
 }
 
 type NewClientEventWorkerOptions struct {
-	ClientManager        *clients.ClientManager
+	ClientManager        *network.ClientManager
 	Repository           repositories.Repository
 	ConnectionEventQueue queue.Queue
 }
@@ -37,9 +37,9 @@ func NewClientEventWorker(opts NewClientEventWorkerOptions) *ClientEventWorker {
 func (w *ClientEventWorker) Start() {
 	for event := range w.clientManager.GetClientEventChan() {
 		switch event.Type {
-		case clients.ClientEventTypeConnect:
+		case network.ClientEventTypeConnect:
 			w.handleClientConnect(event)
-		case clients.ClientEventTypeDisconnect:
+		case network.ClientEventTypeDisconnect:
 			w.handleClientDisconnect(event)
 		default:
 			log.Error("Unknown client event type: %v", event.Type)
@@ -48,7 +48,7 @@ func (w *ClientEventWorker) Start() {
 	}
 }
 
-func (w *ClientEventWorker) handleClientConnect(event clients.ClientEvent) {
+func (w *ClientEventWorker) handleClientConnect(event network.ClientEvent) {
 	var playerState *gametypes.PlayerState
 	if lastKnownState, err := w.repository.LoadPlayerState(context.Background(), event.ClientID); err == nil {
 		playerState = lastKnownState
@@ -73,7 +73,7 @@ func (w *ClientEventWorker) handleClientConnect(event clients.ClientEvent) {
 	}
 }
 
-func (w *ClientEventWorker) handleClientDisconnect(event clients.ClientEvent) {
+func (w *ClientEventWorker) handleClientDisconnect(event network.ClientEvent) {
 	if err := w.connectionEventQueue.Enqueue(&gametypes.DisconnectPlayerEvent{
 		ClientID: event.ClientID,
 	}); err != nil {

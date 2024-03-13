@@ -1,11 +1,10 @@
-package servers
+package network
 
 import (
 	"encoding/json"
 	"fmt"
 	"net"
 
-	"github.com/cbodonnell/flywheel/pkg/clients"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -13,13 +12,13 @@ import (
 
 // TCPServer represents a TCP server.
 type TCPServer struct {
-	ClientManager *clients.ClientManager
+	ClientManager *ClientManager
 	MessageQueue  queue.Queue
 	Port          string
 }
 
 // NewTCPServer creates a new TCP server.
-func NewTCPServer(clientManager *clients.ClientManager, messageQueue queue.Queue, port string) *TCPServer {
+func NewTCPServer(clientManager *ClientManager, messageQueue queue.Queue, port string) *TCPServer {
 	return &TCPServer{
 		ClientManager: clientManager,
 		MessageQueue:  messageQueue,

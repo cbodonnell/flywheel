@@ -6,22 +6,21 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cbodonnell/flywheel/pkg/clients"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	"github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/kinematic"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
+	"github.com/cbodonnell/flywheel/pkg/network"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
-	"github.com/cbodonnell/flywheel/pkg/servers"
 	"github.com/cbodonnell/flywheel/pkg/state"
 	"github.com/cbodonnell/flywheel/pkg/workers"
 	"github.com/solarlune/resolv"
 )
 
 type GameManager struct {
-	clientManager        *clients.ClientManager
+	clientManager        *network.ClientManager
 	clientMessageQueue   queue.Queue
 	connectionEventQueue queue.Queue
 	repository           repositories.Repository
@@ -33,7 +32,7 @@ type GameManager struct {
 
 // NewGameManagerOptions contains options for creating a new GameManager.
 type NewGameManagerOptions struct {
-	ClientManager        *clients.ClientManager
+	ClientManager        *network.ClientManager
 	ClientMessageQueue   queue.Queue
 	ConnectionEventQueue queue.Queue
 	Repository           repositories.Repository
@@ -241,7 +240,7 @@ func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
 			continue
 		}
 		// TODO: reliable vs unreliable messages
-		err := servers.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
+		err := network.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
 		if err != nil {
 			log.Error("Failed to write message to UDP connection for client %d: %v", client.ID, err)
 			continue

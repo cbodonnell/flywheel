@@ -8,13 +8,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/cbodonnell/flywheel/pkg/clients"
 	"github.com/cbodonnell/flywheel/pkg/collisions"
 	"github.com/cbodonnell/flywheel/pkg/game"
 	"github.com/cbodonnell/flywheel/pkg/log"
+	"github.com/cbodonnell/flywheel/pkg/network"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
-	"github.com/cbodonnell/flywheel/pkg/servers"
 	"github.com/cbodonnell/flywheel/pkg/state"
 	"github.com/cbodonnell/flywheel/pkg/version"
 	"github.com/cbodonnell/flywheel/pkg/workers"
@@ -38,11 +37,11 @@ func main() {
 	log.Info("Starting server version %s", version.Get())
 	ctx := context.Background()
 
-	clientManager := clients.NewClientManager()
+	clientManager := network.NewClientManager()
 	clientMessageQueue := queue.NewInMemoryQueue(10000)
 
-	tcpServer := servers.NewTCPServer(clientManager, clientMessageQueue, *tcpPort)
-	udpServer := servers.NewUDPServer(clientManager, clientMessageQueue, *udpPort)
+	tcpServer := network.NewTCPServer(clientManager, clientMessageQueue, *tcpPort)
+	udpServer := network.NewUDPServer(clientManager, clientMessageQueue, *udpPort)
 	go tcpServer.Start()
 	go udpServer.Start()
 
