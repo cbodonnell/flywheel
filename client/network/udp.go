@@ -12,31 +12,32 @@ import (
 
 // UDPClient represents a UDP client.
 type UDPClient struct {
-	serverAddr   string
+	serverAddr   *net.UDPAddr
 	messageQueue queue.Queue
 	conn         *net.UDPConn
 }
 
 // NewUDPClient creates a new UDP client.
-func NewUDPClient(serverAddr string, messageQueue queue.Queue) *UDPClient {
-	return &UDPClient{
-		serverAddr: serverAddr,
+func NewUDPClient(serverAddr string, messageQueue queue.Queue) (*UDPClient, error) {
+	serverUDPAddr, err := net.ResolveUDPAddr("udp", serverAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve UDP address: %v", err)
 	}
+
+	return &UDPClient{
+		serverAddr:   serverUDPAddr,
+		messageQueue: messageQueue,
+	}, nil
 }
 
-// Start starts the UDP client.
-func (c *UDPClient) Start() error {
-	udpAddr, err := net.ResolveUDPAddr("udp", c.serverAddr)
+// Connect starts the UDP client.
+func (c *UDPClient) Connect() error {
+	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
-		return fmt.Errorf("failed to resolve UDP address: %v", err)
+		return fmt.Errorf("failed to listen on UDP address: %v", err)
 	}
-
-	conn, err := net.DialUDP("udp", nil, udpAddr)
-	if err != nil {
-		return fmt.Errorf("failed to connect to server: %v", err)
-	}
-	c.conn = conn
 	defer conn.Close()
+	c.conn = conn
 
 	for {
 		msg, err := ReceiveUDPMessage(conn)
@@ -44,12 +45,19 @@ func (c *UDPClient) Start() error {
 			fmt.Printf("Failed to receive message from UDP connection: %v\n", err)
 			continue
 		}
-		log.Debug("Received message from UDP server: %v", msg)
+		log.Trace("Received message from UDP server of type %s", msg.Type)
 
-		// TODO: some messages might not make sense to queue (e.g. server pong)
-		if err := c.messageQueue.Enqueue(msg); err != nil {
-			log.Error("Failed to enqueue message: %v", err)
+		switch msg.Type {
+		case messages.MessageTypeServerPong:
+			log.Debug("Received server pong")
+		case messages.MessageTypeServerGameUpdate:
+			if err := c.messageQueue.Enqueue(msg); err != nil {
+				log.Error("Failed to enqueue message: %v", err)
+			}
+		default:
+			log.Warn("Received unexpected message type from UDP server: %s", msg.Type)
 		}
+
 	}
 }
 
@@ -60,7 +68,7 @@ func (c *UDPClient) SendMessage(msg *messages.Message) error {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}
 
-	_, err = c.conn.Write(jsonData)
+	_, err = c.conn.WriteToUDP(jsonData, c.serverAddr)
 	if err != nil {
 		return fmt.Errorf("failed to write message to UDP connection: %v", err)
 	}

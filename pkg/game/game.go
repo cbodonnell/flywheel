@@ -239,7 +239,7 @@ func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
 			log.Trace("Client %d does not have a UDP address", client.ID)
 			continue
 		}
-		// TODO: reliable vs unreliable messages
+
 		err := network.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
 		if err != nil {
 			log.Error("Failed to write message to UDP connection for client %d: %v", client.ID, err)

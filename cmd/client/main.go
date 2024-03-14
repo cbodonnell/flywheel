@@ -1,11 +1,17 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"image/color"
-	"log"
+	"os"
 	"strings"
 
+	"github.com/cbodonnell/flywheel/client/network"
+	"github.com/cbodonnell/flywheel/pkg/log"
+	"github.com/cbodonnell/flywheel/pkg/messages"
+	"github.com/cbodonnell/flywheel/pkg/queue"
+	"github.com/cbodonnell/flywheel/pkg/version"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
@@ -37,6 +43,8 @@ func (m GameMode) String() string {
 
 // Game implements ebiten.Game interface, which has Update, Draw and Layout methods.
 type Game struct {
+	// networkManager is the network manager.
+	networkManager *network.NetworkManager
 	// mode is the current game mode.
 	mode GameMode
 	// touchIDs is the last touch identifiers.
@@ -45,18 +53,19 @@ type Game struct {
 	gamepadIDs []ebiten.GamepadID
 }
 
-func NewGame() ebiten.Game {
+func NewGame(networkManager *network.NetworkManager) ebiten.Game {
 	return &Game{
-		mode: GameModeMenu,
+		networkManager: networkManager,
+		mode:           GameModeMenu,
 	}
 }
 
 var mplusNormalFont font.Face
 
-func init() {
+func loadFonts() error {
 	tt, err := opentype.Parse(fonts.MPlus1pRegular_ttf)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to parse font: %v", err)
 	}
 	const dpi = 72
 	mplusNormalFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
@@ -65,8 +74,10 @@ func init() {
 		Hinting: font.HintingVertical,
 	})
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to create font face: %v", err)
 	}
+
+	return nil
 }
 
 func (g *Game) isKeyJustPressed() bool {
@@ -103,6 +114,21 @@ func (g *Game) isKeyJustPressed() bool {
 }
 
 func (g *Game) Update() error {
+	serverMessages, err := g.networkManager.ServerMessageQueue().ReadAllMessages()
+	if err != nil {
+		return fmt.Errorf("failed to read server messages: %v", err)
+	}
+
+	for _, item := range serverMessages {
+		message, ok := item.(*messages.Message)
+		if !ok {
+			log.Error("Failed to cast message to messages.Message")
+			continue
+		}
+
+		log.Debug("Processing server message of type %s", message.Type)
+	}
+
 	switch g.mode {
 	case GameModeMenu:
 		if g.isKeyJustPressed() {
@@ -134,7 +160,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	t = strings.ToUpper(t)
 	bounds, _ := font.BoundString(mplusNormalFont, t)
 	op := &ebiten.DrawImageOptions{}
-	// // Center the text
 	op.GeoM.Translate(ScreenWidth/2-float64(bounds.Max.X>>6)/2, ScreenHeight/2-float64(bounds.Max.Y>>6)/2)
 	op.ColorScale.ScaleWithColor(color.White)
 	text.DrawWithOptions(screen, t, mplusNormalFont, op)
@@ -150,9 +175,37 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 }
 
 func main() {
+	logLevel := flag.String("log-level", "info", "Log level")
+	flag.Parse()
+
+	parsedLogLevel, err := log.ParseLogLevel(*logLevel)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to parse log level: %v", err))
+	}
+
+	logger := log.New(os.Stdout, "", log.DefaultLoggerFlag, parsedLogLevel)
+	log.SetDefaultLogger(logger)
+	log.Info("Log level set to %s", parsedLogLevel)
+
+	log.Info("Starting client version %s", version.Get())
+
+	if err := loadFonts(); err != nil {
+		panic(fmt.Sprintf("Failed to load fonts: %v", err))
+	}
+
+	serverMessageQueue := queue.NewInMemoryQueue(1024)
+	networkManager, err := network.NewNetworkManager(serverMessageQueue)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create network manager: %v", err))
+	}
+
+	if err := networkManager.Start(); err != nil {
+		panic(fmt.Sprintf("Failed to start network manager: %v", err))
+	}
+
 	ebiten.SetWindowSize(640, 480)
 	ebiten.SetWindowTitle("Hello, World!")
-	if err := ebiten.RunGame(NewGame()); err != nil {
-		log.Fatal(err)
+	if err := ebiten.RunGame(NewGame(networkManager)); err != nil {
+		panic(fmt.Sprintf("Failed to run game: %v", err))
 	}
 }

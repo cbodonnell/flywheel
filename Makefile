@@ -26,6 +26,13 @@ run:
 	./cmd/server/main.go \
 	-log-level=debug
 
+.PHONY: run-client
+run-client:
+	go run \
+	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
+	./cmd/client/main.go \
+	-log-level=debug
+
 .PHONY: container
 container:
 	docker build \

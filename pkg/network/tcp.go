@@ -71,11 +71,21 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 
 	log.Debug("TCP Connection established for client %d", clientID)
 
+	assignID := messages.AssignID{
+		ClientID: clientID,
+	}
+
+	payload, err := json.Marshal(assignID)
+	if err != nil {
+		log.Error("Failed to marshal assignID: %v", err)
+		return
+	}
+
 	// Send the client its ID
 	message := &messages.Message{
 		ClientID: 0,
 		Type:     messages.MessageTypeServerAssignID,
-		Payload:  []byte(fmt.Sprintf(`{"clientID":%d}`, clientID)),
+		Payload:  payload,
 	}
 	if err := WriteMessageToTCP(conn, message); err != nil {
 		log.Error("Error writing TCP message of type %s to client %d: %v", message.Type, clientID, err)
