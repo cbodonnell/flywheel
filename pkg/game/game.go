@@ -108,7 +108,7 @@ func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
 		switch event := item.(type) {
 		case *types.ConnectPlayerEvent:
 			playerState := event.PlayerState
-			playerState.Object = resolv.NewObject(playerState.Position.X, playerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight)
+			playerState.Object = resolv.NewObject(playerState.Position.X, playerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer)
 			// add the player to the game state
 			gameState.Players[event.ClientID] = playerState
 			// add the player object to the collision space

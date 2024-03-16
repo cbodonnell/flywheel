@@ -93,7 +93,7 @@ func (m *NetworkManager) Start() error {
 	return nil
 }
 
-// Stop stops the network manager.
+// Stop stops the network manager and its clients and clears the server message queue.
 func (m *NetworkManager) Stop() error {
 	if m.cancelClientCtx == nil {
 		log.Warn("Network manager already stopped")
