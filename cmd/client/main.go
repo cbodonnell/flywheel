@@ -1,13 +1,18 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"image/color"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/cbodonnell/flywheel/client/network"
+	"github.com/cbodonnell/flywheel/pkg/game"
+	"github.com/cbodonnell/flywheel/pkg/game/constants"
+	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -17,6 +22,8 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
+	"github.com/hajimehoshi/ebiten/v2/vector"
+	"github.com/solarlune/resolv"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 )
@@ -27,6 +34,7 @@ const (
 	GameModeMenu GameMode = iota
 	GameModePlay
 	GameModeOver
+	GameModeNetworkError
 )
 
 func (m GameMode) String() string {
@@ -37,6 +45,8 @@ func (m GameMode) String() string {
 		return "Play"
 	case GameModeOver:
 		return "Over"
+	case GameModeNetworkError:
+		return "NetworkError"
 	}
 	return "Unknown"
 }
@@ -45,6 +55,10 @@ func (m GameMode) String() string {
 type Game struct {
 	// networkManager is the network manager.
 	networkManager *network.NetworkManager
+	// collisionSpace is the collision space.
+	collisionSpace *resolv.Space
+	// playerStates is a map of the current player states indexed by client ID.
+	playerStates map[uint32]*gametypes.PlayerState
 	// mode is the current game mode.
 	mode GameMode
 	// touchIDs is the last touch identifiers.
@@ -54,8 +68,12 @@ type Game struct {
 }
 
 func NewGame(networkManager *network.NetworkManager) ebiten.Game {
+	collisionSpace := game.NewCollisionSpace()
+
 	return &Game{
 		networkManager: networkManager,
+		collisionSpace: collisionSpace,
+		playerStates:   make(map[uint32]*gametypes.PlayerState),
 		mode:           GameModeMenu,
 	}
 }
@@ -80,10 +98,9 @@ func loadFonts() error {
 	return nil
 }
 
+// isKeyJustPressed returns a boolean value indicating whether the generic input is just pressed.
+// This is used to handle both keyboard and touch inputs.
 func (g *Game) isKeyJustPressed() bool {
-	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
-		return true
-	}
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		return true
 	}
@@ -114,48 +131,162 @@ func (g *Game) isKeyJustPressed() bool {
 }
 
 func (g *Game) Update() error {
-	serverMessages, err := g.networkManager.ServerMessageQueue().ReadAllMessages()
-	if err != nil {
-		return fmt.Errorf("failed to read server messages: %v", err)
-	}
-
-	for _, item := range serverMessages {
-		message, ok := item.(*messages.Message)
-		if !ok {
-			log.Error("Failed to cast message to messages.Message")
-			continue
-		}
-
-		log.Debug("Processing server message of type %s", message.Type)
-	}
-
 	switch g.mode {
 	case GameModeMenu:
 		if g.isKeyJustPressed() {
+			if err := g.networkManager.Start(); err != nil {
+				log.Error("Failed to start network manager: %v", err)
+				g.networkManager.Stop()
+				g.mode = GameModeNetworkError
+				return nil
+			}
+
 			g.mode = GameModePlay
 		}
 	case GameModePlay:
-		if g.isKeyJustPressed() {
+		if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+			g.networkManager.Stop()
 			g.mode = GameModeOver
+			g.playerStates = make(map[uint32]*gametypes.PlayerState)
+			break
+		}
+
+		serverMessages, err := g.networkManager.ServerMessageQueue().ReadAllMessages()
+		if err != nil {
+			return fmt.Errorf("failed to read server messages: %v", err)
+		}
+
+		for _, item := range serverMessages {
+			message, ok := item.(*messages.Message)
+			if !ok {
+				log.Error("Failed to cast message to messages.Message")
+				continue
+			}
+
+			switch message.Type {
+			case messages.MessageTypeServerGameUpdate:
+				log.Trace("Received game state: %s", message.Payload)
+				gameState := &gametypes.GameState{}
+				if err := json.Unmarshal(message.Payload, gameState); err != nil {
+					log.Error("Failed to unmarshal game state: %v", err)
+					continue
+				}
+
+				for clientID, playerState := range gameState.Players {
+					if _, ok := g.playerStates[clientID]; !ok {
+						log.Debug("Adding new player state for client %d", clientID)
+						g.playerStates[clientID] = playerState
+						g.playerStates[clientID].Object = resolv.NewObject(float64(playerState.Position.X), float64(playerState.Position.Y), constants.PlayerWidth, constants.PlayerHeight)
+						g.collisionSpace.Add(g.playerStates[clientID].Object)
+					} else {
+						g.playerStates[clientID].Position = playerState.Position
+						g.playerStates[clientID].Velocity = playerState.Velocity
+						g.playerStates[clientID].IsOnGround = playerState.IsOnGround
+						g.playerStates[clientID].Object.Position.X = float64(playerState.Position.X)
+						g.playerStates[clientID].Object.Position.Y = float64(playerState.Position.Y)
+					}
+				}
+			}
+		}
+
+		if err := g.validateNetworkManager(); err != nil {
+			log.Error("Network manager error: %v", err)
+			g.networkManager.Stop()
+			g.mode = GameModeNetworkError
+			break
+		}
+
+		localPlayer := g.playerStates[g.networkManager.ClientID()]
+		if localPlayer == nil {
+			log.Warn("Local player state not found")
+			break
+		}
+
+		inputX := 0.0
+		rightPressed := ebiten.IsKeyPressed(ebiten.KeyRight) || ebiten.IsKeyPressed(ebiten.KeyD)
+		leftPressed := ebiten.IsKeyPressed(ebiten.KeyLeft) || ebiten.IsKeyPressed(ebiten.KeyA)
+		if rightPressed && !leftPressed {
+			inputX = 1.0
+		} else if leftPressed && !rightPressed {
+			inputX = -1.0
+		}
+
+		inputY := 0.0
+		upPressed := ebiten.IsKeyPressed(ebiten.KeyUp) || ebiten.IsKeyPressed(ebiten.KeyW)
+		downPressed := ebiten.IsKeyPressed(ebiten.KeyDown) || ebiten.IsKeyPressed(ebiten.KeyS)
+		if upPressed && !downPressed {
+			inputY = -1.0
+		} else if downPressed && !upPressed {
+			inputY = 1.0
+		}
+
+		inputJump := ebiten.IsKeyPressed(ebiten.KeySpace)
+
+		cpu := &messages.ClientPlayerUpdate{
+			Timestamp: time.Now().UnixMilli(),
+			InputX:    inputX,
+			InputY:    inputY,
+			InputJump: inputJump,
+			DeltaTime: 1.0 / 60.0,
+		}
+		payload, err := json.Marshal(cpu)
+		if err != nil {
+			return fmt.Errorf("failed to marshal client player update: %v", err)
+		}
+
+		msg := &messages.Message{
+			ClientID: g.networkManager.ClientID(),
+			Type:     messages.MessageTypeClientPlayerUpdate,
+			Payload:  payload,
+		}
+
+		if err := g.networkManager.SendUnreliableMessage(msg); err != nil {
+			return fmt.Errorf("failed to send client player update: %v", err)
 		}
 	case GameModeOver:
 		if g.isKeyJustPressed() {
 			g.mode = GameModeMenu
 		}
+	case GameModeNetworkError:
+		if g.isKeyJustPressed() {
+			g.mode = GameModeMenu
+		}
 	}
+
 	return nil
+}
+
+func (g *Game) validateNetworkManager() error {
+	select {
+	case err := <-g.networkManager.TCPClientErrChan():
+		return fmt.Errorf("TCP client error: %v", err)
+	case err := <-g.networkManager.UDPClientErrChan():
+		return fmt.Errorf("UDP client error: %v", err)
+	default:
+		return nil
+	}
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("\nTPS: %0.2f", ebiten.ActualTPS()))
 	var t string
 	switch g.mode {
 	case GameModeMenu:
 		t = "Press to Start!"
 	case GameModePlay:
-		t = "Playing..."
+		for _, playerState := range g.playerStates {
+			playerObject := playerState.Object
+			playerColor := color.RGBA{0, 255, 60, 255} // Green
+			if playerState.IsOnGround {
+				playerColor = color.RGBA{200, 0, 200, 255} // Purple
+			}
+			vector.DrawFilledRect(screen, float32(playerObject.Position.X), float32(ScreenHeight-constants.PlayerHeight)-float32(playerObject.Position.Y), float32(playerObject.Size.X), float32(playerObject.Size.Y), playerColor, false)
+		}
 	case GameModeOver:
 		t = "Game Over"
+	case GameModeNetworkError:
+		t = "Network Error"
 	}
 	t = strings.ToUpper(t)
 	bounds, _ := font.BoundString(mplusNormalFont, t)
@@ -166,8 +297,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 const (
-	ScreenWidth  = 320
-	ScreenHeight = 240
+	ScreenWidth  = 640
+	ScreenHeight = 480
 )
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
@@ -199,12 +330,8 @@ func main() {
 		panic(fmt.Sprintf("Failed to create network manager: %v", err))
 	}
 
-	if err := networkManager.Start(); err != nil {
-		panic(fmt.Sprintf("Failed to start network manager: %v", err))
-	}
-
 	ebiten.SetWindowSize(640, 480)
-	ebiten.SetWindowTitle("Hello, World!")
+	ebiten.SetWindowTitle("Flywheel Client")
 	if err := ebiten.RunGame(NewGame(networkManager)); err != nil {
 		panic(fmt.Sprintf("Failed to run game: %v", err))
 	}

@@ -1,4 +1,4 @@
-package collisions
+package game
 
 import "github.com/solarlune/resolv"
 

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -31,7 +32,7 @@ func NewUDPClient(serverAddr string, messageQueue queue.Queue) (*UDPClient, erro
 }
 
 // Connect starts the UDP client.
-func (c *UDPClient) Connect() error {
+func (c *UDPClient) Connect(ctx context.Context) error {
 	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		return fmt.Errorf("failed to listen on UDP address: %v", err)
@@ -40,8 +41,20 @@ func (c *UDPClient) Connect() error {
 	c.conn = conn
 
 	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
 		msg, err := ReceiveUDPMessage(conn)
 		if err != nil {
+			if _, ok := err.(*ErrConnectionClosedByServer); ok {
+				return err
+			} else if _, ok := err.(*ErrConnectionClosedByClient); ok {
+				log.Info("UDP connection closed by client")
+				return nil
+			}
 			fmt.Printf("Failed to receive message from UDP connection: %v\n", err)
 			continue
 		}
@@ -59,6 +72,15 @@ func (c *UDPClient) Connect() error {
 		}
 
 	}
+}
+
+// Close closes the UDP connection.
+func (c *UDPClient) Close() {
+	if c.conn == nil {
+		log.Warn("UDP connection is already closed")
+		return
+	}
+	c.conn.Close()
 }
 
 // SendMessage sends a message to the UDP server.
@@ -81,6 +103,9 @@ func ReceiveUDPMessage(conn *net.UDPConn) (*messages.Message, error) {
 	buffer := make([]byte, messages.MessageBufferSize)
 	n, _, err := conn.ReadFromUDP(buffer)
 	if err != nil {
+		if err, ok := err.(*net.OpError); ok && err.Err.Error() == "use of closed network connection" {
+			return nil, &ErrConnectionClosedByClient{}
+		}
 		return nil, fmt.Errorf("failed to read message from UDP connection: %v", err)
 	}
 

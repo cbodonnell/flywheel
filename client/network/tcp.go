@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -25,7 +26,7 @@ func NewTCPClient(serverAddr string, messageQueue queue.Queue) *TCPClient {
 	}
 }
 
-func (c *TCPClient) Connect(clientIDChan chan uint32) error {
+func (c *TCPClient) Connect(ctx context.Context, clientIDChan chan uint32) error {
 	conn, err := net.Dial("tcp", c.serverAddr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %v", err)
@@ -34,10 +35,19 @@ func (c *TCPClient) Connect(clientIDChan chan uint32) error {
 	c.conn = conn
 
 	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+
 		msg, err := ReceiveTCPMessage(conn)
 		if err != nil {
-			if _, ok := err.(*ErrConnectionClosed); ok {
+			if _, ok := err.(*ErrConnectionClosedByServer); ok {
 				return err
+			} else if _, ok := err.(*ErrConnectionClosedByClient); ok {
+				log.Info("TCP connection closed by client")
+				return nil
 			}
 			log.Error("Failed to receive message from TCP connection: %v", err)
 			continue
@@ -61,6 +71,15 @@ func (c *TCPClient) Connect(clientIDChan chan uint32) error {
 	}
 }
 
+// Close closes the TCP connection.
+func (c *TCPClient) Close() error {
+	if c.conn == nil {
+		log.Warn("TCP connection is already closed")
+		return nil
+	}
+	return c.conn.Close()
+}
+
 // SendMessage sends a message to the TCP server.
 func (c *TCPClient) SendMessage(msg *messages.Message) error {
 	jsonData, err := json.Marshal(msg)
@@ -76,20 +95,16 @@ func (c *TCPClient) SendMessage(msg *messages.Message) error {
 	return nil
 }
 
-// ErrConnectionClosed is returned when the TCP connection is closed
-type ErrConnectionClosed struct{}
-
-func (e *ErrConnectionClosed) Error() string {
-	return "connection closed"
-}
-
 // ReceiveTCPMessage receives a message from the TCP server.
 func ReceiveTCPMessage(conn net.Conn) (*messages.Message, error) {
 	jsonData := make([]byte, messages.MessageBufferSize)
 	n, err := conn.Read(jsonData)
 	if err != nil {
 		if err.Error() == "EOF" {
-			return nil, &ErrConnectionClosed{}
+			return nil, &ErrConnectionClosedByServer{}
+		}
+		if err, ok := err.(*net.OpError); ok && err.Err.Error() == "use of closed network connection" {
+			return nil, &ErrConnectionClosedByClient{}
 		}
 		return nil, fmt.Errorf("failed to read message from TCP connection: %v", err)
 	}
