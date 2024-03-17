@@ -232,8 +232,8 @@ func (g *Game) processPendingServerMessages() error {
 
 const (
 	// InterpolationOffset is how far back in time we want to interpolate.
-	// A good rule of is 2x the server tick rate.
-	InterpolationOffset = 100 // ms
+	// TODO: find a good rule of thumb for this value vs server tick rate
+	InterpolationOffset = 150 // ms
 )
 
 func (g *Game) updatePlayerStates() error {
