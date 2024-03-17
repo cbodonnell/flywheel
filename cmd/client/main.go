@@ -248,16 +248,14 @@ func (g *Game) updatePlayerStates() error {
 		g.gameStates = g.gameStates[1:]
 	}
 
-	// TODO: fix this bouncing between interpolation and extrapolation before clocks are synced
 	if len(g.gameStates) > 2 {
 		// we have a future state to interpolate to
-		log.Debug("Interpolating...")
+		// log.Debug("Interpolating...")
 		interpolationFactor := float64(renderTime-g.gameStates[1].Timestamp) / float64(g.gameStates[2].Timestamp-g.gameStates[1].Timestamp)
 		for clientID, playerState := range g.gameStates[2].Players {
 			if _, ok := g.gameStates[1].Players[clientID]; !ok {
 				continue
 			}
-
 			previousPlayerState := g.gameStates[1].Players[clientID]
 
 			id := fmt.Sprintf("player-%d", clientID)
@@ -287,13 +285,12 @@ func (g *Game) updatePlayerStates() error {
 		}
 	} else {
 		// we don't have a future state, so we need to extrapolate from the last state
-		log.Debug("Extrapolating...")
+		// log.Debug("Extrapolating...")
 		extrapolationFactor := float64(renderTime-g.gameStates[0].Timestamp) / float64(g.gameStates[1].Timestamp-g.gameStates[0].Timestamp)
 		for clientID, playerState := range g.gameStates[1].Players {
 			if _, ok := g.gameStates[0].Players[clientID]; !ok {
 				continue
 			}
-
 			previousPlayerState := g.gameStates[0].Players[clientID]
 
 			id := fmt.Sprintf("player-%d", clientID)
