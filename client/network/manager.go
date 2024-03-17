@@ -33,7 +33,8 @@ type NetworkManager struct {
 	clientIDMutex      sync.Mutex
 	clientIDChan       <-chan uint32
 	serverTime         int64
-	ping               int64
+	ping               float64
+	recentRTTs         []int64
 	serverTimeMutex    sync.Mutex
 	serverTimeChan     <-chan *messages.ServerSyncTime
 }
@@ -149,9 +150,23 @@ func (m *NetworkManager) syncTime() error {
 	case <-time.After(5 * time.Second):
 		return fmt.Errorf("timed out waiting for server sync time message")
 	case serverSyncTime := <-m.serverTimeChan:
-		ping := time.Now().UnixMilli() - serverSyncTime.ClientTimestamp
-		serverTime := serverSyncTime.Timestamp + ping/2
-		log.Debug("Server time: %d, ping: %d", serverTime, ping)
+		rtt := time.Now().UnixMilli() - serverSyncTime.ClientTimestamp
+		serverTime := serverSyncTime.Timestamp + rtt/2
+		log.Trace("Server time: %d, ping: %d", serverTime, rtt)
+
+		// keep track of the last 10 RTTs to calculate an average ping
+		m.recentRTTs = append(m.recentRTTs, rtt)
+		for len(m.recentRTTs) > 10 {
+			m.recentRTTs = m.recentRTTs[1:]
+		}
+
+		sampleRTTs := removeOutlierRTTs(m.recentRTTs)
+		ping := 0.0
+		for _, p := range sampleRTTs {
+			ping += float64(p)
+		}
+		ping /= float64(len(sampleRTTs))
+
 		m.setServerTime(serverTime, ping)
 	}
 
@@ -166,7 +181,7 @@ func (m *NetworkManager) pingUDP() error {
 	return m.SendUnreliableMessage(pingUDPMsg)
 }
 
-func (m *NetworkManager) setServerTime(serverTime int64, ping int64) {
+func (m *NetworkManager) setServerTime(serverTime int64, ping float64) {
 	m.serverTimeMutex.Lock()
 	defer m.serverTimeMutex.Unlock()
 	m.serverTime = serverTime
@@ -198,7 +213,7 @@ func (m *NetworkManager) Stop() error {
 	return nil
 }
 
-func (m *NetworkManager) ServerTime() (serverTime int64, ping int64) {
+func (m *NetworkManager) ServerTime() (serverTime int64, ping float64) {
 	m.serverTimeMutex.Lock()
 	defer m.serverTimeMutex.Unlock()
 	return m.serverTime, m.ping

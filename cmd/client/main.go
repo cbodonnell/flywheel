@@ -283,9 +283,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) drawOverlay(screen *ebiten.Image) {
+	_, ping := g.networkManager.ServerTime()
+
 	if g.debug {
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.2f", ebiten.ActualFPS()))
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("\nTPS: %0.2f", ebiten.ActualTPS()))
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.1f", ebiten.ActualFPS()))
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("\nTPS: %0.1f", ebiten.ActualTPS()))
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\nPing: %0.1f", ping))
 	}
 
 	var t string
