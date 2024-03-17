@@ -69,7 +69,7 @@ func (p *Player) Update() error {
 		InputX:    inputX,
 		InputY:    inputY,
 		InputJump: inputJump,
-		DeltaTime: 1.0 / 60.0,
+		DeltaTime: 1.0 / float64(ebiten.TPS()),
 	}
 	payload, err := json.Marshal(cpu)
 	if err != nil {

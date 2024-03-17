@@ -137,6 +137,8 @@ func (g *Game) isKeyJustPressed() bool {
 }
 
 func (g *Game) Update() error {
+	g.networkManager.UpdateServerTime(1.0 / float64(ebiten.TPS()))
+
 	switch g.mode {
 	case GameModeMenu:
 		if g.isKeyJustPressed() {
@@ -283,12 +285,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 }
 
 func (g *Game) drawOverlay(screen *ebiten.Image) {
-	_, ping := g.networkManager.ServerTime()
+	serverTime, ping := g.networkManager.ServerTime()
 
 	if g.debug {
 		ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.1f", ebiten.ActualFPS()))
 		ebitenutil.DebugPrint(screen, fmt.Sprintf("\nTPS: %0.1f", ebiten.ActualTPS()))
 		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\nPing: %0.1f", ping))
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\nServer Time: %d", serverTime))
 	}
 
 	var t string

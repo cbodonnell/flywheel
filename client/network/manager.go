@@ -21,20 +21,24 @@ const (
 // NetworkManager represents a network manager.
 type NetworkManager struct {
 	serverMessageQueue queue.Queue
-	tcpClient          *TCPClient
-	tcpClientErrChan   chan error
-	udpClient          *UDPClient
-	udpClientErrChan   chan error
-	cancelClientCtx    context.CancelFunc
-	clientWaitGroup    *sync.WaitGroup
-	clientID           uint32
-	clientIDMutex      sync.Mutex
-	clientIDChan       <-chan uint32
-	serverTime         int64
-	ping               float64
-	recentRTTs         []int64
-	serverTimeMutex    sync.Mutex
-	serverTimeChan     <-chan *messages.ServerSyncTime
+
+	tcpClient        *TCPClient
+	tcpClientErrChan chan error
+	udpClient        *UDPClient
+	udpClientErrChan chan error
+	cancelClientCtx  context.CancelFunc
+
+	clientWaitGroup *sync.WaitGroup
+	clientID        uint32
+	clientIDMutex   sync.Mutex
+	clientIDChan    <-chan uint32
+
+	serverTime      int64
+	ping            float64
+	deltaPing       float64
+	recentRTTs      []int64
+	serverTimeMutex sync.Mutex
+	serverTimeChan  <-chan *messages.ServerSyncTime
 }
 
 // NewNetworkManager creates a new network manager.
@@ -183,7 +187,22 @@ func (m *NetworkManager) setServerTime(serverTime int64, ping float64) {
 	m.serverTimeMutex.Lock()
 	defer m.serverTimeMutex.Unlock()
 	m.serverTime = serverTime
+	m.deltaPing = ping - m.ping
 	m.ping = ping
+}
+
+// UpdateServerTime updates the server time with the given delta time.
+// This is intended to be called by the game update loop to keep
+// the server time in sync with the client's time.
+func (m *NetworkManager) UpdateServerTime(deltaTime float64) {
+	m.serverTimeMutex.Lock()
+	defer m.serverTimeMutex.Unlock()
+	if m.serverTime == 0 {
+		return
+	}
+	deltaTimeMs := int64(deltaTime * 1000)
+	m.serverTime += deltaTimeMs + int64(m.deltaPing)
+	m.deltaPing = 0
 }
 
 // Stop stops the network manager and its clients and clears the server message queue.
