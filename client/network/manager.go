@@ -12,10 +12,8 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/queue"
 )
 
-// TODO: Client-side network manager similar to https://github.com/cbodonnell/flywheel-client/blob/main/Assets/Scripts/NetworkManager.cs
-
 const (
-	DefaultServerHostname = "10.8.0.1"
+	DefaultServerHostname = "127.0.0.1"
 	DefaultServerTCPPort  = 8888
 	DefaultServerUDPPort  = 8889
 )
