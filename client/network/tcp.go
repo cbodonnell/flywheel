@@ -13,20 +13,24 @@ import (
 
 // TCPClient represents a TCP client.
 type TCPClient struct {
-	serverAddr   string
-	messageQueue queue.Queue
-	conn         net.Conn
+	serverAddr     string
+	messageQueue   queue.Queue
+	clientIDChan   chan<- uint32
+	serverTimeChan chan<- *messages.ServerSyncTime
+	conn           net.Conn
 }
 
 // NewTCPClient creates a new TCP client.
-func NewTCPClient(serverAddr string, messageQueue queue.Queue) *TCPClient {
+func NewTCPClient(serverAddr string, messageQueue queue.Queue, clientIDChan chan<- uint32, serverTimeChan chan<- *messages.ServerSyncTime) *TCPClient {
 	return &TCPClient{
-		serverAddr:   serverAddr,
-		messageQueue: messageQueue,
+		serverAddr:     serverAddr,
+		messageQueue:   messageQueue,
+		clientIDChan:   clientIDChan,
+		serverTimeChan: serverTimeChan,
 	}
 }
 
-func (c *TCPClient) Connect(ctx context.Context, clientIDChan chan uint32) error {
+func (c *TCPClient) Connect(ctx context.Context) error {
 	conn, err := net.Dial("tcp", c.serverAddr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %v", err)
@@ -63,7 +67,15 @@ func (c *TCPClient) Connect(ctx context.Context, clientIDChan chan uint32) error
 				continue
 			}
 			// write the client ID back to the manager
-			clientIDChan <- assignID.ClientID
+			c.clientIDChan <- assignID.ClientID
+		case messages.MessageTypeServerSyncTime:
+			serverSyncTime := &messages.ServerSyncTime{}
+			err := json.Unmarshal(msg.Payload, serverSyncTime)
+			if err != nil {
+				log.Error("Failed to deserialize server sync time message: %v", err)
+				continue
+			}
+			c.serverTimeChan <- serverSyncTime
 		default:
 			log.Warn("Received unexpected message type from TCP server: %s", msg.Type)
 			continue
