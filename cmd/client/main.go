@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"image/color"
+	"math"
 	"os"
 	"strings"
 
@@ -229,37 +230,86 @@ func (g *Game) processPendingServerMessages() error {
 	return nil
 }
 
+const (
+	// InterpolationOffset is how far back in time we want to interpolate.
+	// TODO: find a good rule of thumb for this value vs server tick rate
+	InterpolationOffset = 150 // ms
+)
+
 func (g *Game) updatePlayerStates() error {
-	if len(g.gameStates) == 0 {
+	if len(g.gameStates) < 2 {
 		return nil
 	}
 
-	// TODO: interpolate between game states
-	gameState := g.gameStates[len(g.gameStates)-1]
-	g.gameStates = g.gameStates[:0]
+	serverTime, _ := g.networkManager.ServerTime()
+	renderTime := int64(math.Round(serverTime)) - InterpolationOffset
 
-	for clientID, playerState := range gameState.Players {
-		id := fmt.Sprintf("player-%d", clientID)
-		if obj, ok := g.gameObjects[id]; !ok {
-			log.Debug("Adding new player object for client %d", clientID)
-			playerObject, err := objects.NewPlayer(id, g.networkManager, playerState)
-			if err != nil {
-				return fmt.Errorf("failed to create new player object: %v", err)
+	for len(g.gameStates) > 2 && g.gameStates[2].Timestamp < renderTime {
+		g.gameStates = g.gameStates[1:]
+	}
+
+	if len(g.gameStates) > 2 {
+		// we have a future state to interpolate to
+		// log.Debug("Interpolating...")
+		interpolationFactor := float64(renderTime-g.gameStates[1].Timestamp) / float64(g.gameStates[2].Timestamp-g.gameStates[1].Timestamp)
+		for clientID, playerState := range g.gameStates[2].Players {
+			if _, ok := g.gameStates[1].Players[clientID]; !ok {
+				continue
 			}
-			playerObject.State.Object = resolv.NewObject(playerState.Position.X, playerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight, game.CollisionSpaceTagPlayer)
-			g.collisionSpace.Add(playerObject.State.Object)
-			g.gameObjects[id] = playerObject
-		} else {
-			playerObject, ok := obj.(*objects.Player)
-			if !ok {
-				return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
+			previousPlayerState := g.gameStates[1].Players[clientID]
+
+			id := fmt.Sprintf("player-%d", clientID)
+			if obj, ok := g.gameObjects[id]; !ok {
+				log.Debug("Adding new player object for client %d", clientID)
+				playerObject, err := objects.NewPlayer(id, g.networkManager, playerState)
+				if err != nil {
+					return fmt.Errorf("failed to create new player object: %v", err)
+				}
+				playerObject.State.Object = resolv.NewObject(playerState.Position.X, playerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight, game.CollisionSpaceTagPlayer)
+				g.collisionSpace.Add(playerObject.State.Object)
+				g.gameObjects[id] = playerObject
+			} else {
+				playerObject, ok := obj.(*objects.Player)
+				if !ok {
+					return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
+				}
+				playerObject.State.LastProcessedTimestamp = playerState.LastProcessedTimestamp
+				playerObject.State.Position.X = previousPlayerState.Position.X + (playerState.Position.X-previousPlayerState.Position.X)*interpolationFactor
+				playerObject.State.Position.Y = previousPlayerState.Position.Y + (playerState.Position.Y-previousPlayerState.Position.Y)*interpolationFactor
+				playerObject.State.Velocity.X = playerState.Velocity.X
+				playerObject.State.Velocity.Y = playerState.Velocity.X
+				playerObject.State.IsOnGround = playerState.IsOnGround
+				playerObject.State.Object.Position.X = playerObject.State.Position.X
+				playerObject.State.Object.Position.Y = playerObject.State.Position.Y
 			}
-			playerObject.State.LastProcessedTimestamp = playerState.LastProcessedTimestamp
-			playerObject.State.Position = playerState.Position
-			playerObject.State.Velocity = playerState.Velocity
-			playerObject.State.IsOnGround = playerState.IsOnGround
-			playerObject.State.Object.Position.X = playerState.Position.X
-			playerObject.State.Object.Position.Y = playerState.Position.Y
+		}
+	} else {
+		// we don't have a future state, so we need to extrapolate from the last state
+		// log.Debug("Extrapolating...")
+		extrapolationFactor := float64(renderTime-g.gameStates[0].Timestamp) / float64(g.gameStates[1].Timestamp-g.gameStates[0].Timestamp)
+		for clientID, playerState := range g.gameStates[1].Players {
+			if _, ok := g.gameStates[0].Players[clientID]; !ok {
+				continue
+			}
+			previousPlayerState := g.gameStates[0].Players[clientID]
+
+			id := fmt.Sprintf("player-%d", clientID)
+			if obj, ok := g.gameObjects[id]; !ok {
+				log.Debug("Player object for client %d not found, not instancing since we're extrapolating", clientID)
+			} else {
+				playerObject, ok := obj.(*objects.Player)
+				if !ok {
+					return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
+				}
+				playerObject.State.LastProcessedTimestamp = playerState.LastProcessedTimestamp
+				playerObject.State.Position.X = playerState.Position.X + (playerState.Position.X-previousPlayerState.Position.X)*extrapolationFactor
+				playerObject.State.Position.Y = playerState.Position.Y + (playerState.Position.Y-previousPlayerState.Position.Y)*extrapolationFactor
+				playerObject.State.Velocity.X = playerState.Velocity.X
+				playerObject.State.Velocity.Y = playerState.Velocity.Y
+				playerObject.State.IsOnGround = playerState.IsOnGround
+				playerObject.State.Object.Position.X = playerObject.State.Position.X
+				playerObject.State.Object.Position.Y = playerObject.State.Position.Y
+			}
 		}
 	}
 

@@ -93,7 +93,7 @@ func main() {
 	})
 	go saveGameStateWorker.Start(ctx)
 
-	gameLoopInterval := 100 * time.Millisecond // 10 FPS
+	gameLoopInterval := 50 * time.Millisecond // 20 ticks per second
 	gameManager := game.NewGameManager(game.NewGameManagerOptions{
 		ClientManager:        clientManager,
 		ClientMessageQueue:   clientMessageQueue,
