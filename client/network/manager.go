@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DefaultServerHostname = "127.0.0.1"
+	DefaultServerHostname = "localhost"
 	DefaultServerTCPPort  = 8888
 	DefaultServerUDPPort  = 8889
 )
