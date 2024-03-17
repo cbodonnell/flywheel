@@ -1,11 +1,10 @@
-package servers
+package network
 
 import (
 	"encoding/json"
 	"fmt"
 	"net"
 
-	"github.com/cbodonnell/flywheel/pkg/clients"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -13,13 +12,13 @@ import (
 
 // TCPServer represents a TCP server.
 type TCPServer struct {
-	ClientManager *clients.ClientManager
+	ClientManager *ClientManager
 	MessageQueue  queue.Queue
 	Port          string
 }
 
 // NewTCPServer creates a new TCP server.
-func NewTCPServer(clientManager *clients.ClientManager, messageQueue queue.Queue, port string) *TCPServer {
+func NewTCPServer(clientManager *ClientManager, messageQueue queue.Queue, port string) *TCPServer {
 	return &TCPServer{
 		ClientManager: clientManager,
 		MessageQueue:  messageQueue,
@@ -72,11 +71,21 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 
 	log.Debug("TCP Connection established for client %d", clientID)
 
+	assignID := messages.AssignID{
+		ClientID: clientID,
+	}
+
+	payload, err := json.Marshal(assignID)
+	if err != nil {
+		log.Error("Failed to marshal assignID: %v", err)
+		return
+	}
+
 	// Send the client its ID
 	message := &messages.Message{
 		ClientID: 0,
 		Type:     messages.MessageTypeServerAssignID,
-		Payload:  []byte(fmt.Sprintf(`{"clientID":%d}`, clientID)),
+		Payload:  payload,
 	}
 	if err := WriteMessageToTCP(conn, message); err != nil {
 		log.Error("Error writing TCP message of type %s to client %d: %v", message.Type, clientID, err)

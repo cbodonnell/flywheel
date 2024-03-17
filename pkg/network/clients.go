@@ -1,4 +1,4 @@
-package clients
+package network
 
 import (
 	"fmt"

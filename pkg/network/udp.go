@@ -1,11 +1,10 @@
-package servers
+package network
 
 import (
 	"encoding/json"
 	"fmt"
 	"net"
 
-	"github.com/cbodonnell/flywheel/pkg/clients"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -13,13 +12,13 @@ import (
 
 // UDPServer represents a UDP server.
 type UDPServer struct {
-	ClientManager *clients.ClientManager
+	ClientManager *ClientManager
 	MessageQueue  queue.Queue
 	Port          string
 }
 
 // NewUDPServer creates a new UDP server.
-func NewUDPServer(clientManager *clients.ClientManager, messageQueue queue.Queue, port string) *UDPServer {
+func NewUDPServer(clientManager *ClientManager, messageQueue queue.Queue, port string) *UDPServer {
 	return &UDPServer{
 		ClientManager: clientManager,
 		MessageQueue:  messageQueue,

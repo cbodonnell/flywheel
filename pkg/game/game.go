@@ -6,36 +6,40 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cbodonnell/flywheel/pkg/clients"
+	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	"github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/kinematic"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
+	"github.com/cbodonnell/flywheel/pkg/network"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
-	"github.com/cbodonnell/flywheel/pkg/servers"
 	"github.com/cbodonnell/flywheel/pkg/state"
 	"github.com/cbodonnell/flywheel/pkg/workers"
+	"github.com/solarlune/resolv"
 )
 
 type GameManager struct {
-	clientManager        *clients.ClientManager
+	clientManager        *network.ClientManager
 	clientMessageQueue   queue.Queue
 	connectionEventQueue queue.Queue
 	repository           repositories.Repository
 	stateManager         state.StateManager
 	savePlayerStateChan  chan<- workers.SavePlayerStateRequest
 	gameLoopInterval     time.Duration
+	collisionSpace       *resolv.Space
 }
 
 // NewGameManagerOptions contains options for creating a new GameManager.
 type NewGameManagerOptions struct {
-	ClientManager        *clients.ClientManager
+	ClientManager        *network.ClientManager
 	ClientMessageQueue   queue.Queue
 	ConnectionEventQueue queue.Queue
 	Repository           repositories.Repository
 	StateManager         state.StateManager
 	SavePlayerStateChan  chan<- workers.SavePlayerStateRequest
 	GameLoopInterval     time.Duration
+	CollisionSpace       *resolv.Space
 }
 
 func NewGameManager(opts NewGameManagerOptions) *GameManager {
@@ -47,6 +51,7 @@ func NewGameManager(opts NewGameManagerOptions) *GameManager {
 		stateManager:         opts.StateManager,
 		savePlayerStateChan:  opts.SavePlayerStateChan,
 		gameLoopInterval:     opts.GameLoopInterval,
+		collisionSpace:       opts.CollisionSpace,
 	}
 }
 
@@ -102,7 +107,12 @@ func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
 	for _, item := range pendingEvents {
 		switch event := item.(type) {
 		case *types.ConnectPlayerEvent:
-			gameState.Players[event.ClientID] = event.PlayerState
+			playerState := event.PlayerState
+			playerState.Object = resolv.NewObject(playerState.Position.X, playerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer)
+			// add the player to the game state
+			gameState.Players[event.ClientID] = playerState
+			// add the player object to the collision space
+			gm.collisionSpace.Add(playerState.Object)
 		case *types.DisconnectPlayerEvent:
 			// send a request to save the player state before deleting it
 			saveRequest := workers.SavePlayerStateRequest{
@@ -111,6 +121,9 @@ func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
 				PlayerState: gameState.Players[event.ClientID],
 			}
 			gm.savePlayerStateChan <- saveRequest
+			// remove the player object from the collision space
+			gm.collisionSpace.Remove(gameState.Players[event.ClientID].Object)
+			// delete the player from the game state
 			delete(gameState.Players, event.ClientID)
 		default:
 			log.Error("unhandled connection event type: %T", event)
@@ -145,12 +158,66 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 				log.Warn("Client %d is not in the game state", message.ClientID)
 				continue
 			}
+
+			if gameState.Players[message.ClientID].LastProcessedTimestamp > clientPlayerUpdate.Timestamp {
+				log.Warn("Client %d sent an outdated player update", message.ClientID)
+				continue
+			}
+
 			// TODO: validate the update before applying it
-			gameState.Players[message.ClientID] = clientPlayerUpdate.PlayerState
+			log.Trace("Player %d initial position: %v, velocity: %v, isOnGround: %v", message.ClientID, gameState.Players[message.ClientID].Position, gameState.Players[message.ClientID].Velocity, gameState.Players[message.ClientID].IsOnGround)
+			updatePlayerState(gameState.Players[message.ClientID], clientPlayerUpdate)
 		default:
 			log.Error("Unhandled message type: %s", message.Type)
 		}
 	}
+}
+
+// updatePlayerState updates the player's position and velocity based on the
+// client's input and the game state.
+// The player state is updated in place.
+func updatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messages.ClientPlayerUpdate) {
+	// X-axis
+	// Apply input
+	dx := kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+	vx := kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+
+	// Check for collisions
+	if collision := playerState.Object.Check(dx, 0); collision != nil {
+		dx = collision.ContactWithObject(collision.Objects[0]).X
+		vx = 0
+	}
+
+	// Y-axis
+	// Apply input
+	vy := playerState.Velocity.Y
+	if playerState.IsOnGround && clientPlayerUpdate.InputJump {
+		vy = constants.PlayerJumpSpeed
+	}
+
+	// Apply gravity
+	dy := kinematic.Displacement(vy, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
+	vy = kinematic.FinalVelocity(vy, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
+
+	// Check for collisions
+	isOnGround := false
+	if collision := playerState.Object.Check(0, dy); collision != nil {
+		dy = collision.ContactWithObject(collision.Objects[0]).Y
+		vy = 0
+		isOnGround = true
+	}
+
+	// Update player state
+	playerState.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
+	playerState.Position.X += dx
+	playerState.Velocity.X = vx
+	playerState.Position.Y += dy
+	playerState.Velocity.Y = vy
+	playerState.IsOnGround = isOnGround
+
+	playerState.Object.Position.X = playerState.Position.X
+	playerState.Object.Position.Y = playerState.Position.Y
+	playerState.Object.Update()
 }
 
 // broadcastGameState sends the game state to connected clients.
@@ -172,8 +239,8 @@ func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
 			log.Trace("Client %d does not have a UDP address", client.ID)
 			continue
 		}
-		// TODO: reliable vs unreliable messages
-		err := servers.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
+
+		err := network.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
 		if err != nil {
 			log.Error("Failed to write message to UDP connection for client %d: %v", client.ID, err)
 			continue

@@ -5,6 +5,14 @@ ifneq ($(shell git status --porcelain),)
 	VERSION := $(VERSION)-dirty
 endif
 
+.PHONY: mocks
+mocks:
+	docker run -v "${PWD}":/src -w /src vektra/mockery --all
+
+.PHONY: test
+test:
+	go test -v -cover ./pkg/... ./cmd/server/...
+
 .PHONY: build
 build:
 	go build \
@@ -16,6 +24,13 @@ run:
 	go run \
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
 	./cmd/server/main.go \
+	-log-level=debug
+
+.PHONY: run-client
+run-client:
+	go run \
+	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
+	./cmd/client/main.go \
 	-log-level=debug
 
 .PHONY: container

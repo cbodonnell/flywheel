@@ -1,5 +1,7 @@
 package types
 
+import "github.com/solarlune/resolv"
+
 type GameState struct {
 	// Timestamp is the time at which the game state was generated
 	Timestamp int64 `json:"timestamp"`
@@ -8,10 +10,19 @@ type GameState struct {
 }
 
 type PlayerState struct {
-	P Position `json:"p"`
+	LastProcessedTimestamp int64          `json:"lastProcessedTimestamp"`
+	Position               Position       `json:"position"`
+	Velocity               Velocity       `json:"velocity"`
+	Object                 *resolv.Object `json:"-"`
+	IsOnGround             bool           `json:"isOnGround"`
 }
 
 type Position struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type Velocity struct {
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 }

@@ -29,10 +29,17 @@ func (m *InMemoryStateManager) Get() (*gametypes.GameState, error) {
 	}
 	for k, v := range m.gameState.Players {
 		copy.Players[k] = &gametypes.PlayerState{
-			P: gametypes.Position{
-				X: v.P.X,
-				Y: v.P.Y,
+			LastProcessedTimestamp: v.LastProcessedTimestamp,
+			Position: gametypes.Position{
+				X: v.Position.X,
+				Y: v.Position.Y,
 			},
+			Velocity: gametypes.Velocity{
+				X: v.Velocity.X,
+				Y: v.Velocity.Y,
+			},
+			IsOnGround: v.IsOnGround,
+			Object:     v.Object,
 		}
 	}
 
