@@ -291,7 +291,7 @@ func (g *Game) drawOverlay(screen *ebiten.Image) {
 		ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.1f", ebiten.ActualFPS()))
 		ebitenutil.DebugPrint(screen, fmt.Sprintf("\nTPS: %0.1f", ebiten.ActualTPS()))
 		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\nPing: %0.1f", ping))
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\nServer Time: %d", serverTime))
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\nServer Time: %0.0f", serverTime))
 	}
 
 	var t string
