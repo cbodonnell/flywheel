@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
@@ -104,9 +105,37 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 		}
 		log.Trace("Received TCP message of type %s from client %d", message.Type, message.ClientID)
 
-		// TODO: some messages might not make sense to queue for the game loop (e.g. a message to disconnect)
-		if err := s.MessageQueue.Enqueue(message); err != nil {
-			log.Error("Failed to enqueue message: %v", err)
+		switch message.Type {
+		case messages.MessageTypeClientSyncTime:
+			clientSyncTime := &messages.ClientSyncTime{}
+			if err := json.Unmarshal(message.Payload, clientSyncTime); err != nil {
+				log.Error("Failed to unmarshal client sync time: %v", err)
+				continue
+			}
+
+			serverSyncTime := &messages.ServerSyncTime{
+				Timestamp:       time.Now().UnixMilli(),
+				ClientTimestamp: clientSyncTime.Timestamp,
+			}
+
+			payload, err := json.Marshal(serverSyncTime)
+			if err != nil {
+				log.Error("Failed to marshal server sync time: %v", err)
+				continue
+			}
+
+			msg := &messages.Message{
+				ClientID: 0,
+				Type:     messages.MessageTypeServerSyncTime,
+				Payload:  payload,
+			}
+			if err := WriteMessageToTCP(conn, msg); err != nil {
+				log.Error("Failed to send server pong: %v", err)
+			}
+		default:
+			if err := s.MessageQueue.Enqueue(message); err != nil {
+				log.Error("Failed to enqueue message: %v", err)
+			}
 		}
 	}
 }
