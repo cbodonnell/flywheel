@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cbodonnell/flywheel/client/network"
+	"github.com/cbodonnell/flywheel/pkg/game"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/messages"
@@ -85,6 +86,9 @@ func (p *Player) Update() error {
 	if err := p.networkManager.SendUnreliableMessage(msg); err != nil {
 		return fmt.Errorf("failed to send client player update: %v", err)
 	}
+
+	// TODO: update the player state with the input
+	game.UpdatePlayerState(p.State, cpu)
 
 	return nil
 }

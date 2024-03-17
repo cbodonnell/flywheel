@@ -20,6 +20,8 @@ const (
 
 // NetworkManager represents a network manager.
 type NetworkManager struct {
+	// TODO: split this into a connection and state message queue
+	// so that messages can be processed in the correct order
 	serverMessageQueue queue.Queue
 
 	tcpClient        *TCPClient

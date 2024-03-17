@@ -224,6 +224,56 @@ func (g *Game) processPendingServerMessages() error {
 			}
 			g.lastGameStateReceived = gameState.Timestamp
 			g.gameStates = append(g.gameStates, gameState)
+		// TODO: handle player connect and disconnect messages after game updates
+		// as a game update might re-create the player object after a disconnect
+		case messages.MessageTypeServerPlayerConnect:
+			log.Debug("Received player connect message: %s", message.Payload)
+			playerConnect := &messages.ServerPlayerConnect{}
+			if err := json.Unmarshal(message.Payload, playerConnect); err != nil {
+				log.Error("Failed to unmarshal player connect message: %v", err)
+				continue
+			}
+
+			id := fmt.Sprintf("player-%d", playerConnect.ClientID)
+			if _, ok := g.gameObjects[id]; ok {
+				log.Warn("Player object for client %d already exists", playerConnect.ClientID)
+				continue
+			}
+
+			log.Debug("Adding new player object for client %d", playerConnect.ClientID)
+			playerObject, err := objects.NewPlayer(id, g.networkManager, playerConnect.PlayerState)
+			if err != nil {
+				log.Error("Failed to create new player object: %v", err)
+				continue
+			}
+			playerObject.State.Object = resolv.NewObject(playerConnect.PlayerState.Position.X, playerConnect.PlayerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight, game.CollisionSpaceTagPlayer)
+			g.collisionSpace.Add(playerObject.State.Object)
+			g.gameObjects[id] = playerObject
+		case messages.MessageTypeServerPlayerDisconnect:
+			log.Debug("Received player disconnect message: %s", message.Payload)
+			playerDisconnect := &messages.ServerPlayerDisconnect{}
+			if err := json.Unmarshal(message.Payload, playerDisconnect); err != nil {
+				log.Error("Failed to unmarshal player disconnect message: %v", err)
+				continue
+			}
+
+			id := fmt.Sprintf("player-%d", playerDisconnect.ClientID)
+			obj, ok := g.gameObjects[id]
+			if !ok {
+				log.Warn("Player object for client %d not found", playerDisconnect.ClientID)
+				continue
+			}
+
+			playerObject, ok := obj.(*objects.Player)
+			if !ok {
+				log.Error("Failed to cast game object %s to *objects.Player", id)
+				continue
+			}
+			g.collisionSpace.Remove(playerObject.State.Object)
+			delete(g.gameObjects, id)
+		default:
+			log.Warn("Received unexpected message type from server: %s", message.Type)
+			continue
 		}
 	}
 
@@ -253,6 +303,10 @@ func (g *Game) updatePlayerStates() error {
 		// log.Debug("Interpolating...")
 		interpolationFactor := float64(renderTime-g.gameStates[1].Timestamp) / float64(g.gameStates[2].Timestamp-g.gameStates[1].Timestamp)
 		for clientID, playerState := range g.gameStates[2].Players {
+			if clientID == g.networkManager.ClientID() {
+				// TODO: perform reconciliation here
+				continue
+			}
 			if _, ok := g.gameStates[1].Players[clientID]; !ok {
 				continue
 			}
@@ -288,6 +342,10 @@ func (g *Game) updatePlayerStates() error {
 		// log.Debug("Extrapolating...")
 		extrapolationFactor := float64(renderTime-g.gameStates[0].Timestamp) / float64(g.gameStates[1].Timestamp-g.gameStates[0].Timestamp)
 		for clientID, playerState := range g.gameStates[1].Players {
+			if clientID == g.networkManager.ClientID() {
+				// TODO: perform reconciliation here
+				continue
+			}
 			if _, ok := g.gameStates[0].Players[clientID]; !ok {
 				continue
 			}
