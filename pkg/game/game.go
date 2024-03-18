@@ -232,7 +232,7 @@ func UpdatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messa
 	vx := kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
 
 	// Check for collisions
-	if collision := playerState.Object.Check(dx, 0); collision != nil {
+	if collision := playerState.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
 		dx = collision.ContactWithObject(collision.Objects[0]).X
 		vx = 0
 	}
@@ -250,7 +250,7 @@ func UpdatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messa
 
 	// Check for collisions
 	isOnGround := false
-	if collision := playerState.Object.Check(0, dy); collision != nil {
+	if collision := playerState.Object.Check(0, dy, CollisionSpaceTagLevel); collision != nil {
 		dy = collision.ContactWithObject(collision.Objects[0]).Y
 		vy = 0
 		isOnGround = true
