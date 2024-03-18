@@ -87,7 +87,6 @@ func (p *Player) Update() error {
 		return fmt.Errorf("failed to send client player update: %v", err)
 	}
 
-	// TODO: update the player state with the input
 	game.UpdatePlayerState(p.State, cpu)
 
 	return nil

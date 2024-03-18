@@ -235,8 +235,6 @@ func (g *Game) processPendingServerMessages() error {
 			}
 			g.lastGameStateReceived = gameState.Timestamp
 			g.gameStates = append(g.gameStates, gameState)
-		// TODO: handle player connect and disconnect messages after game updates
-		// as a game update might re-create the player object after a disconnect
 		case messages.MessageTypeServerPlayerConnect:
 			log.Debug("Received player connect message: %s", message.Payload)
 			playerConnect := &messages.ServerPlayerConnect{}
@@ -312,11 +310,10 @@ func (g *Game) updatePlayerStates() error {
 
 	if len(g.gameStates) > 2 {
 		// we have a future state to interpolate to
-		// log.Debug("Interpolating...")
 		interpolationFactor := float64(renderTime-g.gameStates[1].Timestamp) / float64(g.gameStates[2].Timestamp-g.gameStates[1].Timestamp)
 		for clientID, playerState := range g.gameStates[2].Players {
 			if clientID == g.networkManager.ClientID() {
-				// TODO: perform reconciliation here
+				// TODO: adjust based on server game state as-needed
 				continue
 			}
 			if _, ok := g.gameStates[1].Players[clientID]; !ok {
@@ -355,11 +352,10 @@ func (g *Game) updatePlayerStates() error {
 		}
 	} else {
 		// we don't have a future state, so we need to extrapolate from the last state
-		// log.Debug("Extrapolating...")
 		extrapolationFactor := float64(renderTime-g.gameStates[0].Timestamp) / float64(g.gameStates[1].Timestamp-g.gameStates[0].Timestamp)
 		for clientID, playerState := range g.gameStates[1].Players {
 			if clientID == g.networkManager.ClientID() {
-				// TODO: perform reconciliation here
+				// TODO: adjust based on server game state as-needed
 				continue
 			}
 			if _, ok := g.gameStates[0].Players[clientID]; !ok {
