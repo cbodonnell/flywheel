@@ -96,8 +96,8 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 	return nil
 }
 
-// processConnectionEvents processes all pending connection events in the queue
-// and updates the game state accordingly.
+// processConnectionEvents processes all pending connection events in the queue,
+// updates the game state, and notifies connected clients
 func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
 	pendingEvents, err := gm.connectionEventQueue.ReadAllMessages()
 	if err != nil {
@@ -113,6 +113,31 @@ func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
 			gameState.Players[event.ClientID] = playerState
 			// add the player object to the collision space
 			gm.collisionSpace.Add(playerState.Object)
+
+			// send a message to connected clients to add the player to the game
+			playerConnect := &messages.ServerPlayerConnect{
+				ClientID:    event.ClientID,
+				PlayerState: playerState,
+			}
+			payload, err := json.Marshal(playerConnect)
+			if err != nil {
+				log.Error("Failed to marshal player state: %v", err)
+				continue
+			}
+
+			for _, client := range gm.clientManager.GetClients() {
+				msg := &messages.Message{
+					ClientID: 0, // ClientID 0 means the message is from the server
+					Type:     messages.MessageTypeServerPlayerConnect,
+					Payload:  payload,
+				}
+
+				err := network.WriteMessageToTCP(client.TCPConn, msg)
+				if err != nil {
+					log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
+					continue
+				}
+			}
 		case *types.DisconnectPlayerEvent:
 			// send a request to save the player state before deleting it
 			saveRequest := workers.SavePlayerStateRequest{
@@ -125,6 +150,30 @@ func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
 			gm.collisionSpace.Remove(gameState.Players[event.ClientID].Object)
 			// delete the player from the game state
 			delete(gameState.Players, event.ClientID)
+
+			// send a message to connected clients to remove the player from the game
+			playerDisconnect := &messages.ServerPlayerDisconnect{
+				ClientID: event.ClientID,
+			}
+			payload, err := json.Marshal(playerDisconnect)
+			if err != nil {
+				log.Error("Failed to marshal player disconnect message: %v", err)
+				continue
+			}
+
+			for _, client := range gm.clientManager.GetClients() {
+				msg := &messages.Message{
+					ClientID: 0, // ClientID 0 means the message is from the server
+					Type:     messages.MessageTypeServerPlayerDisconnect,
+					Payload:  payload,
+				}
+
+				err := network.WriteMessageToTCP(client.TCPConn, msg)
+				if err != nil {
+					log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
+					continue
+				}
+			}
 		default:
 			log.Error("unhandled connection event type: %T", event)
 		}
@@ -166,24 +215,24 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 
 			// TODO: validate the update before applying it
 			log.Trace("Player %d initial position: %v, velocity: %v, isOnGround: %v", message.ClientID, gameState.Players[message.ClientID].Position, gameState.Players[message.ClientID].Velocity, gameState.Players[message.ClientID].IsOnGround)
-			updatePlayerState(gameState.Players[message.ClientID], clientPlayerUpdate)
+			UpdatePlayerState(gameState.Players[message.ClientID], clientPlayerUpdate)
 		default:
 			log.Error("Unhandled message type: %s", message.Type)
 		}
 	}
 }
 
-// updatePlayerState updates the player's position and velocity based on the
+// UpdatePlayerState updates the player's position and velocity based on the
 // client's input and the game state.
 // The player state is updated in place.
-func updatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messages.ClientPlayerUpdate) {
+func UpdatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messages.ClientPlayerUpdate) {
 	// X-axis
 	// Apply input
 	dx := kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
 	vx := kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
 
 	// Check for collisions
-	if collision := playerState.Object.Check(dx, 0); collision != nil {
+	if collision := playerState.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
 		dx = collision.ContactWithObject(collision.Objects[0]).X
 		vx = 0
 	}
@@ -201,7 +250,7 @@ func updatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messa
 
 	// Check for collisions
 	isOnGround := false
-	if collision := playerState.Object.Check(0, dy); collision != nil {
+	if collision := playerState.Object.Check(0, dy, CollisionSpaceTagLevel); collision != nil {
 		dy = collision.ContactWithObject(collision.Objects[0]).Y
 		vy = 0
 		isOnGround = true
@@ -245,7 +294,5 @@ func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
 			log.Error("Failed to write message to UDP connection for client %d: %v", client.ID, err)
 			continue
 		}
-
-		log.Trace("Sent message: %s", message.Type)
 	}
 }

@@ -76,6 +76,10 @@ func (c *TCPClient) Connect(ctx context.Context) error {
 				continue
 			}
 			c.serverTimeChan <- serverSyncTime
+		case messages.MessageTypeServerPlayerConnect, messages.MessageTypeServerPlayerDisconnect:
+			if err := c.messageQueue.Enqueue(msg); err != nil {
+				log.Error("Failed to enqueue message: %v", err)
+			}
 		default:
 			log.Warn("Received unexpected message type from TCP server: %s", msg.Type)
 			continue
