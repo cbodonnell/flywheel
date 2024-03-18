@@ -324,7 +324,7 @@ func (g *Game) updatePlayerStates() error {
 			id := fmt.Sprintf("player-%d", clientID)
 			if obj, ok := g.gameObjects[id]; !ok {
 				if _, ok := g.deletedObjects[id]; ok {
-					log.Debug("Player object for client %d was recently deleted, not instancing as part of update", clientID)
+					log.Warn("Player object for client %d was recently deleted, not instancing as part of update", clientID)
 					continue
 				}
 				log.Debug("Adding new player object for client %d", clientID)
