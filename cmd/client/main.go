@@ -413,9 +413,19 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			vector.DrawFilledRect(screen, float32(obj.Position.X), float32(obj.Position.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
 		}
 	}
-	for _, obj := range g.gameObjects {
+
+	playerObjectID := fmt.Sprintf("player-%d", g.networkManager.ClientID())
+	for id, obj := range g.gameObjects {
+		if id == playerObjectID {
+			// skip the player object, we'll draw it last so it's on top
+			continue
+		}
 		obj.Draw(screen)
 	}
+	if obj, ok := g.gameObjects[playerObjectID]; ok {
+		obj.Draw(screen)
+	}
+
 	g.drawOverlay(screen)
 }
 
