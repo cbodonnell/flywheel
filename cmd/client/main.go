@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/client/objects"
@@ -23,6 +24,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/solarlune/resolv"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
@@ -61,6 +63,9 @@ type Game struct {
 	collisionSpace *resolv.Space
 	// gameObjects is a map of game objects indexed by a unique identifier.
 	gameObjects map[string]objects.GameObject
+	// deletedObjects is a map of deleted game objects indexed by a unique identifier
+	// and the timestamp of the deletion.
+	deletedObjects map[string]int64
 	// lastGameStateReceived is the timestamp of the last game state received from the server.
 	lastGameStateReceived int64
 	// gameStates is a buffer of game states received from the server.
@@ -81,6 +86,7 @@ func NewGame(networkManager *network.NetworkManager) ebiten.Game {
 		networkManager: networkManager,
 		collisionSpace: collisionSpace,
 		gameObjects:    make(map[string]objects.GameObject),
+		deletedObjects: make(map[string]int64),
 		mode:           GameModeMenu,
 	}
 }
@@ -183,6 +189,11 @@ func (g *Game) Update() error {
 				break
 			}
 		}
+
+		if err := g.cleanupDeletedObjects(); err != nil {
+			log.Error("Failed to cleanup deleted objects: %v", err)
+			break
+		}
 	case GameModeOver:
 		if g.isKeyJustPressed() {
 			g.mode = GameModeMenu
@@ -271,6 +282,7 @@ func (g *Game) processPendingServerMessages() error {
 			}
 			g.collisionSpace.Remove(playerObject.State.Object)
 			delete(g.gameObjects, id)
+			g.deletedObjects[id] = time.Now().UnixMilli()
 		default:
 			log.Warn("Received unexpected message type from server: %s", message.Type)
 			continue
@@ -314,6 +326,10 @@ func (g *Game) updatePlayerStates() error {
 
 			id := fmt.Sprintf("player-%d", clientID)
 			if obj, ok := g.gameObjects[id]; !ok {
+				if _, ok := g.deletedObjects[id]; ok {
+					log.Debug("Player object for client %d was recently deleted, not instancing as part of update", clientID)
+					continue
+				}
 				log.Debug("Adding new player object for client %d", clientID)
 				playerObject, err := objects.NewPlayer(id, g.networkManager, playerState)
 				if err != nil {
@@ -385,21 +401,36 @@ func (g *Game) validateNetworkManager() error {
 	}
 }
 
+func (g *Game) cleanupDeletedObjects() error {
+	for id, timestamp := range g.deletedObjects {
+		if time.Now().UnixMilli()-timestamp > 1000 {
+			delete(g.deletedObjects, id)
+		}
+	}
+	return nil
+}
+
 func (g *Game) Draw(screen *ebiten.Image) {
-	g.drawOverlay(screen)
+	for _, obj := range g.collisionSpace.Objects() {
+		if obj.HasTags(game.CollisionSpaceTagLevel) {
+			levelColor := color.RGBA{0x80, 0x80, 0x80, 0xff} // white
+			vector.DrawFilledRect(screen, float32(obj.Position.X), float32(obj.Position.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
+		}
+	}
 	for _, obj := range g.gameObjects {
 		obj.Draw(screen)
 	}
+	g.drawOverlay(screen)
 }
 
 func (g *Game) drawOverlay(screen *ebiten.Image) {
 	serverTime, ping := g.networkManager.ServerTime()
 
 	if g.debug {
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("FPS: %0.1f", ebiten.ActualFPS()))
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("\nTPS: %0.1f", ebiten.ActualTPS()))
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\nPing: %0.1f", ping))
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\nServer Time: %0.0f", serverTime))
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n   FPS: %0.1f", ebiten.ActualFPS()))
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n   TPS: %0.1f", ebiten.ActualTPS()))
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n   Ping: %0.1f", ping))
+		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n\n   Time: %0.0f", serverTime))
 	}
 
 	var t string
