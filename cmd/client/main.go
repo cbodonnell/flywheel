@@ -235,7 +235,10 @@ func (g *Game) processPendingServerMessages() error {
 			}
 			g.lastGameStateReceived = gameState.Timestamp
 			g.gameStates = append(g.gameStates, gameState)
-			g.reconcilePlayerState(gameState)
+
+			if err := g.reconcilePlayerState(gameState); err != nil {
+				log.Warn("Failed to reconcile player state: %v", err)
+			}
 		case messages.MessageTypeServerPlayerConnect:
 			playerConnect := &messages.ServerPlayerConnect{}
 			if err := json.Unmarshal(message.Payload, playerConnect); err != nil {
@@ -307,9 +310,8 @@ func (g *Game) reconcilePlayerState(gameState *gametypes.GameState) error {
 	if !ok {
 		return fmt.Errorf("failed to cast game object %s to *objects.Player", playerObjectID)
 	}
-	playerObject.ReconcileState(playerState)
 
-	return nil
+	return playerObject.ReconcileState(playerState)
 }
 
 const (

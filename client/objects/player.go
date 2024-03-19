@@ -144,7 +144,7 @@ func (p *Player) Draw(screen *ebiten.Image) {
 // the client state for that timestamp matches the server state.
 // If it doesn't match, the server state is applied and all of the
 // past updates that are after the last processed timestamp are replayed.
-func (p *Player) ReconcileState(state *gametypes.PlayerState) {
+func (p *Player) ReconcileState(state *gametypes.PlayerState) error {
 	foundPreviousState := false
 	for i := len(p.previousStates) - 1; i >= 0; i-- {
 		ps := p.previousStates[i]
@@ -173,6 +173,8 @@ func (p *Player) ReconcileState(state *gametypes.PlayerState) {
 	}
 
 	if !foundPreviousState {
-		log.Warn("Failed to find previous state at timestamp %d for %s for reconciliation", state.LastProcessedTimestamp, p.ID)
+		return fmt.Errorf("failed to find previous state for timestamp %d", state.LastProcessedTimestamp)
 	}
+
+	return nil
 }
