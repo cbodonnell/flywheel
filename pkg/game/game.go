@@ -213,19 +213,19 @@ func (gm *GameManager) processClientMessages(gameState *types.GameState) {
 				continue
 			}
 
+			// TODO: check for previousUpdates that have not been processed
 			// TODO: validate the update before applying it
-			log.Trace("Player %d initial position: %v, velocity: %v, isOnGround: %v", message.ClientID, gameState.Players[message.ClientID].Position, gameState.Players[message.ClientID].Velocity, gameState.Players[message.ClientID].IsOnGround)
-			UpdatePlayerState(gameState.Players[message.ClientID], clientPlayerUpdate)
+			ApplyInput(gameState.Players[message.ClientID], clientPlayerUpdate)
 		default:
 			log.Error("Unhandled message type: %s", message.Type)
 		}
 	}
 }
 
-// UpdatePlayerState updates the player's position and velocity based on the
+// ApplyInput updates the player's position and velocity based on the
 // client's input and the game state.
 // The player state is updated in place.
-func UpdatePlayerState(playerState *types.PlayerState, clientPlayerUpdate *messages.ClientPlayerUpdate) {
+func ApplyInput(playerState *types.PlayerState, clientPlayerUpdate *messages.ClientPlayerUpdate) {
 	// X-axis
 	// Apply input
 	dx := kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
