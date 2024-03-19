@@ -27,6 +27,25 @@ type Velocity struct {
 	Y float64 `json:"y"`
 }
 
+// Equal returns true if the player state is equal to the other player state
+func (p *PlayerState) Equal(other *PlayerState) bool {
+	return p.Position.X == other.Position.X &&
+		p.Position.Y == other.Position.Y &&
+		p.Velocity.X == other.Velocity.X &&
+		p.Velocity.Y == other.Velocity.Y &&
+		p.IsOnGround == other.IsOnGround
+}
+
+// Copy returns a copy of the player state with an empty object reference
+func (p *PlayerState) Copy() *PlayerState {
+	return &PlayerState{
+		LastProcessedTimestamp: p.LastProcessedTimestamp,
+		Position:               p.Position,
+		Velocity:               p.Velocity,
+		IsOnGround:             p.IsOnGround,
+	}
+}
+
 type ConnectPlayerEvent struct {
 	ClientID    uint32
 	PlayerState *PlayerState

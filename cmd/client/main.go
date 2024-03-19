@@ -235,8 +235,8 @@ func (g *Game) processPendingServerMessages() error {
 			}
 			g.lastGameStateReceived = gameState.Timestamp
 			g.gameStates = append(g.gameStates, gameState)
+			g.reconcilePlayerState(gameState)
 		case messages.MessageTypeServerPlayerConnect:
-			log.Debug("Received player connect message: %s", message.Payload)
 			playerConnect := &messages.ServerPlayerConnect{}
 			if err := json.Unmarshal(message.Payload, playerConnect); err != nil {
 				log.Error("Failed to unmarshal player connect message: %v", err)
@@ -290,6 +290,28 @@ func (g *Game) processPendingServerMessages() error {
 	return nil
 }
 
+func (g *Game) reconcilePlayerState(gameState *gametypes.GameState) error {
+	playerState := gameState.Players[g.networkManager.ClientID()]
+	if playerState == nil {
+		return nil
+	}
+
+	playerObjectID := fmt.Sprintf("player-%d", g.networkManager.ClientID())
+	obj, ok := g.gameObjects[playerObjectID]
+	if !ok {
+		log.Warn("Player object for client %d not found", g.networkManager.ClientID())
+		return nil
+	}
+
+	playerObject, ok := obj.(*objects.Player)
+	if !ok {
+		return fmt.Errorf("failed to cast game object %s to *objects.Player", playerObjectID)
+	}
+	playerObject.ReconcileState(playerState)
+
+	return nil
+}
+
 const (
 	// InterpolationOffset is how far back in time we want to interpolate.
 	// TODO: find a good rule of thumb for this value vs server tick rate
@@ -313,7 +335,6 @@ func (g *Game) updatePlayerStates() error {
 		interpolationFactor := float64(renderTime-g.gameStates[1].Timestamp) / float64(g.gameStates[2].Timestamp-g.gameStates[1].Timestamp)
 		for clientID, playerState := range g.gameStates[2].Players {
 			if clientID == g.networkManager.ClientID() {
-				// TODO: adjust based on server game state as-needed
 				continue
 			}
 			if _, ok := g.gameStates[1].Players[clientID]; !ok {
@@ -355,7 +376,6 @@ func (g *Game) updatePlayerStates() error {
 		extrapolationFactor := float64(renderTime-g.gameStates[0].Timestamp) / float64(g.gameStates[1].Timestamp-g.gameStates[0].Timestamp)
 		for clientID, playerState := range g.gameStates[1].Players {
 			if clientID == g.networkManager.ClientID() {
-				// TODO: adjust based on server game state as-needed
 				continue
 			}
 			if _, ok := g.gameStates[0].Players[clientID]; !ok {

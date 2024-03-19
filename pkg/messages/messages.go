@@ -8,7 +8,8 @@ import (
 
 const (
 	// MessageBufferSize represents the maximum size of a message
-	MessageBufferSize = 1024
+	// TODO: determine a more appropriate size
+	MessageBufferSize = 512
 )
 
 // Message types
@@ -35,6 +36,12 @@ type AssignID struct {
 	ClientID uint32 `json:"clientID"`
 }
 
+const (
+	// MaxPreviousUpdates is the maximum number of previous updates to send to the server
+	// TODO: determine a more appropriate size
+	MaxPreviousUpdates = 2
+)
+
 // TODO: change this to a more generic client input message
 // with a type field to differentiate between different input types (move, jump, fire, etc.)
 type ClientPlayerUpdate struct {
@@ -48,6 +55,9 @@ type ClientPlayerUpdate struct {
 	InputJump bool `json:"inputJump"`
 	// DeltaTime is the time since the last update as recorded by the client
 	DeltaTime float64 `json:"deltaTime"`
+	// PastUpdates is a list of past updates from the client to
+	// mitigate the effects of packet loss and out-of-order delivery
+	PastUpdates []*ClientPlayerUpdate `json:"previousUpdates"`
 }
 
 // ClientSyncTime is a message sent by the client to request a time sync with the server
