@@ -10,10 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cbodonnell/flywheel/client/flow"
+	"github.com/cbodonnell/flywheel/client/fonts"
+	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/client/objects"
 	"github.com/cbodonnell/flywheel/pkg/game"
-	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
@@ -21,37 +23,11 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/version"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/solarlune/resolv"
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/opentype"
 )
-
-type GameMode int
-
-const (
-	GameModeMenu GameMode = iota
-	GameModePlay
-	GameModeOver
-	GameModeNetworkError
-)
-
-func (m GameMode) String() string {
-	switch m {
-	case GameModeMenu:
-		return "Menu"
-	case GameModePlay:
-		return "Play"
-	case GameModeOver:
-		return "Over"
-	case GameModeNetworkError:
-		return "NetworkError"
-	}
-	return "Unknown"
-}
 
 // Game implements ebiten.Game interface, which has Update, Draw and Layout methods.
 type Game struct {
@@ -71,11 +47,7 @@ type Game struct {
 	// gameStates is a buffer of game states received from the server.
 	gameStates []*gametypes.GameState
 	// mode is the current game mode.
-	mode GameMode
-	// touchIDs is the last touch identifiers.
-	touchIDs []ebiten.TouchID
-	// gamepadIDs is the last gamepad identifiers.
-	gamepadIDs []ebiten.GamepadID
+	mode flow.GameMode
 }
 
 func NewGame(networkManager *network.NetworkManager) ebiten.Game {
@@ -87,81 +59,29 @@ func NewGame(networkManager *network.NetworkManager) ebiten.Game {
 		collisionSpace: collisionSpace,
 		gameObjects:    make(map[string]objects.GameObject),
 		deletedObjects: make(map[string]int64),
-		mode:           GameModeMenu,
+		mode:           flow.GameModeMenu,
 	}
-}
-
-var mplusNormalFont font.Face
-
-func loadFonts() error {
-	tt, err := opentype.Parse(fonts.MPlus1pRegular_ttf)
-	if err != nil {
-		return fmt.Errorf("failed to parse font: %v", err)
-	}
-	const dpi = 72
-	mplusNormalFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
-		Size:    24,
-		DPI:     dpi,
-		Hinting: font.HintingVertical,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create font face: %v", err)
-	}
-
-	return nil
-}
-
-// isKeyJustPressed returns a boolean value indicating whether the generic input is just pressed.
-// This is used to handle both keyboard and touch inputs.
-func (g *Game) isKeyJustPressed() bool {
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		return true
-	}
-	g.touchIDs = inpututil.AppendJustPressedTouchIDs(g.touchIDs[:0])
-	if len(g.touchIDs) > 0 {
-		return true
-	}
-	g.gamepadIDs = ebiten.AppendGamepadIDs(g.gamepadIDs[:0])
-	for _, g := range g.gamepadIDs {
-		if ebiten.IsStandardGamepadLayoutAvailable(g) {
-			if inpututil.IsStandardGamepadButtonJustPressed(g, ebiten.StandardGamepadButtonRightBottom) {
-				return true
-			}
-			if inpututil.IsStandardGamepadButtonJustPressed(g, ebiten.StandardGamepadButtonRightRight) {
-				return true
-			}
-		} else {
-			// The button 0/1 might not be A/B buttons.
-			if inpututil.IsGamepadButtonJustPressed(g, ebiten.GamepadButton0) {
-				return true
-			}
-			if inpututil.IsGamepadButtonJustPressed(g, ebiten.GamepadButton1) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func (g *Game) Update() error {
 	g.networkManager.UpdateServerTime(1.0 / float64(ebiten.TPS()))
 
 	switch g.mode {
-	case GameModeMenu:
-		if g.isKeyJustPressed() {
+	case flow.GameModeMenu:
+		if input.IsPositiveJustPressed() {
 			if err := g.networkManager.Start(); err != nil {
 				log.Error("Failed to start network manager: %v", err)
 				g.networkManager.Stop()
-				g.mode = GameModeNetworkError
+				g.mode = flow.GameModeNetworkError
 				break
 			}
 
-			g.mode = GameModePlay
+			g.mode = flow.GameModePlay
 		}
-	case GameModePlay:
-		if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+	case flow.GameModePlay:
+		if input.IsNegativeJustPressed() {
 			g.networkManager.Stop()
-			g.mode = GameModeOver
+			g.mode = flow.GameModeOver
 			g.gameObjects = make(map[string]objects.GameObject)
 			break
 		}
@@ -176,10 +96,10 @@ func (g *Game) Update() error {
 			break
 		}
 
-		if err := g.validateNetworkManager(); err != nil {
+		if err := g.checkNetworkManager(); err != nil {
 			log.Error("Network manager error: %v", err)
 			g.networkManager.Stop()
-			g.mode = GameModeNetworkError
+			g.mode = flow.GameModeNetworkError
 			break
 		}
 
@@ -194,13 +114,13 @@ func (g *Game) Update() error {
 			log.Error("Failed to cleanup deleted objects: %v", err)
 			break
 		}
-	case GameModeOver:
-		if g.isKeyJustPressed() {
-			g.mode = GameModeMenu
+	case flow.GameModeOver:
+		if input.IsPositiveJustPressed() {
+			g.mode = flow.GameModeMenu
 		}
-	case GameModeNetworkError:
-		if g.isKeyJustPressed() {
-			g.mode = GameModeMenu
+	case flow.GameModeNetworkError:
+		if input.IsPositiveJustPressed() {
+			g.mode = flow.GameModeMenu
 		}
 	}
 
@@ -258,7 +178,6 @@ func (g *Game) processPendingServerMessages() error {
 				log.Error("Failed to create new player object: %v", err)
 				continue
 			}
-			playerObject.State.Object = resolv.NewObject(playerConnect.PlayerState.Position.X, playerConnect.PlayerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight, game.CollisionSpaceTagPlayer)
 			g.collisionSpace.Add(playerObject.State.Object)
 			g.gameObjects[id] = playerObject
 			delete(g.deletedObjects, id)
@@ -334,82 +253,88 @@ func (g *Game) updatePlayerStates() error {
 	}
 
 	if len(g.gameStates) > 2 {
-		// we have a future state to interpolate to
-		interpolationFactor := float64(renderTime-g.gameStates[1].Timestamp) / float64(g.gameStates[2].Timestamp-g.gameStates[1].Timestamp)
-		for clientID, playerState := range g.gameStates[2].Players {
-			if clientID == g.networkManager.ClientID() {
-				continue
-			}
-			if _, ok := g.gameStates[1].Players[clientID]; !ok {
-				continue
-			}
-			previousPlayerState := g.gameStates[1].Players[clientID]
-
-			id := fmt.Sprintf("player-%d", clientID)
-			if obj, ok := g.gameObjects[id]; !ok {
-				if _, ok := g.deletedObjects[id]; ok {
-					log.Warn("Player object for client %d was recently deleted, not instancing as part of update", clientID)
-					continue
-				}
-				log.Debug("Adding new player object for client %d", clientID)
-				playerObject, err := objects.NewPlayer(id, g.networkManager, playerState)
-				if err != nil {
-					return fmt.Errorf("failed to create new player object: %v", err)
-				}
-				playerObject.State.Object = resolv.NewObject(playerState.Position.X, playerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight, game.CollisionSpaceTagPlayer)
-				g.collisionSpace.Add(playerObject.State.Object)
-				g.gameObjects[id] = playerObject
-			} else {
-				playerObject, ok := obj.(*objects.Player)
-				if !ok {
-					return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
-				}
-				playerObject.State.LastProcessedTimestamp = playerState.LastProcessedTimestamp
-				playerObject.State.Position.X = previousPlayerState.Position.X + (playerState.Position.X-previousPlayerState.Position.X)*interpolationFactor
-				playerObject.State.Position.Y = previousPlayerState.Position.Y + (playerState.Position.Y-previousPlayerState.Position.Y)*interpolationFactor
-				playerObject.State.Velocity.X = playerState.Velocity.X
-				playerObject.State.Velocity.Y = playerState.Velocity.X
-				playerObject.State.IsOnGround = playerState.IsOnGround
-				playerObject.State.Object.Position.X = playerObject.State.Position.X
-				playerObject.State.Object.Position.Y = playerObject.State.Position.Y
-			}
+		if err := g.interpolateState(g.gameStates[1], g.gameStates[2], renderTime); err != nil {
+			return fmt.Errorf("failed to interpolate game state: %v", err)
 		}
 	} else {
-		// we don't have a future state, so we need to extrapolate from the last state
-		extrapolationFactor := float64(renderTime-g.gameStates[0].Timestamp) / float64(g.gameStates[1].Timestamp-g.gameStates[0].Timestamp)
-		for clientID, playerState := range g.gameStates[1].Players {
-			if clientID == g.networkManager.ClientID() {
-				continue
-			}
-			if _, ok := g.gameStates[0].Players[clientID]; !ok {
-				continue
-			}
-			previousPlayerState := g.gameStates[0].Players[clientID]
-
-			id := fmt.Sprintf("player-%d", clientID)
-			if obj, ok := g.gameObjects[id]; !ok {
-				log.Debug("Player object for client %d not found, not instancing since we're extrapolating", clientID)
-			} else {
-				playerObject, ok := obj.(*objects.Player)
-				if !ok {
-					return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
-				}
-				playerObject.State.LastProcessedTimestamp = playerState.LastProcessedTimestamp
-				playerObject.State.Position.X = playerState.Position.X + (playerState.Position.X-previousPlayerState.Position.X)*extrapolationFactor
-				playerObject.State.Position.Y = playerState.Position.Y + (playerState.Position.Y-previousPlayerState.Position.Y)*extrapolationFactor
-				playerObject.State.Velocity.X = playerState.Velocity.X
-				playerObject.State.Velocity.Y = playerState.Velocity.Y
-				playerObject.State.IsOnGround = playerState.IsOnGround
-				playerObject.State.Object.Position.X = playerObject.State.Position.X
-				playerObject.State.Object.Position.Y = playerObject.State.Position.Y
-			}
+		if err := g.extrapolateState(g.gameStates[0], g.gameStates[1], renderTime); err != nil {
+			return fmt.Errorf("failed to extrapolate game state: %v", err)
 		}
 	}
 
 	return nil
 }
 
-func (g *Game) validateNetworkManager() error {
+// interpolateState interpolates the game state between two states given a render time
+// that is between the two states.
+func (g *Game) interpolateState(from *gametypes.GameState, to *gametypes.GameState, renderTime int64) error {
+	// we have a future state to interpolate to
+	interpolationFactor := float64(renderTime-from.Timestamp) / float64(to.Timestamp-from.Timestamp)
+	for clientID, playerState := range to.Players {
+		if clientID == g.networkManager.ClientID() {
+			continue
+		}
+		if _, ok := from.Players[clientID]; !ok {
+			continue
+		}
+		previousPlayerState := from.Players[clientID]
+
+		id := fmt.Sprintf("player-%d", clientID)
+		if obj, ok := g.gameObjects[id]; !ok {
+			if _, ok := g.deletedObjects[id]; ok {
+				log.Warn("Player object for client %d was recently deleted, not instancing as part of update", clientID)
+				continue
+			}
+			log.Debug("Adding new player object for client %d", clientID)
+			playerObject, err := objects.NewPlayer(id, g.networkManager, playerState)
+			if err != nil {
+				return fmt.Errorf("failed to create new player object: %v", err)
+			}
+			g.collisionSpace.Add(playerObject.State.Object)
+			g.gameObjects[id] = playerObject
+		} else {
+			playerObject, ok := obj.(*objects.Player)
+			if !ok {
+				return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
+			}
+			playerObject.InterpolateState(previousPlayerState, playerState, interpolationFactor)
+		}
+	}
+
+	return nil
+}
+
+// extrapolateState extrapolates the game state based on the last two states.
+// This is used when we don't have a future state to interpolate to.
+func (g *Game) extrapolateState(from *gametypes.GameState, to *gametypes.GameState, renderTime int64) error {
+	// we don't have a future state, so we need to extrapolate from the last state
+	extrapolationFactor := float64(renderTime-to.Timestamp) / float64(to.Timestamp-from.Timestamp)
+	for clientID, playerState := range to.Players {
+		if clientID == g.networkManager.ClientID() {
+			continue
+		}
+		if _, ok := from.Players[clientID]; !ok {
+			continue
+		}
+		previousPlayerState := from.Players[clientID]
+
+		id := fmt.Sprintf("player-%d", clientID)
+		if obj, ok := g.gameObjects[id]; !ok {
+			log.Debug("Player object for client %d not found, not instancing since we're extrapolating", clientID)
+		} else {
+			playerObject, ok := obj.(*objects.Player)
+			if !ok {
+				return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
+			}
+			playerObject.ExtrapolateState(previousPlayerState, playerState, extrapolationFactor)
+		}
+	}
+
+	return nil
+}
+
+// checkNetworkManager checks the network manager for errors and returns any that are found.
+func (g *Game) checkNetworkManager() error {
 	select {
 	case err := <-g.networkManager.TCPClientErrChan():
 		return fmt.Errorf("TCP client error: %v", err)
@@ -464,21 +389,21 @@ func (g *Game) drawOverlay(screen *ebiten.Image) {
 
 	var t string
 	switch g.mode {
-	case GameModeMenu:
+	case flow.GameModeMenu:
 		t = "Press to Start!"
-	case GameModePlay:
+	case flow.GameModePlay:
 		return
-	case GameModeOver:
+	case flow.GameModeOver:
 		t = "Game Over"
-	case GameModeNetworkError:
+	case flow.GameModeNetworkError:
 		t = "Network Error"
 	}
 	t = strings.ToUpper(t)
-	bounds, _ := font.BoundString(mplusNormalFont, t)
+	bounds, _ := font.BoundString(fonts.MPlusNormalFont, t)
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(float64(screen.Bounds().Dx())/2-float64(bounds.Max.X>>6)/2, float64(screen.Bounds().Dy())/2-float64(bounds.Max.Y>>6)/2)
 	op.ColorScale.ScaleWithColor(color.White)
-	text.DrawWithOptions(screen, t, mplusNormalFont, op)
+	text.DrawWithOptions(screen, t, fonts.MPlusNormalFont, op)
 }
 
 const (
@@ -504,10 +429,6 @@ func main() {
 	log.Info("Log level set to %s", parsedLogLevel)
 
 	log.Info("Starting client version %s", version.Get())
-
-	if err := loadFonts(); err != nil {
-		panic(fmt.Sprintf("Failed to load fonts: %v", err))
-	}
 
 	serverMessageQueue := queue.NewInMemoryQueue(1024)
 	networkManager, err := network.NewNetworkManager(serverMessageQueue)

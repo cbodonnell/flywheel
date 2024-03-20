@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"time"
 
+	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/pkg/game"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
@@ -14,6 +15,7 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
+	"github.com/solarlune/resolv"
 )
 
 const (
@@ -46,6 +48,8 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 		return nil, fmt.Errorf("client ID is required")
 	}
 
+	state.Object = resolv.NewObject(state.Position.X, state.Position.Y, constants.PlayerWidth, constants.PlayerHeight, game.CollisionSpaceTagPlayer)
+
 	return &Player{
 		ID:             id,
 		networkManager: networkManager,
@@ -60,8 +64,8 @@ func (p *Player) Update() error {
 	}
 
 	inputX := 0.0
-	rightPressed := ebiten.IsKeyPressed(ebiten.KeyRight) || ebiten.IsKeyPressed(ebiten.KeyD)
-	leftPressed := ebiten.IsKeyPressed(ebiten.KeyLeft) || ebiten.IsKeyPressed(ebiten.KeyA)
+	rightPressed := input.IsRightPressed()
+	leftPressed := input.IsLeftPressed()
 	if rightPressed && !leftPressed {
 		inputX = 1.0
 	} else if leftPressed && !rightPressed {
@@ -69,15 +73,15 @@ func (p *Player) Update() error {
 	}
 
 	inputY := 0.0
-	upPressed := ebiten.IsKeyPressed(ebiten.KeyUp) || ebiten.IsKeyPressed(ebiten.KeyW)
-	downPressed := ebiten.IsKeyPressed(ebiten.KeyDown) || ebiten.IsKeyPressed(ebiten.KeyS)
+	upPressed := input.IsUpPressed()
+	downPressed := input.IsDownPressed()
 	if upPressed && !downPressed {
 		inputY = -1.0
 	} else if downPressed && !upPressed {
 		inputY = 1.0
 	}
 
-	inputJump := ebiten.IsKeyPressed(ebiten.KeySpace)
+	inputJump := input.IsJumpJustPressed()
 
 	cpu := &messages.ClientPlayerUpdate{
 		Timestamp:   time.Now().UnixMilli(),
@@ -136,7 +140,29 @@ func (p *Player) Draw(screen *ebiten.Image) {
 			playerColor = color.RGBA{200, 0, 200, 255} // Purple
 		}
 	}
-	vector.DrawFilledRect(screen, float32(playerObject.Position.X), float32(float64(screen.Bounds().Dy())-constants.PlayerHeight)-float32(playerObject.Position.Y), float32(playerObject.Size.X), float32(playerObject.Size.Y), playerColor, false)
+	vector.DrawFilledRect(screen, float32(playerObject.Position.X), float32(float64(screen.Bounds().Dy())-playerObject.Size.Y)-float32(playerObject.Position.Y), float32(playerObject.Size.X), float32(playerObject.Size.Y), playerColor, false)
+}
+
+func (p *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {
+	p.State.LastProcessedTimestamp = to.LastProcessedTimestamp
+	p.State.Position.X = from.Position.X + (to.Position.X-from.Position.X)*factor
+	p.State.Position.Y = from.Position.Y + (to.Position.Y-from.Position.Y)*factor
+	p.State.Velocity.X = to.Velocity.X
+	p.State.Velocity.Y = to.Velocity.X
+	p.State.IsOnGround = to.IsOnGround
+	p.State.Object.Position.X = p.State.Position.X
+	p.State.Object.Position.Y = p.State.Position.Y
+}
+
+func (p *Player) ExtrapolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {
+	p.State.LastProcessedTimestamp = to.LastProcessedTimestamp
+	p.State.Position.X = to.Position.X + (to.Position.X-from.Position.X)*factor
+	p.State.Position.Y = to.Position.Y + (to.Position.Y-from.Position.Y)*factor
+	p.State.Velocity.X = to.Velocity.X
+	p.State.Velocity.Y = to.Velocity.Y
+	p.State.IsOnGround = to.IsOnGround
+	p.State.Object.Position.X = p.State.Position.X
+	p.State.Object.Position.Y = p.State.Position.Y
 }
 
 // ReconcileState reconciles the player state with the server state
