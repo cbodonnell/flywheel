@@ -81,7 +81,7 @@ func (p *Player) Update() error {
 		inputY = 1.0
 	}
 
-	inputJump := input.IsJumpJustPressed()
+	inputJump := input.IsJumpPressed()
 
 	cpu := &messages.ClientPlayerUpdate{
 		Timestamp:   time.Now().UnixMilli(),
