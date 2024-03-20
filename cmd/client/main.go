@@ -261,6 +261,7 @@ func (g *Game) processPendingServerMessages() error {
 			playerObject.State.Object = resolv.NewObject(playerConnect.PlayerState.Position.X, playerConnect.PlayerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight, game.CollisionSpaceTagPlayer)
 			g.collisionSpace.Add(playerObject.State.Object)
 			g.gameObjects[id] = playerObject
+			delete(g.deletedObjects, id)
 		case messages.MessageTypeServerPlayerDisconnect:
 			log.Debug("Received player disconnect message: %s", message.Payload)
 			playerDisconnect := &messages.ServerPlayerDisconnect{}
@@ -421,7 +422,7 @@ func (g *Game) validateNetworkManager() error {
 
 func (g *Game) cleanupDeletedObjects() error {
 	for id, timestamp := range g.deletedObjects {
-		if time.Now().UnixMilli()-timestamp > 1000 {
+		if time.Now().UnixMilli()-timestamp > 2000 {
 			delete(g.deletedObjects, id)
 		}
 	}
