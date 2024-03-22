@@ -24,6 +24,8 @@ const (
 )
 
 type Player struct {
+	BaseObject
+
 	ID string
 	// TODO: should this be the network manager or the parent game object?
 	networkManager *network.NetworkManager

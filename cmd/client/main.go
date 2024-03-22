@@ -30,6 +30,7 @@ import (
 )
 
 // Game implements ebiten.Game interface, which has Update, Draw and Layout methods.
+// TODO: move some of this into scenes
 type Game struct {
 	// debug is a boolean value indicating whether debug mode is enabled.
 	debug bool
@@ -48,12 +49,14 @@ type Game struct {
 	gameStates []*gametypes.GameState
 	// mode is the current game mode.
 	mode flow.GameMode
+
+	scene objects.Scene
 }
 
-func NewGame(networkManager *network.NetworkManager) ebiten.Game {
+func NewGame(networkManager *network.NetworkManager) (ebiten.Game, error) {
 	collisionSpace := game.NewCollisionSpace()
 
-	return &Game{
+	g := &Game{
 		debug:          true,
 		networkManager: networkManager,
 		collisionSpace: collisionSpace,
@@ -61,10 +64,45 @@ func NewGame(networkManager *network.NetworkManager) ebiten.Game {
 		deletedObjects: make(map[string]int64),
 		mode:           flow.GameModeMenu,
 	}
+
+	menu, err := objects.NewMenuScene()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create menu scene: %v", err)
+	}
+	if err := g.SetScene(menu); err != nil {
+		return nil, fmt.Errorf("failed to set menu scene: %v", err)
+	}
+
+	for _, obj := range g.gameObjects {
+		if err := objects.InitTree(obj); err != nil {
+			return nil, fmt.Errorf("failed to initialize game object tree: %v", err)
+		}
+	}
+
+	return g, nil
+}
+
+func (g *Game) SetScene(scene objects.Scene) error {
+	if g.scene != nil {
+		if err := g.scene.Destroy(); err != nil {
+			return fmt.Errorf("failed to destroy previous scene: %v", err)
+		}
+	}
+
+	g.scene = scene
+	if err := g.scene.Init(); err != nil {
+		return fmt.Errorf("failed to initialize scene: %v", err)
+	}
+
+	return nil
 }
 
 func (g *Game) Update() error {
 	g.networkManager.UpdateServerTime(1.0 / float64(ebiten.TPS()))
+
+	if err := g.scene.Update(); err != nil {
+		return fmt.Errorf("failed to update scene: %v", err)
+	}
 
 	switch g.mode {
 	case flow.GameModeMenu:
@@ -91,8 +129,8 @@ func (g *Game) Update() error {
 			break
 		}
 
-		if err := g.updatePlayerStates(); err != nil {
-			log.Error("Failed to update player states: %v", err)
+		if err := g.updateGameState(); err != nil {
+			log.Error("Failed to update game state: %v", err)
 			break
 		}
 
@@ -104,7 +142,7 @@ func (g *Game) Update() error {
 		}
 
 		for _, obj := range g.gameObjects {
-			if err := obj.Update(); err != nil {
+			if err := objects.UpdateTree(obj); err != nil {
 				log.Error("Failed to update game object: %v", err)
 				break
 			}
@@ -240,7 +278,7 @@ const (
 	InterpolationOffset = 150 // ms - currently 3x the server tick rate (50ms)
 )
 
-func (g *Game) updatePlayerStates() error {
+func (g *Game) updateGameState() error {
 	if len(g.gameStates) < 2 {
 		return nil
 	}
@@ -355,6 +393,8 @@ func (g *Game) cleanupDeletedObjects() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	// TODO: g.scene.Draw(screen)
+
 	for _, obj := range g.collisionSpace.Objects() {
 		if obj.HasTags(game.CollisionSpaceTagLevel) {
 			levelColor := color.RGBA{0x80, 0x80, 0x80, 0xff} // white
@@ -368,10 +408,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			// skip the player object, we'll draw it last so it's on top
 			continue
 		}
-		obj.Draw(screen)
+		objects.DrawTree(obj, screen)
 	}
 	if obj, ok := g.gameObjects[playerObjectID]; ok {
-		obj.Draw(screen)
+		objects.DrawTree(obj, screen)
 	}
 
 	g.drawOverlay(screen)
@@ -407,12 +447,12 @@ func (g *Game) drawOverlay(screen *ebiten.Image) {
 }
 
 const (
-	ScreenWidth  = 640
-	ScreenHeight = 480
+	DefaultScreenWidth  = 640
+	DefaultScreenHeight = 480
 )
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	return ScreenWidth, ScreenHeight
+	return DefaultScreenWidth, DefaultScreenHeight
 }
 
 func main() {
@@ -436,9 +476,14 @@ func main() {
 		panic(fmt.Sprintf("Failed to create network manager: %v", err))
 	}
 
-	ebiten.SetWindowSize(ScreenWidth, ScreenHeight)
+	game, err := NewGame(networkManager)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create game: %v", err))
+	}
+
+	ebiten.SetWindowSize(DefaultScreenWidth, DefaultScreenHeight)
 	ebiten.SetWindowTitle("Flywheel Client")
-	if err := ebiten.RunGame(NewGame(networkManager)); err != nil {
+	if err := ebiten.RunGame(game); err != nil {
 		panic(fmt.Sprintf("Failed to run game: %v", err))
 	}
 }
