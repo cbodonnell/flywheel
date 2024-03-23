@@ -226,6 +226,14 @@ func (m *NetworkManager) Stop() error {
 
 	m.clientID = 0
 	m.cancelClientCtx = nil
+
+	m.serverTimeMutex.Lock()
+	defer m.serverTimeMutex.Unlock()
+	m.serverTime = 0
+	m.ping = 0
+	m.deltaPing = 0
+	m.recentRTTs = nil
+
 	m.isConnected = false
 
 	log.Info("Network manager stopped")
