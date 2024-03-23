@@ -1,8 +1,16 @@
 # Flywheel
 
-Unity client project: https://github.com/cbodonnell/flywheel-client
+A 2D multiplayer game server written in Go.
 
 ## Development
+
+The project can be built and run with Docker Compose, or locally with Go.
+
+### Docker Compose
+
+Dependencies:
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
 
 Start the server with:
 ```
@@ -18,6 +26,19 @@ docker compose down
 
 Pass the `-v` flag to remove volumes.
 
-## Schema Migrations
+### Local
 
-TODO: Switch to a more robust migration tool. Something like [goose](https://github.com/pressly/goose)?
+Dependencies:
+- [Go](https://go.dev/doc/install)
+
+Start the server with a local SQLite database:
+```
+go run ./cmd/server/main.go -log-level debug
+```
+
+## Client
+
+Run a local client with:
+```
+go run ./cmd/client/main.go
+```
