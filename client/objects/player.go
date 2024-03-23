@@ -53,6 +53,9 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 	state.Object = resolv.NewObject(state.Position.X, state.Position.Y, constants.PlayerWidth, constants.PlayerHeight, game.CollisionSpaceTagPlayer)
 
 	return &Player{
+		BaseObject: BaseObject{
+			Children: make(map[string]GameObject),
+		},
 		ID:             id,
 		networkManager: networkManager,
 		isLocalPlayer:  id == fmt.Sprintf("player-%d", networkManager.ClientID()),
@@ -173,6 +176,11 @@ func (p *Player) ExtrapolateState(from *gametypes.PlayerState, to *gametypes.Pla
 // If it doesn't match, the server state is applied and all of the
 // past updates that are after the last processed timestamp are replayed.
 func (p *Player) ReconcileState(state *gametypes.PlayerState) error {
+	if state.LastProcessedTimestamp == 0 {
+		// no previous state to reconcile with
+		return nil
+	}
+
 	foundPreviousState := false
 	for i := len(p.previousStates) - 1; i >= 0; i-- {
 		ps := p.previousStates[i]

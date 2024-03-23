@@ -3,12 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"image/color"
 	"os"
-	"strings"
 
 	"github.com/cbodonnell/flywheel/client/flow"
-	"github.com/cbodonnell/flywheel/client/fonts"
 	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/client/scenes"
@@ -17,8 +14,6 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/version"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/hajimehoshi/ebiten/v2/text"
-	"golang.org/x/image/font"
 )
 
 // Game implements ebiten.Game interface, which has Update, Draw and Layout methods.
@@ -34,10 +29,15 @@ type Game struct {
 	scene scenes.Scene
 }
 
-func NewGame(networkManager *network.NetworkManager) (ebiten.Game, error) {
+type NewGameOptions struct {
+	Debug          bool
+	NetworkManager *network.NetworkManager
+}
+
+func NewGame(opts NewGameOptions) (ebiten.Game, error) {
 	g := &Game{
-		debug:          true,
-		networkManager: networkManager,
+		debug:          opts.Debug,
+		networkManager: opts.NetworkManager,
 	}
 
 	if err := g.loadMenu(); err != nil {
@@ -75,6 +75,15 @@ func (g *Game) loadMenu() error {
 }
 
 func (g *Game) loadGame() error {
+	if err := g.networkManager.Start(); err != nil {
+		log.Error("Failed to start network manager: %v", err)
+		g.networkManager.Stop()
+		if err := g.loadNetworkError(); err != nil {
+			return fmt.Errorf("failed to load network error scene: %v", err)
+		}
+		return nil
+	}
+
 	gameScene, err := scenes.NewGameScene(g.networkManager)
 	if err != nil {
 		return fmt.Errorf("failed to create game scene: %v", err)
@@ -87,6 +96,8 @@ func (g *Game) loadGame() error {
 }
 
 func (g *Game) loadGameOver() error {
+	g.networkManager.Stop()
+
 	gameOver, err := scenes.NewGameOverScene()
 	if err != nil {
 		return fmt.Errorf("failed to create game over scene: %v", err)
@@ -99,7 +110,9 @@ func (g *Game) loadGameOver() error {
 }
 
 func (g *Game) loadNetworkError() error {
-	networkError, err := scenes.NewMenuScene()
+	g.networkManager.Stop()
+
+	networkError, err := scenes.NewErrorScene("Network Error")
 	if err != nil {
 		return fmt.Errorf("failed to create network error scene: %v", err)
 	}
@@ -111,54 +124,17 @@ func (g *Game) loadNetworkError() error {
 }
 
 func (g *Game) Update() error {
-	g.networkManager.UpdateServerTime(1.0 / float64(ebiten.TPS()))
-
-	switch g.mode {
-	case flow.GameModeMenu:
-		if input.IsPositiveJustPressed() {
-			if err := g.networkManager.Start(); err != nil {
-				log.Error("Failed to start network manager: %v", err)
-				g.networkManager.Stop()
-				if err := g.loadNetworkError(); err != nil {
-					return fmt.Errorf("failed to load network error scene: %v", err)
-				}
-				break
-			}
-
-			if err := g.loadGame(); err != nil {
-				return fmt.Errorf("failed to load game scene: %v", err)
-			}
-		}
-	case flow.GameModePlay:
-		if input.IsNegativeJustPressed() {
-			g.networkManager.Stop()
-			if err := g.loadGameOver(); err != nil {
-				return fmt.Errorf("failed to load game over scene: %v", err)
-			}
-			break
-		}
-
-		if err := g.checkNetworkManager(); err != nil {
-			log.Error("Network manager error: %v", err)
-			g.networkManager.Stop()
-			if err := g.loadNetworkError(); err != nil {
-				return fmt.Errorf("failed to load network error scene: %v", err)
-			}
-		}
-	case flow.GameModeOver:
-		if input.IsPositiveJustPressed() {
-			if err := g.loadMenu(); err != nil {
-				return fmt.Errorf("failed to load menu scene: %v", err)
-			}
-		}
-	case flow.GameModeNetworkError:
-		if input.IsPositiveJustPressed() {
-			if err := g.loadMenu(); err != nil {
-				return fmt.Errorf("failed to load menu scene: %v", err)
-			}
-		}
+	// Update the network manager
+	if err := g.networkManagerUpdate(); err != nil {
+		return fmt.Errorf("failed to update network manager: %v", err)
 	}
 
+	// Handle input
+	if err := g.handleInput(); err != nil {
+		return fmt.Errorf("failed to handle input: %v", err)
+	}
+
+	// Update the current scene
 	if err := g.scene.Update(); err != nil {
 		return fmt.Errorf("failed to update scene: %v", err)
 	}
@@ -166,8 +142,25 @@ func (g *Game) Update() error {
 	return nil
 }
 
-// checkNetworkManager checks the network manager for errors and returns any that are found.
-func (g *Game) checkNetworkManager() error {
+func (g *Game) networkManagerUpdate() error {
+	if !g.networkManager.IsConnected() {
+		return nil
+	}
+
+	g.networkManager.UpdateServerTime(1.0 / float64(ebiten.TPS()))
+
+	if err := g.checkNetworkManagerErrors(); err != nil {
+		log.Error("Network manager error: %v", err)
+		if err := g.loadNetworkError(); err != nil {
+			return fmt.Errorf("failed to load network error scene: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// checkNetworkManagerErrors checks the network manager for errors and returns any that are found.
+func (g *Game) checkNetworkManagerErrors() error {
 	select {
 	case err := <-g.networkManager.TCPClientErrChan():
 		return fmt.Errorf("TCP client error: %v", err)
@@ -178,38 +171,51 @@ func (g *Game) checkNetworkManager() error {
 	}
 }
 
-func (g *Game) Draw(screen *ebiten.Image) {
-	g.scene.Draw(screen)
-	g.drawOverlay(screen)
-}
-
-func (g *Game) drawOverlay(screen *ebiten.Image) {
-	serverTime, ping := g.networkManager.ServerTime()
-
-	if g.debug {
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n   FPS: %0.1f", ebiten.ActualFPS()))
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n   TPS: %0.1f", ebiten.ActualTPS()))
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n   Ping: %0.1f", ping))
-		ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n\n   Time: %0.0f", serverTime))
-	}
-
-	var t string
+func (g *Game) handleInput() error {
 	switch g.mode {
 	case flow.GameModeMenu:
-		t = "Press to Start!"
+		if input.IsPositiveJustPressed() {
+			if err := g.loadGame(); err != nil {
+				return fmt.Errorf("failed to load game scene: %v", err)
+			}
+		}
 	case flow.GameModePlay:
-		return
+		if input.IsNegativeJustPressed() {
+			if err := g.loadGameOver(); err != nil {
+				return fmt.Errorf("failed to load game over scene: %v", err)
+			}
+			break
+		}
 	case flow.GameModeOver:
-		t = "Game Over"
+		if input.IsPositiveJustPressed() {
+			if err := g.loadMenu(); err != nil {
+				return fmt.Errorf("failed to load menu scene: %v", err)
+			}
+		}
 	case flow.GameModeNetworkError:
-		t = "Network Error"
+		if input.IsPositiveJustPressed() {
+			if err := g.loadMenu(); err != nil {
+				return fmt.Errorf("failed to load menu scene: %v", err)
+			}
+		}
 	}
-	t = strings.ToUpper(t)
-	bounds, _ := font.BoundString(fonts.MPlusNormalFont, t)
-	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(float64(screen.Bounds().Dx())/2-float64(bounds.Max.X>>6)/2, float64(screen.Bounds().Dy())/2-float64(bounds.Max.Y>>6)/2)
-	op.ColorScale.ScaleWithColor(color.White)
-	text.DrawWithOptions(screen, t, fonts.MPlusNormalFont, op)
+
+	return nil
+}
+
+func (g *Game) Draw(screen *ebiten.Image) {
+	g.scene.Draw(screen)
+	if g.debug {
+		g.drawDebugOverlay(screen)
+	}
+}
+
+func (g *Game) drawDebugOverlay(screen *ebiten.Image) {
+	serverTime, ping := g.networkManager.ServerTime()
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n   FPS: %0.1f", ebiten.ActualFPS()))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n   TPS: %0.1f", ebiten.ActualTPS()))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n   Ping: %0.1f", ping))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n\n   Time: %0.0f", serverTime))
 }
 
 const (
@@ -222,6 +228,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 }
 
 func main() {
+	debug := flag.Bool("debug", false, "Debug mode")
 	logLevel := flag.String("log-level", "info", "Log level")
 	flag.Parse()
 
@@ -242,7 +249,10 @@ func main() {
 		panic(fmt.Sprintf("Failed to create network manager: %v", err))
 	}
 
-	game, err := NewGame(networkManager)
+	game, err := NewGame(NewGameOptions{
+		Debug:          *debug,
+		NetworkManager: networkManager,
+	})
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create game: %v", err))
 	}

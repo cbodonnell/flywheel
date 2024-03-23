@@ -54,10 +54,8 @@ func (g *GameScene) Update() error {
 		return fmt.Errorf("failed to update game state: %v", err)
 	}
 
-	for _, obj := range g.Root.GetChildren() {
-		if err := objects.UpdateTree(obj); err != nil {
-			return fmt.Errorf("failed to update object tree: %v", err)
-		}
+	if err := objects.UpdateTree(g.Root); err != nil {
+		return fmt.Errorf("failed to update object tree: %v", err)
 	}
 
 	if err := g.cleanupDeletedObjects(); err != nil {

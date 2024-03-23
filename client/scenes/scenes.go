@@ -35,29 +35,3 @@ func (s *BaseScene) Update() error {
 func (s *BaseScene) Draw(screen *ebiten.Image) {
 	objects.DrawTree(s.Root, screen)
 }
-
-type MenuScene struct {
-	BaseScene
-}
-
-// TODO: implement
-func NewMenuScene() (Scene, error) {
-	return &MenuScene{
-		BaseScene{
-			Root: objects.NewBaseObject(),
-		},
-	}, nil
-}
-
-type GameOverScene struct {
-	BaseScene
-}
-
-// TODO: implement
-func NewGameOverScene() (Scene, error) {
-	return &GameOverScene{
-		BaseScene{
-			Root: objects.NewBaseObject(),
-		},
-	}, nil
-}

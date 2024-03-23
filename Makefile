@@ -31,6 +31,7 @@ run-client:
 	go run \
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
 	./cmd/client/main.go \
+	-debug \
 	-log-level=debug
 
 .PHONY: container

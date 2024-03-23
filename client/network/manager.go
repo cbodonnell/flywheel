@@ -33,6 +33,7 @@ type NetworkManager struct {
 	clientIDMutex   sync.Mutex
 	clientIDChan    <-chan uint32
 
+	isConnected     bool
 	serverTime      float64
 	ping            float64
 	deltaPing       float64
@@ -104,6 +105,7 @@ func (m *NetworkManager) Start() error {
 		return fmt.Errorf("failed to ping UDP: %v", err)
 	}
 
+	m.isConnected = true
 	return nil
 }
 
@@ -224,10 +226,15 @@ func (m *NetworkManager) Stop() error {
 
 	m.clientID = 0
 	m.cancelClientCtx = nil
+	m.isConnected = false
 
 	log.Info("Network manager stopped")
 
 	return nil
+}
+
+func (m *NetworkManager) IsConnected() bool {
+	return m.isConnected
 }
 
 func (m *NetworkManager) ServerTime() (serverTime float64, ping float64) {
