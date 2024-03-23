@@ -19,7 +19,7 @@ type Game struct {
 	networkManager *network.NetworkManager
 	// mode is the current game mode.
 	mode GameMode
-
+	// scene is the current scene.
 	scene scenes.Scene
 }
 
@@ -127,8 +127,6 @@ func (g *Game) loadGameOver() error {
 }
 
 func (g *Game) loadNetworkError() error {
-	g.networkManager.Stop()
-
 	networkError, err := scenes.NewErrorScene("Network Error")
 	if err != nil {
 		return fmt.Errorf("failed to create network error scene: %v", err)

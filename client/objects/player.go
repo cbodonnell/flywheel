@@ -26,8 +26,7 @@ const (
 type Player struct {
 	BaseObject
 
-	ID string
-	// TODO: should this be the network manager or the parent game object?
+	ID             string
 	networkManager *network.NetworkManager
 	isLocalPlayer  bool
 	// TODO: make this private with a getter and setter
