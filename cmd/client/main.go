@@ -1,31 +1,23 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"image/color"
-	"math"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/cbodonnell/flywheel/client/flow"
 	"github.com/cbodonnell/flywheel/client/fonts"
 	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
-	"github.com/cbodonnell/flywheel/client/objects"
-	"github.com/cbodonnell/flywheel/pkg/game"
-	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/client/scenes"
 	"github.com/cbodonnell/flywheel/pkg/log"
-	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/version"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text"
-	"github.com/hajimehoshi/ebiten/v2/vector"
-	"github.com/solarlune/resolv"
 	"golang.org/x/image/font"
 )
 
@@ -36,53 +28,26 @@ type Game struct {
 	debug bool
 	// networkManager is the network manager.
 	networkManager *network.NetworkManager
-	// collisionSpace is the collision space.
-	collisionSpace *resolv.Space
-	// gameObjects is a map of game objects indexed by a unique identifier.
-	gameObjects map[string]objects.GameObject
-	// deletedObjects is a map of deleted game objects indexed by a unique identifier
-	// and the timestamp of the deletion.
-	deletedObjects map[string]int64
-	// lastGameStateReceived is the timestamp of the last game state received from the server.
-	lastGameStateReceived int64
-	// gameStates is a buffer of game states received from the server.
-	gameStates []*gametypes.GameState
 	// mode is the current game mode.
 	mode flow.GameMode
 
-	scene objects.Scene
+	scene scenes.Scene
 }
 
 func NewGame(networkManager *network.NetworkManager) (ebiten.Game, error) {
-	collisionSpace := game.NewCollisionSpace()
-
 	g := &Game{
 		debug:          true,
 		networkManager: networkManager,
-		collisionSpace: collisionSpace,
-		gameObjects:    make(map[string]objects.GameObject),
-		deletedObjects: make(map[string]int64),
-		mode:           flow.GameModeMenu,
 	}
 
-	menu, err := objects.NewMenuScene()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create menu scene: %v", err)
-	}
-	if err := g.SetScene(menu); err != nil {
-		return nil, fmt.Errorf("failed to set menu scene: %v", err)
-	}
-
-	for _, obj := range g.gameObjects {
-		if err := objects.InitTree(obj); err != nil {
-			return nil, fmt.Errorf("failed to initialize game object tree: %v", err)
-		}
+	if err := g.loadMenu(); err != nil {
+		return nil, fmt.Errorf("failed to load menu scene: %v", err)
 	}
 
 	return g, nil
 }
 
-func (g *Game) SetScene(scene objects.Scene) error {
+func (g *Game) SetScene(scene scenes.Scene) error {
 	if g.scene != nil {
 		if err := g.scene.Destroy(); err != nil {
 			return fmt.Errorf("failed to destroy previous scene: %v", err)
@@ -97,12 +62,56 @@ func (g *Game) SetScene(scene objects.Scene) error {
 	return nil
 }
 
+func (g *Game) loadMenu() error {
+	menu, err := scenes.NewMenuScene()
+	if err != nil {
+		return fmt.Errorf("failed to create menu scene: %v", err)
+	}
+	if err := g.SetScene(menu); err != nil {
+		return fmt.Errorf("failed to set menu scene: %v", err)
+	}
+	g.mode = flow.GameModeMenu
+	return nil
+}
+
+func (g *Game) loadGame() error {
+	gameScene, err := scenes.NewGameScene(g.networkManager)
+	if err != nil {
+		return fmt.Errorf("failed to create game scene: %v", err)
+	}
+	if err := g.SetScene(gameScene); err != nil {
+		return fmt.Errorf("failed to set game scene: %v", err)
+	}
+	g.mode = flow.GameModePlay
+	return nil
+}
+
+func (g *Game) loadGameOver() error {
+	gameOver, err := scenes.NewGameOverScene()
+	if err != nil {
+		return fmt.Errorf("failed to create game over scene: %v", err)
+	}
+	if err := g.SetScene(gameOver); err != nil {
+		return fmt.Errorf("failed to set game over scene: %v", err)
+	}
+	g.mode = flow.GameModeOver
+	return nil
+}
+
+func (g *Game) loadNetworkError() error {
+	networkError, err := scenes.NewMenuScene()
+	if err != nil {
+		return fmt.Errorf("failed to create network error scene: %v", err)
+	}
+	if err := g.SetScene(networkError); err != nil {
+		return fmt.Errorf("failed to set network error scene: %v", err)
+	}
+	g.mode = flow.GameModeNetworkError
+	return nil
+}
+
 func (g *Game) Update() error {
 	g.networkManager.UpdateServerTime(1.0 / float64(ebiten.TPS()))
-
-	if err := g.scene.Update(); err != nil {
-		return fmt.Errorf("failed to update scene: %v", err)
-	}
 
 	switch g.mode {
 	case flow.GameModeMenu:
@@ -110,262 +119,48 @@ func (g *Game) Update() error {
 			if err := g.networkManager.Start(); err != nil {
 				log.Error("Failed to start network manager: %v", err)
 				g.networkManager.Stop()
-				g.mode = flow.GameModeNetworkError
+				if err := g.loadNetworkError(); err != nil {
+					return fmt.Errorf("failed to load network error scene: %v", err)
+				}
 				break
 			}
 
-			g.mode = flow.GameModePlay
+			if err := g.loadGame(); err != nil {
+				return fmt.Errorf("failed to load game scene: %v", err)
+			}
 		}
 	case flow.GameModePlay:
 		if input.IsNegativeJustPressed() {
 			g.networkManager.Stop()
-			g.mode = flow.GameModeOver
-			g.gameObjects = make(map[string]objects.GameObject)
-			break
-		}
-
-		if err := g.processPendingServerMessages(); err != nil {
-			log.Error("Failed to process pending server messages: %v", err)
-			break
-		}
-
-		if err := g.updateGameState(); err != nil {
-			log.Error("Failed to update game state: %v", err)
+			if err := g.loadGameOver(); err != nil {
+				return fmt.Errorf("failed to load game over scene: %v", err)
+			}
 			break
 		}
 
 		if err := g.checkNetworkManager(); err != nil {
 			log.Error("Network manager error: %v", err)
 			g.networkManager.Stop()
-			g.mode = flow.GameModeNetworkError
-			break
-		}
-
-		for _, obj := range g.gameObjects {
-			if err := objects.UpdateTree(obj); err != nil {
-				log.Error("Failed to update game object: %v", err)
-				break
+			if err := g.loadNetworkError(); err != nil {
+				return fmt.Errorf("failed to load network error scene: %v", err)
 			}
-		}
-
-		if err := g.cleanupDeletedObjects(); err != nil {
-			log.Error("Failed to cleanup deleted objects: %v", err)
-			break
 		}
 	case flow.GameModeOver:
 		if input.IsPositiveJustPressed() {
-			g.mode = flow.GameModeMenu
+			if err := g.loadMenu(); err != nil {
+				return fmt.Errorf("failed to load menu scene: %v", err)
+			}
 		}
 	case flow.GameModeNetworkError:
 		if input.IsPositiveJustPressed() {
-			g.mode = flow.GameModeMenu
+			if err := g.loadMenu(); err != nil {
+				return fmt.Errorf("failed to load menu scene: %v", err)
+			}
 		}
 	}
 
-	return nil
-}
-
-func (g *Game) processPendingServerMessages() error {
-	serverMessages, err := g.networkManager.ServerMessageQueue().ReadAllMessages()
-	if err != nil {
-		return fmt.Errorf("failed to read server messages: %v", err)
-	}
-
-	for _, item := range serverMessages {
-		message, ok := item.(*messages.Message)
-		if !ok {
-			log.Error("Failed to cast message to messages.Message")
-			continue
-		}
-
-		switch message.Type {
-		case messages.MessageTypeServerGameUpdate:
-			log.Trace("Received game state: %s", message.Payload)
-			gameState := &gametypes.GameState{}
-			if err := json.Unmarshal(message.Payload, gameState); err != nil {
-				log.Error("Failed to unmarshal game state: %v", err)
-				continue
-			}
-
-			if gameState.Timestamp < g.lastGameStateReceived {
-				log.Warn("Received outdated game state: %d < %d", gameState.Timestamp, g.lastGameStateReceived)
-				continue
-			}
-			g.lastGameStateReceived = gameState.Timestamp
-			g.gameStates = append(g.gameStates, gameState)
-
-			if err := g.reconcilePlayerState(gameState); err != nil {
-				log.Warn("Failed to reconcile player state: %v", err)
-			}
-		case messages.MessageTypeServerPlayerConnect:
-			playerConnect := &messages.ServerPlayerConnect{}
-			if err := json.Unmarshal(message.Payload, playerConnect); err != nil {
-				log.Error("Failed to unmarshal player connect message: %v", err)
-				continue
-			}
-
-			id := fmt.Sprintf("player-%d", playerConnect.ClientID)
-			if _, ok := g.gameObjects[id]; ok {
-				log.Warn("Player object for client %d already exists", playerConnect.ClientID)
-				continue
-			}
-
-			log.Debug("Adding new player object for client %d", playerConnect.ClientID)
-			playerObject, err := objects.NewPlayer(id, g.networkManager, playerConnect.PlayerState)
-			if err != nil {
-				log.Error("Failed to create new player object: %v", err)
-				continue
-			}
-			g.collisionSpace.Add(playerObject.State.Object)
-			g.gameObjects[id] = playerObject
-			delete(g.deletedObjects, id)
-		case messages.MessageTypeServerPlayerDisconnect:
-			log.Debug("Received player disconnect message: %s", message.Payload)
-			playerDisconnect := &messages.ServerPlayerDisconnect{}
-			if err := json.Unmarshal(message.Payload, playerDisconnect); err != nil {
-				log.Error("Failed to unmarshal player disconnect message: %v", err)
-				continue
-			}
-
-			id := fmt.Sprintf("player-%d", playerDisconnect.ClientID)
-			obj, ok := g.gameObjects[id]
-			if !ok {
-				log.Warn("Player object for client %d not found", playerDisconnect.ClientID)
-				continue
-			}
-
-			playerObject, ok := obj.(*objects.Player)
-			if !ok {
-				log.Error("Failed to cast game object %s to *objects.Player", id)
-				continue
-			}
-			g.collisionSpace.Remove(playerObject.State.Object)
-			delete(g.gameObjects, id)
-			g.deletedObjects[id] = time.Now().UnixMilli()
-		default:
-			log.Warn("Received unexpected message type from server: %s", message.Type)
-			continue
-		}
-	}
-
-	return nil
-}
-
-func (g *Game) reconcilePlayerState(gameState *gametypes.GameState) error {
-	playerState := gameState.Players[g.networkManager.ClientID()]
-	if playerState == nil {
-		return nil
-	}
-
-	playerObjectID := fmt.Sprintf("player-%d", g.networkManager.ClientID())
-	obj, ok := g.gameObjects[playerObjectID]
-	if !ok {
-		log.Warn("Player object for client %d not found", g.networkManager.ClientID())
-		return nil
-	}
-
-	playerObject, ok := obj.(*objects.Player)
-	if !ok {
-		return fmt.Errorf("failed to cast game object %s to *objects.Player", playerObjectID)
-	}
-
-	return playerObject.ReconcileState(playerState)
-}
-
-const (
-	// InterpolationOffset is how far back in time we want to interpolate.
-	// TODO: find a good rule of thumb for this value vs server tick rate
-	InterpolationOffset = 150 // ms - currently 3x the server tick rate (50ms)
-)
-
-func (g *Game) updateGameState() error {
-	if len(g.gameStates) < 2 {
-		return nil
-	}
-
-	serverTime, _ := g.networkManager.ServerTime()
-	renderTime := int64(math.Round(serverTime)) - InterpolationOffset
-
-	for len(g.gameStates) > 2 && g.gameStates[2].Timestamp < renderTime {
-		g.gameStates = g.gameStates[1:]
-	}
-
-	if len(g.gameStates) > 2 {
-		if err := g.interpolateState(g.gameStates[1], g.gameStates[2], renderTime); err != nil {
-			return fmt.Errorf("failed to interpolate game state: %v", err)
-		}
-	} else {
-		if err := g.extrapolateState(g.gameStates[0], g.gameStates[1], renderTime); err != nil {
-			return fmt.Errorf("failed to extrapolate game state: %v", err)
-		}
-	}
-
-	return nil
-}
-
-// interpolateState interpolates the game state between two states given a render time
-// that is between the two states.
-func (g *Game) interpolateState(from *gametypes.GameState, to *gametypes.GameState, renderTime int64) error {
-	// we have a future state to interpolate to
-	interpolationFactor := float64(renderTime-from.Timestamp) / float64(to.Timestamp-from.Timestamp)
-	for clientID, playerState := range to.Players {
-		if clientID == g.networkManager.ClientID() {
-			continue
-		}
-		if _, ok := from.Players[clientID]; !ok {
-			continue
-		}
-		previousPlayerState := from.Players[clientID]
-
-		id := fmt.Sprintf("player-%d", clientID)
-		if obj, ok := g.gameObjects[id]; !ok {
-			if _, ok := g.deletedObjects[id]; ok {
-				log.Warn("Player object for client %d was recently deleted, not instancing as part of update", clientID)
-				continue
-			}
-			log.Debug("Adding new player object for client %d", clientID)
-			playerObject, err := objects.NewPlayer(id, g.networkManager, playerState)
-			if err != nil {
-				return fmt.Errorf("failed to create new player object: %v", err)
-			}
-			g.collisionSpace.Add(playerObject.State.Object)
-			g.gameObjects[id] = playerObject
-		} else {
-			playerObject, ok := obj.(*objects.Player)
-			if !ok {
-				return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
-			}
-			playerObject.InterpolateState(previousPlayerState, playerState, interpolationFactor)
-		}
-	}
-
-	return nil
-}
-
-// extrapolateState extrapolates the game state based on the last two states.
-// This is used when we don't have a future state to interpolate to.
-func (g *Game) extrapolateState(from *gametypes.GameState, to *gametypes.GameState, renderTime int64) error {
-	// we don't have a future state, so we need to extrapolate from the last state
-	extrapolationFactor := float64(renderTime-to.Timestamp) / float64(to.Timestamp-from.Timestamp)
-	for clientID, playerState := range to.Players {
-		if clientID == g.networkManager.ClientID() {
-			continue
-		}
-		if _, ok := from.Players[clientID]; !ok {
-			continue
-		}
-		previousPlayerState := from.Players[clientID]
-
-		id := fmt.Sprintf("player-%d", clientID)
-		if obj, ok := g.gameObjects[id]; !ok {
-			log.Debug("Player object for client %d not found, not instancing since we're extrapolating", clientID)
-		} else {
-			playerObject, ok := obj.(*objects.Player)
-			if !ok {
-				return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
-			}
-			playerObject.ExtrapolateState(previousPlayerState, playerState, extrapolationFactor)
-		}
+	if err := g.scene.Update(); err != nil {
+		return fmt.Errorf("failed to update scene: %v", err)
 	}
 
 	return nil
@@ -383,37 +178,8 @@ func (g *Game) checkNetworkManager() error {
 	}
 }
 
-func (g *Game) cleanupDeletedObjects() error {
-	for id, timestamp := range g.deletedObjects {
-		if time.Now().UnixMilli()-timestamp > 2000 {
-			delete(g.deletedObjects, id)
-		}
-	}
-	return nil
-}
-
 func (g *Game) Draw(screen *ebiten.Image) {
-	// TODO: g.scene.Draw(screen)
-
-	for _, obj := range g.collisionSpace.Objects() {
-		if obj.HasTags(game.CollisionSpaceTagLevel) {
-			levelColor := color.RGBA{0x80, 0x80, 0x80, 0xff} // white
-			vector.DrawFilledRect(screen, float32(obj.Position.X), float32(obj.Position.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
-		}
-	}
-
-	playerObjectID := fmt.Sprintf("player-%d", g.networkManager.ClientID())
-	for id, obj := range g.gameObjects {
-		if id == playerObjectID {
-			// skip the player object, we'll draw it last so it's on top
-			continue
-		}
-		objects.DrawTree(obj, screen)
-	}
-	if obj, ok := g.gameObjects[playerObjectID]; ok {
-		objects.DrawTree(obj, screen)
-	}
-
+	g.scene.Draw(screen)
 	g.drawOverlay(screen)
 }
 

@@ -1,62 +1,50 @@
-package objects
+package scenes
 
 import (
+	"github.com/cbodonnell/flywheel/client/objects"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 type Scene interface {
-	Lifecycle
+	objects.Lifecycle
 
 	// Scene specific methods
-	GetRoot() GameObject
+	GetRoot() objects.GameObject
 }
 
 type BaseScene struct {
-	Root GameObject
+	Root objects.GameObject
 }
 
-func (s *BaseScene) GetRoot() GameObject {
+func (s *BaseScene) GetRoot() objects.GameObject {
 	return s.Root
 }
 
 func (s *BaseScene) Init() error {
-	return InitTree(s.Root)
+	return objects.InitTree(s.Root)
 }
 
 func (s *BaseScene) Destroy() error {
-	return DestroyTree(s.Root)
+	return objects.DestroyTree(s.Root)
 }
 
 func (s *BaseScene) Update() error {
-	return UpdateTree(s.Root)
+	return objects.UpdateTree(s.Root)
 }
 
 func (s *BaseScene) Draw(screen *ebiten.Image) {
-	DrawTree(s.Root, screen)
+	objects.DrawTree(s.Root, screen)
 }
 
 type MenuScene struct {
 	BaseScene
 }
 
+// TODO: implement
 func NewMenuScene() (Scene, error) {
 	return &MenuScene{
 		BaseScene{
-			Root: &BaseObject{},
-		},
-	}, nil
-}
-
-// TODO: implement menu scene methods
-
-type GameScene struct {
-	BaseScene
-}
-
-func NewGameScene() (Scene, error) {
-	return &GameScene{
-		BaseScene{
-			Root: &BaseObject{},
+			Root: objects.NewBaseObject(),
 		},
 	}, nil
 }
@@ -65,10 +53,11 @@ type GameOverScene struct {
 	BaseScene
 }
 
+// TODO: implement
 func NewGameOverScene() (Scene, error) {
 	return &GameOverScene{
 		BaseScene{
-			Root: &BaseObject{},
+			Root: objects.NewBaseObject(),
 		},
 	}, nil
 }

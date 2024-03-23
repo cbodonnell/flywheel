@@ -16,7 +16,7 @@ type GameObject interface {
 
 	// Child management methods
 	GetChildren() map[string]GameObject
-	GetChild(id string) (GameObject, error)
+	GetChild(id string) GameObject
 	AddChild(id string, child GameObject) error
 	RemoveChild(id string) error
 }
@@ -28,6 +28,12 @@ type BaseObject struct {
 }
 
 var _ GameObject = &BaseObject{}
+
+func NewBaseObject() *BaseObject {
+	return &BaseObject{
+		Children: make(map[string]GameObject),
+	}
+}
 
 func (o *BaseObject) Init() error {
 	return nil
@@ -47,17 +53,11 @@ func (o *BaseObject) GetChildren() map[string]GameObject {
 	return o.Children
 }
 
-func (o *BaseObject) GetChild(id string) (GameObject, error) {
-	if _, ok := o.Children[id]; !ok {
-		return nil, fmt.Errorf("child object not found")
-	}
-	return o.Children[id], nil
+func (o *BaseObject) GetChild(id string) GameObject {
+	return o.Children[id]
 }
 
 func (o *BaseObject) AddChild(id string, child GameObject) error {
-	if o.Children == nil {
-		o.Children = make(map[string]GameObject)
-	}
 	if _, ok := o.Children[id]; ok {
 		return fmt.Errorf("child object already exists")
 	}
