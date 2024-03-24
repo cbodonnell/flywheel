@@ -5,7 +5,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-// IsPrimaryPressed returns a boolean value indicating whether the generic positive input is just pressed.
+// IsPositiveJustPressed returns a boolean value indicating whether the generic positive input is just pressed.
 // This is used to handle both keyboard and touch inputs.
 func IsPositiveJustPressed() bool {
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
