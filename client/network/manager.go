@@ -20,6 +20,7 @@ const (
 
 // NetworkManager represents a network manager.
 type NetworkManager struct {
+	serverSettings     ServerSettings
 	serverMessageQueue queue.Queue
 
 	tcpClient        *TCPClient
@@ -42,18 +43,25 @@ type NetworkManager struct {
 	serverTimeChan  <-chan *messages.ServerSyncTime
 }
 
+type ServerSettings struct {
+	Hostname string
+	TCPPort  int
+	UDPPort  int
+}
+
 // NewNetworkManager creates a new network manager.
-func NewNetworkManager(messageQueue queue.Queue) (*NetworkManager, error) {
+func NewNetworkManager(serverSettings ServerSettings, messageQueue queue.Queue) (*NetworkManager, error) {
 	clientIDChan := make(chan uint32)
 	serverTimeChan := make(chan *messages.ServerSyncTime)
 
-	tcpClient := NewTCPClient(fmt.Sprintf("%s:%d", DefaultServerHostname, DefaultServerTCPPort), messageQueue, clientIDChan, serverTimeChan)
-	udpClient, err := NewUDPClient(fmt.Sprintf("%s:%d", DefaultServerHostname, DefaultServerUDPPort), messageQueue)
+	tcpClient := NewTCPClient(fmt.Sprintf("%s:%d", serverSettings.Hostname, serverSettings.TCPPort), messageQueue, clientIDChan, serverTimeChan)
+	udpClient, err := NewUDPClient(fmt.Sprintf("%s:%d", serverSettings.Hostname, serverSettings.UDPPort), messageQueue)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create UDP client: %v", err)
 	}
 
 	return &NetworkManager{
+		serverSettings:     serverSettings,
 		serverMessageQueue: messageQueue,
 		tcpClient:          tcpClient,
 		tcpClientErrChan:   make(chan error),
@@ -239,6 +247,10 @@ func (m *NetworkManager) Stop() error {
 	log.Info("Network manager stopped")
 
 	return nil
+}
+
+func (m *NetworkManager) ServerSettings() ServerSettings {
+	return m.serverSettings
 }
 
 func (m *NetworkManager) IsConnected() bool {
