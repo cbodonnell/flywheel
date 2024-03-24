@@ -14,8 +14,13 @@ import (
 )
 
 func main() {
+	log.Info("Starting client version %s", version.Get())
+
 	debug := flag.Bool("debug", false, "Debug mode")
 	logLevel := flag.String("log-level", "info", "Log level")
+	serverHostname := flag.String("server-hostname", network.DefaultServerHostname, "Server hostname")
+	serverTCPPort := flag.Int("server-tcp-port", network.DefaultServerTCPPort, "Server TCP port")
+	serverUDPPort := flag.Int("server-udp-port", network.DefaultServerUDPPort, "Server UDP port")
 	flag.Parse()
 
 	parsedLogLevel, err := log.ParseLogLevel(*logLevel)
@@ -27,13 +32,17 @@ func main() {
 	log.SetDefaultLogger(logger)
 	log.Info("Log level set to %s", parsedLogLevel)
 
-	log.Info("Starting client version %s", version.Get())
-
+	serverSettings := network.ServerSettings{
+		Hostname: *serverHostname,
+		TCPPort:  *serverTCPPort,
+		UDPPort:  *serverUDPPort,
+	}
 	serverMessageQueue := queue.NewInMemoryQueue(1024)
-	networkManager, err := network.NewNetworkManager(serverMessageQueue)
+	networkManager, err := network.NewNetworkManager(serverSettings, serverMessageQueue)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create network manager: %v", err))
 	}
+	log.Info("Configured for server %s ports %d (TCP) and %d (UDP)", serverSettings.Hostname, serverSettings.TCPPort, serverSettings.UDPPort)
 
 	game, err := clientgame.NewGame(clientgame.NewGameOptions{
 		Debug:          *debug,

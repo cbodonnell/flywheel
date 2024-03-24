@@ -38,6 +38,17 @@ run-client:
 	-debug \
 	-log-level=debug
 
+.PHONY: run-client-remote
+run-client-remote:
+	go run \
+	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
+	./cmd/client/main.go \
+	-debug \
+	-log-level=debug \
+	-server-hostname=${FLYWHEEL_SERVER_HOSTNAME} \
+	-server-tcp-port=${FLYWHEEL_SERVER_TCP_PORT} \
+	-server-udp-port=${FLYWHEEL_SERVER_UDP_PORT}
+
 .PHONY: container
 container:
 	docker build \
