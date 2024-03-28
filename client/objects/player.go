@@ -178,9 +178,17 @@ func (p *Player) Draw(screen *ebiten.Image) {
 
 	op := &ebiten.DrawImageOptions{}
 	op.Filter = ebiten.FilterNearest
-	op.GeoM.Translate(playerObject.Position.X, float64(screen.Bounds().Dy()-frameHeight)-playerObject.Position.Y)
+	scaleX, scaleY := 1.0, 1.0
+	translateX := playerObject.Position.X
+	translateY := float64(screen.Bounds().Dy()-frameHeight) - playerObject.Position.Y
 	i := (p.animationCounter / 5) % frameCount
 	sx, sy := frameOX+i*frameWidth, frameOY
+	if p.State.AnimationFlip {
+		scaleX = -1.0
+		translateX = (-1.0 * translateX) - frameWidth
+	}
+	op.GeoM.Translate(translateX, translateY)
+	op.GeoM.Scale(scaleX, scaleY)
 
 	screen.DrawImage(p.animationImage.SubImage(image.Rect(sx, sy, sx+frameWidth, sy+frameHeight)).(*ebiten.Image), op)
 }
@@ -192,6 +200,8 @@ func (p *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.Pla
 	p.State.Velocity.X = to.Velocity.X
 	p.State.Velocity.Y = to.Velocity.X
 	p.State.IsOnGround = to.IsOnGround
+	p.State.Animation = to.Animation
+	p.State.AnimationFlip = to.AnimationFlip
 	p.State.Object.Position.X = p.State.Position.X
 	p.State.Object.Position.Y = p.State.Position.Y
 }
@@ -203,6 +213,8 @@ func (p *Player) ExtrapolateState(from *gametypes.PlayerState, to *gametypes.Pla
 	p.State.Velocity.X = to.Velocity.X
 	p.State.Velocity.Y = to.Velocity.Y
 	p.State.IsOnGround = to.IsOnGround
+	p.State.Animation = to.Animation
+	p.State.AnimationFlip = to.AnimationFlip
 	p.State.Object.Position.X = p.State.Position.X
 	p.State.Object.Position.Y = p.State.Position.Y
 }
@@ -231,6 +243,8 @@ func (p *Player) ReconcileState(state *gametypes.PlayerState) error {
 				p.State.Velocity.X = state.Velocity.X
 				p.State.Velocity.Y = state.Velocity.Y
 				p.State.IsOnGround = state.IsOnGround
+				p.State.Animation = state.Animation
+				p.State.AnimationFlip = state.AnimationFlip
 				p.State.Object.Position.X = state.Position.X
 				p.State.Object.Position.Y = state.Position.Y
 
