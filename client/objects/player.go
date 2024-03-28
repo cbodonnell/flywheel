@@ -1,8 +1,10 @@
 package objects
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"image"
 	"image/color"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/examples/resources/images"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/solarlune/resolv"
 )
@@ -21,6 +24,12 @@ import (
 const (
 	// MaxPreviousStates is the maximum number of past states to keep
 	MaxPreviousStates = 60
+
+	frameOX     = 0
+	frameOY     = 32
+	frameWidth  = 32
+	frameHeight = 32
+	frameCount  = 8
 )
 
 type Player struct {
@@ -28,11 +37,15 @@ type Player struct {
 
 	ID             string
 	networkManager *network.NetworkManager
+	debug          bool
 	isLocalPlayer  bool
 	// TODO: make this private with a getter and setter
 	State          *gametypes.PlayerState
 	previousStates []PreviousState
 	pastUpdates    []*messages.ClientPlayerUpdate
+
+	animationImage   *ebiten.Image
+	animationCounter int
 }
 
 type PreviousState struct {
@@ -41,6 +54,13 @@ type PreviousState struct {
 }
 
 func NewPlayer(id string, networkManager *network.NetworkManager, state *gametypes.PlayerState) (*Player, error) {
+	img, _, err := image.Decode(bytes.NewReader(images.Runner_png))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image: %v", err)
+	}
+	animationImage := ebiten.NewImageFromImage(img)
+
+	// TODO: is network manager required for non-local players?
 	if networkManager == nil {
 		return nil, fmt.Errorf("network manager is required")
 	}
@@ -55,14 +75,20 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 		BaseObject: BaseObject{
 			Children: make(map[string]GameObject),
 		},
-		ID:             id,
-		networkManager: networkManager,
-		isLocalPlayer:  id == fmt.Sprintf("player-%d", networkManager.ClientID()),
-		State:          state,
+		ID:               id,
+		networkManager:   networkManager,
+		isLocalPlayer:    id == fmt.Sprintf("player-%d", networkManager.ClientID()),
+		debug:            true,
+		State:            state,
+		animationImage:   animationImage,
+		animationCounter: 0,
 	}, nil
 }
 
 func (p *Player) Update() error {
+
+	p.animationCounter++
+
 	if !p.isLocalPlayer {
 		return nil
 	}
@@ -131,20 +157,32 @@ func (p *Player) Update() error {
 
 func (p *Player) Draw(screen *ebiten.Image) {
 	playerObject := p.State.Object
-	var playerColor color.RGBA
-	if p.isLocalPlayer {
-		// red if not on ground, blue if on ground
-		playerColor = color.RGBA{255, 0, 0, 255} // Red
-		if p.State.IsOnGround {
-			playerColor = color.RGBA{0, 0, 255, 255} // Blue
+
+	if p.debug {
+		strokeWidth := float32(1)
+		var playerColor color.RGBA
+		if p.isLocalPlayer {
+			// red if not on ground, blue if on ground
+			playerColor = color.RGBA{255, 0, 0, 255} // Red
+			if p.State.IsOnGround {
+				playerColor = color.RGBA{0, 0, 255, 255} // Blue
+			}
+		} else {
+			playerColor = color.RGBA{0, 255, 60, 255} // Green
+			if p.State.IsOnGround {
+				playerColor = color.RGBA{200, 0, 200, 255} // Purple
+			}
 		}
-	} else {
-		playerColor = color.RGBA{0, 255, 60, 255} // Green
-		if p.State.IsOnGround {
-			playerColor = color.RGBA{200, 0, 200, 255} // Purple
-		}
+		vector.StrokeRect(screen, float32(playerObject.Position.X), float32(float64(screen.Bounds().Dy())-playerObject.Size.Y)-float32(playerObject.Position.Y), float32(playerObject.Size.X), float32(playerObject.Size.Y), strokeWidth, playerColor, false)
 	}
-	vector.DrawFilledRect(screen, float32(playerObject.Position.X), float32(float64(screen.Bounds().Dy())-playerObject.Size.Y)-float32(playerObject.Position.Y), float32(playerObject.Size.X), float32(playerObject.Size.Y), playerColor, false)
+
+	op := &ebiten.DrawImageOptions{}
+	op.Filter = ebiten.FilterNearest
+	op.GeoM.Translate(playerObject.Position.X, float64(screen.Bounds().Dy()-frameHeight)-playerObject.Position.Y)
+	i := (p.animationCounter / 5) % frameCount
+	sx, sy := frameOX+i*frameWidth, frameOY
+
+	screen.DrawImage(p.animationImage.SubImage(image.Rect(sx, sy, sx+frameWidth, sy+frameHeight)).(*ebiten.Image), op)
 }
 
 func (p *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {
