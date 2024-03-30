@@ -23,6 +23,12 @@ build:
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
 	-o ./bin/flywheel ./cmd/server/main.go
 
+.PHONY: build-client
+build-client:
+	go build \
+	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
+	-o ./bin/flywheel-client.exe ./cmd/client/main.go
+
 .PHONY: run
 run:
 	go run \
