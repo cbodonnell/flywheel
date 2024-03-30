@@ -86,6 +86,8 @@ func WriteMessageToUDP(conn *net.UDPConn, addr *net.UDPAddr, msg *messages.Messa
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}
 
+	log.Debug("Sending message type %s with size %d to %s", msg.Type, len(b), addr.String())
+
 	_, err = conn.WriteToUDP(b, addr)
 	if err != nil {
 		return fmt.Errorf("failed to write message to UDP connection: %v", err)

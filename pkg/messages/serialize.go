@@ -2,7 +2,7 @@ package messages
 
 import (
 	"bytes"
-	"compress/gzip"
+	"compress/zlib"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,7 +15,7 @@ func (m *Message) Serialize() ([]byte, error) {
 	}
 
 	compressed := bytes.NewBuffer(nil)
-	gzipWriter := gzip.NewWriter(compressed)
+	gzipWriter := zlib.NewWriter(compressed)
 	if _, err := gzipWriter.Write(jsonData); err != nil {
 		return nil, fmt.Errorf("failed to compress message: %v", err)
 	}
@@ -27,7 +27,7 @@ func (m *Message) Serialize() ([]byte, error) {
 }
 
 func DeserializeMessage(data []byte) (*Message, error) {
-	gzipReader, err := gzip.NewReader(bytes.NewReader(data))
+	gzipReader, err := zlib.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decompress message: %v", err)
 	}
