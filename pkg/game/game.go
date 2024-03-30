@@ -273,7 +273,7 @@ func ApplyInput(playerState *types.PlayerState, clientPlayerUpdate *messages.Cli
 
 	if isOnGround {
 		if clientPlayerUpdate.InputX != 0 {
-			playerState.Animation = types.PlayerAnimationJump
+			playerState.Animation = types.PlayerAnimationRun
 		} else {
 			playerState.Animation = types.PlayerAnimationIdle
 		}
@@ -297,6 +297,8 @@ func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
 		log.Error("Failed to marshal game state: %v", err)
 		return
 	}
+
+	log.Trace("Broadcasting game state size: %d", len(payload))
 
 	for _, client := range gm.clientManager.GetClients() {
 		message := &messages.Message{

@@ -1,13 +1,12 @@
 package objects
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"image"
 	"image/color"
 	"time"
 
+	"github.com/cbodonnell/flywheel/client/animations"
 	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/pkg/game"
@@ -16,7 +15,6 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/examples/resources/images"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/solarlune/resolv"
 )
@@ -24,12 +22,6 @@ import (
 const (
 	// MaxPreviousStates is the maximum number of past states to keep
 	MaxPreviousStates = 60
-
-	frameOX     = 0
-	frameOY     = 32
-	frameWidth  = 32
-	frameHeight = 32
-	frameCount  = 8
 )
 
 type Player struct {
@@ -44,8 +36,7 @@ type Player struct {
 	previousStates []PreviousState
 	pastUpdates    []*messages.ClientPlayerUpdate
 
-	animationImage   *ebiten.Image
-	animationCounter int
+	animations map[string]*animations.Animation
 }
 
 type PreviousState struct {
@@ -54,11 +45,6 @@ type PreviousState struct {
 }
 
 func NewPlayer(id string, networkManager *network.NetworkManager, state *gametypes.PlayerState) (*Player, error) {
-	img, _, err := image.Decode(bytes.NewReader(images.Runner_png))
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode image: %v", err)
-	}
-	animationImage := ebiten.NewImageFromImage(img)
 
 	// TODO: is network manager required for non-local players?
 	if networkManager == nil {
@@ -75,19 +61,25 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 		BaseObject: BaseObject{
 			Children: make(map[string]GameObject),
 		},
-		ID:               id,
-		networkManager:   networkManager,
-		isLocalPlayer:    id == fmt.Sprintf("player-%d", networkManager.ClientID()),
-		debug:            true,
-		State:            state,
-		animationImage:   animationImage,
-		animationCounter: 0,
+		ID:             id,
+		networkManager: networkManager,
+		isLocalPlayer:  id == fmt.Sprintf("player-%d", networkManager.ClientID()),
+		debug:          false,
+		State:          state,
+		animations: map[string]*animations.Animation{
+			gametypes.PlayerAnimationIdle: animations.PlayerIdleAnimation,
+			gametypes.PlayerAnimationRun:  animations.PlayerRunAnimation,
+			gametypes.PlayerAnimationJump: animations.PlayerJumpAnimation,
+			gametypes.PlayerAnimationFall: animations.PlayerJumpAnimation,
+		},
 	}, nil
 }
 
 func (p *Player) Update() error {
-
-	p.animationCounter++
+	// TODO: find out when this is empty (enum could be used)
+	if p.State.Animation != "" {
+		p.animations[p.State.Animation].Update()
+	}
 
 	if !p.isLocalPlayer {
 		return nil
@@ -176,21 +168,21 @@ func (p *Player) Draw(screen *ebiten.Image) {
 		vector.StrokeRect(screen, float32(playerObject.Position.X), float32(float64(screen.Bounds().Dy())-playerObject.Size.Y)-float32(playerObject.Position.Y), float32(playerObject.Size.X), float32(playerObject.Size.Y), strokeWidth, playerColor, false)
 	}
 
-	op := &ebiten.DrawImageOptions{}
-	op.Filter = ebiten.FilterNearest
-	scaleX, scaleY := 1.0, 1.0
-	translateX := playerObject.Position.X
-	translateY := float64(screen.Bounds().Dy()-frameHeight) - playerObject.Position.Y
-	i := (p.animationCounter / 5) % frameCount
-	sx, sy := frameOX+i*frameWidth, frameOY
-	if p.State.AnimationFlip {
-		scaleX = -1.0
-		translateX = (-1.0 * translateX) - frameWidth
-	}
-	op.GeoM.Translate(translateX, translateY)
-	op.GeoM.Scale(scaleX, scaleY)
+	if p.State.Animation != "" {
+		frameWidth, frameHeight := p.animations[p.State.Animation].Size()
+		scaleX, scaleY := 1.0, 1.0
+		translateX := playerObject.Position.X
+		translateY := float64(screen.Bounds().Dy()-frameHeight) - playerObject.Position.Y
+		if p.State.AnimationFlip {
+			scaleX = -1.0
+			translateX = (-1.0 * translateX) - float64(frameWidth)
+		}
 
-	screen.DrawImage(p.animationImage.SubImage(image.Rect(sx, sy, sx+frameWidth, sy+frameHeight)).(*ebiten.Image), op)
+		op := p.animations[p.State.Animation].DefaultOptions()
+		op.GeoM.Translate(translateX, translateY)
+		op.GeoM.Scale(scaleX, scaleY)
+		screen.DrawImage(p.animations[p.State.Animation].CurrentImage(), op)
+	}
 }
 
 func (p *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {
