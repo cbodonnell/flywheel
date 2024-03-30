@@ -7,32 +7,56 @@ import (
 )
 
 type Animation struct {
-	image       *ebiten.Image
-	frameOX     int
-	frameOY     int
-	frameWidth  int
+	// image is the image containing the animation frames.
+	image *ebiten.Image
+	// frameOX is the x offset of the first frame in the animation.
+	frameOX int
+	// frameOY is the y offset of the first frame in the animation.
+	frameOY int
+	// frameWidth is the width of each frame in the animation.
+	frameWidth int
+	// frameHeight is the height of each frame in the animation.
 	frameHeight int
-	frameCount  int
+	// frameCount is the number of frames in the animation.
+	frameCount int
+	// frameSpeed is the number of updates before the frame index is incremented.
+	frameSpeed int
 
+	// updateCount is the number of times the animation has been updated.
+	updateCount int
+	// frameIndex is the current frame index.
 	frameIndex int
 }
 
-func NewAnimation(image *ebiten.Image, frameOX, frameOY, frameWidth, frameHeight, frameCount int) *Animation {
+type NewAnimationOptions struct {
+	Image       *ebiten.Image
+	FrameOX     int
+	FrameOY     int
+	FrameWidth  int
+	FrameHeight int
+	FrameCount  int
+	FrameSpeed  int
+}
+
+func NewAnimation(opts NewAnimationOptions) *Animation {
 	return &Animation{
-		image:       image,
-		frameOX:     frameOX,
-		frameOY:     frameOY,
-		frameWidth:  frameWidth,
-		frameHeight: frameHeight,
-		frameCount:  frameCount,
+		image:       opts.Image,
+		frameOX:     opts.FrameOX,
+		frameOY:     opts.FrameOY,
+		frameWidth:  opts.FrameWidth,
+		frameHeight: opts.FrameHeight,
+		frameCount:  opts.FrameCount,
+		frameSpeed:  opts.FrameSpeed,
 	}
 }
 
 func (a *Animation) Update() {
-	a.frameIndex++
+	a.updateCount++
+	a.frameIndex = (a.updateCount / a.frameSpeed) % a.frameCount
 }
 
 func (a *Animation) Reset() {
+	a.updateCount = 0
 	a.frameIndex = 0
 }
 
@@ -43,8 +67,7 @@ func (a *Animation) DefaultOptions() *ebiten.DrawImageOptions {
 }
 
 func (a *Animation) CurrentImage() *ebiten.Image {
-	i := (a.frameIndex / 5) % a.frameCount
-	sx, sy := a.frameOX+i*a.frameWidth, a.frameOY
+	sx, sy := a.frameOX+a.frameIndex*a.frameWidth, a.frameOY
 	return a.image.SubImage(image.Rect(sx, sy, sx+a.frameWidth, sy+a.frameHeight)).(*ebiten.Image)
 }
 

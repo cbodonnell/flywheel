@@ -9,9 +9,11 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/images"
 )
 
-var PlayerIdleAnimation *Animation
-var PlayerRunAnimation *Animation
-var PlayerJumpAnimation *Animation
+var (
+	PlayerIdleAnimation *Animation
+	PlayerRunAnimation  *Animation
+	PlayerJumpAnimation *Animation
+)
 
 func init() {
 	var err error
@@ -35,13 +37,15 @@ func NewPlayerIdleAnimation() (*Animation, error) {
 		return nil, fmt.Errorf("failed to decode image: %v", err)
 	}
 
-	frameOX := 0
-	frameOY := 0
-	frameWidth := 32
-	frameHeight := 32
-	frameCount := 5
-
-	return NewAnimation(ebiten.NewImageFromImage(img), frameOX, frameOY, frameWidth, frameHeight, frameCount), nil
+	return NewAnimation(NewAnimationOptions{
+		Image:       ebiten.NewImageFromImage(img),
+		FrameOX:     0,
+		FrameOY:     0,
+		FrameWidth:  32,
+		FrameHeight: 32,
+		FrameCount:  5,
+		FrameSpeed:  5,
+	}), nil
 }
 
 func NewPlayerRunAnimation() (*Animation, error) {
@@ -50,13 +54,15 @@ func NewPlayerRunAnimation() (*Animation, error) {
 		return nil, fmt.Errorf("failed to decode image: %v", err)
 	}
 
-	frameOX := 0
-	frameOY := 32
-	frameWidth := 32
-	frameHeight := 32
-	frameCount := 8
-
-	return NewAnimation(ebiten.NewImageFromImage(img), frameOX, frameOY, frameWidth, frameHeight, frameCount), nil
+	return NewAnimation(NewAnimationOptions{
+		Image:       ebiten.NewImageFromImage(img),
+		FrameOX:     0,
+		FrameOY:     32,
+		FrameWidth:  32,
+		FrameHeight: 32,
+		FrameCount:  8,
+		FrameSpeed:  5,
+	}), nil
 }
 
 func NewPlayerJumpAnimation() (*Animation, error) {
@@ -65,11 +71,13 @@ func NewPlayerJumpAnimation() (*Animation, error) {
 		return nil, fmt.Errorf("failed to decode image: %v", err)
 	}
 
-	frameOX := 0
-	frameOY := 64
-	frameWidth := 32
-	frameHeight := 32
-	frameCount := 4
-
-	return NewAnimation(ebiten.NewImageFromImage(img), frameOX, frameOY, frameWidth, frameHeight, frameCount), nil
+	return NewAnimation(NewAnimationOptions{
+		Image:       ebiten.NewImageFromImage(img),
+		FrameOX:     0,
+		FrameOY:     64,
+		FrameWidth:  32,
+		FrameHeight: 32,
+		FrameCount:  4,
+		FrameSpeed:  5,
+	}), nil
 }
