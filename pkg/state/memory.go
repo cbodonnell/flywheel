@@ -38,8 +38,10 @@ func (m *InMemoryStateManager) Get() (*gametypes.GameState, error) {
 				X: v.Velocity.X,
 				Y: v.Velocity.Y,
 			},
-			IsOnGround: v.IsOnGround,
-			Object:     v.Object,
+			IsOnGround:    v.IsOnGround,
+			Animation:     v.Animation,
+			AnimationFlip: v.AnimationFlip,
+			Object:        v.Object, // TODO: this is a pointer, not a deep copy
 		}
 	}
 

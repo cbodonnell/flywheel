@@ -264,6 +264,27 @@ func ApplyInput(playerState *types.PlayerState, clientPlayerUpdate *messages.Cli
 	playerState.Velocity.Y = vy
 	playerState.IsOnGround = isOnGround
 
+	// Update the player animation
+	if clientPlayerUpdate.InputX > 0 {
+		playerState.AnimationFlip = false
+	} else if clientPlayerUpdate.InputX < 0 {
+		playerState.AnimationFlip = true
+	}
+
+	if isOnGround {
+		if clientPlayerUpdate.InputX != 0 {
+			playerState.Animation = types.PlayerAnimationRun
+		} else {
+			playerState.Animation = types.PlayerAnimationIdle
+		}
+	} else {
+		if vy < 0 {
+			playerState.Animation = types.PlayerAnimationJump
+		} else {
+			playerState.Animation = types.PlayerAnimationFall
+		}
+	}
+
 	playerState.Object.Position.X = playerState.Position.X
 	playerState.Object.Position.Y = playerState.Position.Y
 	playerState.Object.Update()
@@ -276,6 +297,8 @@ func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
 		log.Error("Failed to marshal game state: %v", err)
 		return
 	}
+
+	log.Trace("Broadcasting game state size: %d", len(payload))
 
 	for _, client := range gm.clientManager.GetClients() {
 		message := &messages.Message{

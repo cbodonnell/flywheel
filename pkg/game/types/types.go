@@ -14,9 +14,18 @@ type PlayerState struct {
 	Position               Position `json:"position"`
 	Velocity               Velocity `json:"velocity"`
 	// TODO: there's some redundancy here with the object reference
-	Object     *resolv.Object `json:"-"`
-	IsOnGround bool           `json:"isOnGround"`
+	Object        *resolv.Object `json:"-"`
+	IsOnGround    bool           `json:"isOnGround"`
+	Animation     string         `json:"animation"`
+	AnimationFlip bool           `json:"animationFlip"`
 }
+
+const (
+	PlayerAnimationIdle = "idle"
+	PlayerAnimationRun  = "run"
+	PlayerAnimationJump = "jump"
+	PlayerAnimationFall = "fall"
+)
 
 type Position struct {
 	X float64 `json:"x"`
@@ -34,7 +43,9 @@ func (p *PlayerState) Equal(other *PlayerState) bool {
 		p.Position.Y == other.Position.Y &&
 		p.Velocity.X == other.Velocity.X &&
 		p.Velocity.Y == other.Velocity.Y &&
-		p.IsOnGround == other.IsOnGround
+		p.IsOnGround == other.IsOnGround &&
+		p.Animation == other.Animation &&
+		p.AnimationFlip == other.AnimationFlip
 }
 
 // Copy returns a copy of the player state with an empty object reference
@@ -44,6 +55,8 @@ func (p *PlayerState) Copy() *PlayerState {
 		Position:               p.Position,
 		Velocity:               p.Velocity,
 		IsOnGround:             p.IsOnGround,
+		Animation:              p.Animation,
+		AnimationFlip:          p.AnimationFlip,
 	}
 }
 

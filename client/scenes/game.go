@@ -117,7 +117,10 @@ func (g *GameScene) processPendingServerMessages() error {
 				continue
 			}
 			g.collisionSpace.Add(playerObject.State.Object)
-			g.GetRoot().AddChild(id, playerObject)
+			if err := g.GetRoot().AddChild(id, playerObject); err != nil {
+				log.Error("Failed to add player object: %v", err)
+				continue
+			}
 			delete(g.deletedObjects, id)
 		case messages.MessageTypeServerPlayerDisconnect:
 			playerDisconnect := &messages.ServerPlayerDisconnect{}
