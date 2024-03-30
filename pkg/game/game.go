@@ -298,8 +298,6 @@ func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
 		return
 	}
 
-	log.Trace("Broadcasting game state size: %d", len(payload))
-
 	for _, client := range gm.clientManager.GetClients() {
 		message := &messages.Message{
 			ClientID: 0, // ClientID 0 means the message is from the server

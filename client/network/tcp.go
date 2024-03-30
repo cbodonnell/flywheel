@@ -98,12 +98,12 @@ func (c *TCPClient) Close() error {
 
 // SendMessage sends a message to the TCP server.
 func (c *TCPClient) SendMessage(msg *messages.Message) error {
-	jsonData, err := json.Marshal(msg)
+	b, err := msg.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}
 
-	_, err = c.conn.Write(jsonData)
+	_, err = c.conn.Write(b)
 	if err != nil {
 		return fmt.Errorf("failed to write message to TCP connection: %v", err)
 	}
@@ -113,8 +113,8 @@ func (c *TCPClient) SendMessage(msg *messages.Message) error {
 
 // ReceiveTCPMessage receives a message from the TCP server.
 func ReceiveTCPMessage(conn net.Conn) (*messages.Message, error) {
-	jsonData := make([]byte, messages.MessageBufferSize)
-	n, err := conn.Read(jsonData)
+	buf := make([]byte, messages.MessageBufferSize)
+	n, err := conn.Read(buf)
 	if err != nil {
 		if err.Error() == "EOF" {
 			return nil, &ErrConnectionClosedByServer{}
@@ -125,8 +125,7 @@ func ReceiveTCPMessage(conn net.Conn) (*messages.Message, error) {
 		return nil, fmt.Errorf("failed to read message from TCP connection: %v", err)
 	}
 
-	msg := &messages.Message{}
-	err = json.Unmarshal(jsonData[:n], msg)
+	msg, err := messages.DeserializeMessage(buf[:n])
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize message: %v", err)
 	}
