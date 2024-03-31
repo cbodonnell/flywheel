@@ -27,6 +27,20 @@ const (
 	MessageTypeServerPlayerDisconnect
 )
 
+func (m MessageType) String() string {
+	return [...]string{
+		"ServerAssignID",
+		"ClientPing",
+		"ServerPong",
+		"ClientPlayerUpdate",
+		"ServerGameUpdate",
+		"ClientSyncTime",
+		"ServerSyncTime",
+		"ServerPlayerConnect",
+		"ServerPlayerDisconnect",
+	}[m]
+}
+
 // Message represents a generic message for serialization/deserialization
 type Message struct {
 	ClientID uint32          `json:"clientID"`
