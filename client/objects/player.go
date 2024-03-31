@@ -67,10 +67,10 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 		debug:          false,
 		State:          state,
 		animations: map[gametypes.PlayerAnimation]*animations.Animation{
-			gametypes.PlayerAnimationIdle: animations.PlayerIdleAnimation,
-			gametypes.PlayerAnimationRun:  animations.PlayerRunAnimation,
-			gametypes.PlayerAnimationJump: animations.PlayerJumpAnimation,
-			gametypes.PlayerAnimationFall: animations.PlayerJumpAnimation,
+			gametypes.PlayerAnimationIdle: animations.NewPlayerIdleAnimation(),
+			gametypes.PlayerAnimationRun:  animations.NewPlayerRunAnimation(),
+			gametypes.PlayerAnimationJump: animations.NewPlayerJumpAnimation(),
+			gametypes.PlayerAnimationFall: animations.NewPlayerJumpAnimation(),
 		},
 	}, nil
 }
@@ -224,6 +224,8 @@ func (p *Player) ReconcileState(state *gametypes.PlayerState) error {
 			foundPreviousState = true
 			if !ps.State.Equal(state) {
 				log.Warn("Reconciling player state at timestamp %d for %s", state.LastProcessedTimestamp, p.ID)
+				log.Warn("Client state: %v", ps.State)
+				log.Warn("Server state: %v", state)
 				// apply the server state
 				p.State.Position.X = state.Position.X
 				p.State.Position.Y = state.Position.Y
