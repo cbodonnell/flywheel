@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 
@@ -85,12 +84,12 @@ func (c *UDPClient) Close() {
 
 // SendMessage sends a message to the UDP server.
 func (c *UDPClient) SendMessage(msg *messages.Message) error {
-	jsonData, err := json.Marshal(msg)
+	b, err := messages.SerializeMessage(msg)
 	if err != nil {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}
 
-	_, err = c.conn.WriteToUDP(jsonData, c.serverAddr)
+	_, err = c.conn.WriteToUDP(b, c.serverAddr)
 	if err != nil {
 		return fmt.Errorf("failed to write message to UDP connection: %v", err)
 	}
@@ -100,8 +99,8 @@ func (c *UDPClient) SendMessage(msg *messages.Message) error {
 
 // receiveMessages continuously receives messages from the UDP server.
 func ReceiveUDPMessage(conn *net.UDPConn) (*messages.Message, error) {
-	buffer := make([]byte, messages.MessageBufferSize)
-	n, _, err := conn.ReadFromUDP(buffer)
+	buf := make([]byte, messages.MessageBufferSize)
+	n, _, err := conn.ReadFromUDP(buf)
 	if err != nil {
 		if err, ok := err.(*net.OpError); ok && err.Err.Error() == "use of closed network connection" {
 			return nil, &ErrConnectionClosedByClient{}
@@ -109,10 +108,9 @@ func ReceiveUDPMessage(conn *net.UDPConn) (*messages.Message, error) {
 		return nil, fmt.Errorf("failed to read message from UDP connection: %v", err)
 	}
 
-	msg := &messages.Message{}
-	err = json.Unmarshal(buffer[:n], msg)
+	msg, err := messages.DeserializeMessage(buf[:n])
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal message: %v", err)
+		return nil, fmt.Errorf("failed to deserialize message: %v", err)
 	}
 
 	return msg, nil

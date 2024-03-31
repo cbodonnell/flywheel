@@ -1,7 +1,6 @@
 package network
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 
@@ -82,12 +81,12 @@ func (s *UDPServer) Start() {
 
 // WriteMessageToUDP writes a Message to a UDP connection
 func WriteMessageToUDP(conn *net.UDPConn, addr *net.UDPAddr, msg *messages.Message) error {
-	jsonData, err := json.Marshal(msg)
+	b, err := messages.SerializeMessage(msg)
 	if err != nil {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}
 
-	_, err = conn.WriteToUDP(jsonData, addr)
+	_, err = conn.WriteToUDP(b, addr)
 	if err != nil {
 		return fmt.Errorf("failed to write message to UDP connection: %v", err)
 	}
@@ -97,14 +96,13 @@ func WriteMessageToUDP(conn *net.UDPConn, addr *net.UDPAddr, msg *messages.Messa
 
 // ReadMessageFromUDP reads a Message from a UDP connection
 func ReadMessageFromUDP(conn *net.UDPConn) (*messages.Message, *net.UDPAddr, error) {
-	jsonData := make([]byte, messages.MessageBufferSize)
-	n, addr, err := conn.ReadFromUDP(jsonData)
+	buf := make([]byte, messages.MessageBufferSize)
+	n, addr, err := conn.ReadFromUDP(buf)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read message from UDP connection: %v", err)
 	}
 
-	msg := &messages.Message{}
-	err = json.Unmarshal(jsonData[:n], msg)
+	msg, err := messages.DeserializeMessage(buf[:n])
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to deserialize message: %v", err)
 	}
