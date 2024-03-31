@@ -13,22 +13,24 @@ const (
 )
 
 // Message types
+type MessageType uint8
+
 const (
-	MessageTypeServerAssignID         = "aid"
-	MessageTypeClientPing             = "cp"
-	MessageTypeServerPong             = "sp"
-	MessageTypeClientPlayerUpdate     = "cpu"
-	MessageTypeServerGameUpdate       = "sgu"
-	MessageTypeClientSyncTime         = "cst"
-	MessageTypeServerSyncTime         = "sst"
-	MessageTypeServerPlayerConnect    = "spc"
-	MessageTypeServerPlayerDisconnect = "spd"
+	MessageTypeServerAssignID MessageType = iota
+	MessageTypeClientPing
+	MessageTypeServerPong
+	MessageTypeClientPlayerUpdate
+	MessageTypeServerGameUpdate
+	MessageTypeClientSyncTime
+	MessageTypeServerSyncTime
+	MessageTypeServerPlayerConnect
+	MessageTypeServerPlayerDisconnect
 )
 
 // Message represents a generic message for serialization/deserialization
 type Message struct {
 	ClientID uint32          `json:"clientID"`
-	Type     string          `json:"type"`
+	Type     MessageType     `json:"type"`
 	Payload  json.RawMessage `json:"payload"`
 }
 

@@ -81,9 +81,9 @@ func (g *GameScene) processPendingServerMessages() error {
 		switch message.Type {
 		case messages.MessageTypeServerGameUpdate:
 			log.Trace("Received game state: %s", message.Payload)
-			gameState := &gametypes.GameState{}
-			if err := json.Unmarshal(message.Payload, gameState); err != nil {
-				log.Error("Failed to unmarshal game state: %v", err)
+			gameState, err := messages.DeserializeGameState(message.Payload)
+			if err != nil {
+				log.Error("Failed to deserialize game state: %v", err)
 				continue
 			}
 

@@ -14,17 +14,19 @@ type PlayerState struct {
 	Position               Position `json:"position"`
 	Velocity               Velocity `json:"velocity"`
 	// TODO: there's some redundancy here with the object reference
-	Object        *resolv.Object `json:"-"`
-	IsOnGround    bool           `json:"isOnGround"`
-	Animation     string         `json:"animation"`
-	AnimationFlip bool           `json:"animationFlip"`
+	Object        *resolv.Object  `json:"-"`
+	IsOnGround    bool            `json:"isOnGround"`
+	Animation     PlayerAnimation `json:"animation"`
+	AnimationFlip bool            `json:"animationFlip"`
 }
 
+type PlayerAnimation uint8
+
 const (
-	PlayerAnimationIdle = "idle"
-	PlayerAnimationRun  = "run"
-	PlayerAnimationJump = "jump"
-	PlayerAnimationFall = "fall"
+	PlayerAnimationIdle PlayerAnimation = iota
+	PlayerAnimationRun
+	PlayerAnimationJump
+	PlayerAnimationFall
 )
 
 type Position struct {

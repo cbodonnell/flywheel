@@ -292,9 +292,9 @@ func ApplyInput(playerState *types.PlayerState, clientPlayerUpdate *messages.Cli
 
 // broadcastGameState sends the game state to connected clients.
 func (gm *GameManager) broadcastGameState(gameState *types.GameState) {
-	payload, err := json.Marshal(gameState)
+	payload, err := messages.SerializeGameState(gameState)
 	if err != nil {
-		log.Error("Failed to marshal game state: %v", err)
+		log.Error("Failed to serialize game state: %v", err)
 		return
 	}
 

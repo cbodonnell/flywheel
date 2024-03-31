@@ -81,7 +81,7 @@ func (s *UDPServer) Start() {
 
 // WriteMessageToUDP writes a Message to a UDP connection
 func WriteMessageToUDP(conn *net.UDPConn, addr *net.UDPAddr, msg *messages.Message) error {
-	b, err := msg.Serialize()
+	b, err := messages.SerializeMessage(msg)
 	if err != nil {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}

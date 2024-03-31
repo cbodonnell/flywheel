@@ -13,6 +13,10 @@ clean:
 mocks:
 	docker run -v "${PWD}":/src -w /src vektra/mockery --all
 
+.PHONY: flatbuffers
+flatbuffers:
+	flatc --go ./pkg/messages/flatbuffers/schemas/*.fbs
+
 .PHONY: test
 test:
 	go test -v -cover ./pkg/... ./cmd/server/...

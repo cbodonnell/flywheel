@@ -142,7 +142,7 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 
 // WriteMessageToTCP writes a Message to a TCP connection
 func WriteMessageToTCP(conn net.Conn, msg *messages.Message) error {
-	b, err := msg.Serialize()
+	b, err := messages.SerializeMessage(msg)
 	if err != nil {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}

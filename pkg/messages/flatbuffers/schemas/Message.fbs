@@ -1,0 +1,9 @@
+namespace pkg.messages.flatbuffers.message;
+
+table Message {
+    client_id: uint32;
+    type: uint8;
+    payload: [ubyte];
+}
+ 
+root_type Message;

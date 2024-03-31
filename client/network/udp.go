@@ -84,7 +84,7 @@ func (c *UDPClient) Close() {
 
 // SendMessage sends a message to the UDP server.
 func (c *UDPClient) SendMessage(msg *messages.Message) error {
-	b, err := msg.Serialize()
+	b, err := messages.SerializeMessage(msg)
 	if err != nil {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}

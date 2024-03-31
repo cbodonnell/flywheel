@@ -36,7 +36,7 @@ type Player struct {
 	previousStates []PreviousState
 	pastUpdates    []*messages.ClientPlayerUpdate
 
-	animations map[string]*animations.Animation
+	animations map[gametypes.PlayerAnimation]*animations.Animation
 }
 
 type PreviousState struct {
@@ -66,7 +66,7 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 		isLocalPlayer:  id == fmt.Sprintf("player-%d", networkManager.ClientID()),
 		debug:          false,
 		State:          state,
-		animations: map[string]*animations.Animation{
+		animations: map[gametypes.PlayerAnimation]*animations.Animation{
 			gametypes.PlayerAnimationIdle: animations.PlayerIdleAnimation,
 			gametypes.PlayerAnimationRun:  animations.PlayerRunAnimation,
 			gametypes.PlayerAnimationJump: animations.PlayerJumpAnimation,
@@ -76,10 +76,7 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 }
 
 func (p *Player) Update() error {
-	// TODO: find out when this is empty (enum could be used)
-	if p.State.Animation != "" {
-		p.animations[p.State.Animation].Update()
-	}
+	p.animations[p.State.Animation].Update()
 
 	if !p.isLocalPlayer {
 		return nil
@@ -168,21 +165,19 @@ func (p *Player) Draw(screen *ebiten.Image) {
 		vector.StrokeRect(screen, float32(playerObject.Position.X), float32(float64(screen.Bounds().Dy())-playerObject.Size.Y)-float32(playerObject.Position.Y), float32(playerObject.Size.X), float32(playerObject.Size.Y), strokeWidth, playerColor, false)
 	}
 
-	if p.State.Animation != "" {
-		frameWidth, frameHeight := p.animations[p.State.Animation].Size()
-		scaleX, scaleY := 1.0, 1.0
-		translateX := playerObject.Position.X
-		translateY := float64(screen.Bounds().Dy()-frameHeight) - playerObject.Position.Y
-		if p.State.AnimationFlip {
-			scaleX = -1.0
-			translateX = (-1.0 * translateX) - float64(frameWidth)
-		}
-
-		op := p.animations[p.State.Animation].DefaultOptions()
-		op.GeoM.Translate(translateX, translateY)
-		op.GeoM.Scale(scaleX, scaleY)
-		screen.DrawImage(p.animations[p.State.Animation].CurrentImage(), op)
+	frameWidth, frameHeight := p.animations[p.State.Animation].Size()
+	scaleX, scaleY := 1.0, 1.0
+	translateX := playerObject.Position.X
+	translateY := float64(screen.Bounds().Dy()-frameHeight) - playerObject.Position.Y
+	if p.State.AnimationFlip {
+		scaleX = -1.0
+		translateX = (-1.0 * translateX) - float64(frameWidth)
 	}
+
+	op := p.animations[p.State.Animation].DefaultOptions()
+	op.GeoM.Translate(translateX, translateY)
+	op.GeoM.Scale(scaleX, scaleY)
+	screen.DrawImage(p.animations[p.State.Animation].CurrentImage(), op)
 }
 
 func (p *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {

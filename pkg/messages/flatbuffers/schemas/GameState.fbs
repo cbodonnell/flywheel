@@ -1,0 +1,32 @@
+namespace pkg.messages.flatbuffers.gamestate;
+ 
+table GameState {
+    timestamp: int64;
+    players: [PlayerStateKeyValue];
+}
+
+table PlayerStateKeyValue {
+    key: uint32;
+    value: PlayerState;
+}
+
+table PlayerState {
+  last_processed_timestamp: int64;
+  position: Position;
+  velocity: Velocity;
+  is_on_ground: bool;
+  animation: uint8;
+  animation_flip: bool;
+}
+
+table Position {
+  x: float64;
+  y: float64;
+}
+
+table Velocity {
+  x: float64;
+  y: float64;
+}
+ 
+root_type GameState;

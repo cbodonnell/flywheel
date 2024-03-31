@@ -3,6 +3,7 @@ module github.com/cbodonnell/flywheel
 go 1.22
 
 require (
+	github.com/google/flatbuffers v24.3.25+incompatible
 	github.com/hajimehoshi/ebiten/v2 v2.6.6
 	github.com/jackc/pgx/v5 v5.5.1
 	github.com/mattn/go-sqlite3 v1.14.19

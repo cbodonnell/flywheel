@@ -98,7 +98,7 @@ func (c *TCPClient) Close() error {
 
 // SendMessage sends a message to the TCP server.
 func (c *TCPClient) SendMessage(msg *messages.Message) error {
-	b, err := msg.Serialize()
+	b, err := messages.SerializeMessage(msg)
 	if err != nil {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}
