@@ -1,6 +1,7 @@
 package state
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -20,7 +21,7 @@ func NewInMemoryStateManager() *InMemoryStateManager {
 	}
 }
 
-func (m *InMemoryStateManager) Get() (*gametypes.GameState, error) {
+func (m *InMemoryStateManager) Get(ctx context.Context) (*gametypes.GameState, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	// TODO: assess usage of pointers here and whether values might be better
@@ -48,7 +49,7 @@ func (m *InMemoryStateManager) Get() (*gametypes.GameState, error) {
 	return copy, nil
 }
 
-func (m *InMemoryStateManager) Set(gameState *gametypes.GameState) error {
+func (m *InMemoryStateManager) Set(ctx context.Context, gameState *gametypes.GameState) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 

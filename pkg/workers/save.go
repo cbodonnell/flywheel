@@ -53,7 +53,7 @@ func (w *SaveGameStateWorker) Start(ctx context.Context) {
 		case saveRequest := <-w.savePlayerStateChan:
 			w.savePlayerState(ctx, saveRequest)
 		case t := <-ticker.C:
-			gameState, err := w.stateManager.Get()
+			gameState, err := w.stateManager.Get(ctx)
 			if err != nil {
 				log.Error("Failed to get current game state: %v", err)
 				continue

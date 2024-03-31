@@ -1,6 +1,8 @@
 package state
 
 import (
+	"context"
+
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 )
 
@@ -8,7 +10,7 @@ import (
 // Implementations must be thread-safe.
 type StateManager interface {
 	// Get returns a copy of the current game state.
-	Get() (*gametypes.GameState, error)
+	Get(ctx context.Context) (*gametypes.GameState, error)
 	// Set sets the current game state.
-	Set(gameState *gametypes.GameState) error
+	Set(ctx context.Context, gameState *gametypes.GameState) error
 }

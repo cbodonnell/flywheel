@@ -79,7 +79,7 @@ func (gm *GameManager) Stop() {
 
 // gameTick runs one iteration of the game loop.
 func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
-	gameState, err := gm.stateManager.Get()
+	gameState, err := gm.stateManager.Get(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current game state: %v", err)
 	}
@@ -89,7 +89,7 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 	gm.processClientMessages(gameState)
 	gm.broadcastGameState(gameState)
 
-	if err := gm.stateManager.Set(gameState); err != nil {
+	if err := gm.stateManager.Set(ctx, gameState); err != nil {
 		return fmt.Errorf("failed to set game state: %v", err)
 	}
 
