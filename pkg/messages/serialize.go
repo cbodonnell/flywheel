@@ -2,7 +2,6 @@ package messages
 
 import (
 	"bytes"
-	"compress/zlib"
 	"fmt"
 	"io"
 
@@ -10,25 +9,25 @@ import (
 	gamestatefb "github.com/cbodonnell/flywheel/pkg/messages/flatbuffers/gamestate"
 	messagefb "github.com/cbodonnell/flywheel/pkg/messages/flatbuffers/message"
 	flatbuffers "github.com/google/flatbuffers/go"
+	"github.com/klauspost/compress/zstd"
 )
 
 func SerializeMessage(m *Message) ([]byte, error) {
+	// TODO: investigate compressed json vs flatbuffers
 	b, err := SerializeMessageFlatbuffer(m)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize message: %v", err)
 	}
 
-	// b, err := json.Marshal(m)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to marshal message: %v", err)
-	// }
-
 	compressed := bytes.NewBuffer(nil)
-	zlibWriter := zlib.NewWriter(compressed)
-	if _, err := zlibWriter.Write(b); err != nil {
+	compWriter, err := zstd.NewWriter(compressed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create zstd writer: %v", err)
+	}
+	if _, err := compWriter.Write(b); err != nil {
 		return nil, fmt.Errorf("failed to compress message: %v", err)
 	}
-	if err := zlibWriter.Close(); err != nil {
+	if err := compWriter.Close(); err != nil {
 		return nil, fmt.Errorf("failed to close gzip writer: %v", err)
 	}
 
@@ -36,13 +35,11 @@ func SerializeMessage(m *Message) ([]byte, error) {
 }
 
 func DeserializeMessage(data []byte) (*Message, error) {
-	zlibReader, err := zlib.NewReader(bytes.NewReader(data))
+	compReader, err := zstd.NewReader(bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("failed to decompress message: %v", err)
+		return nil, fmt.Errorf("failed to create zstd reader: %v", err)
 	}
-	defer zlibReader.Close()
-
-	b, err := io.ReadAll(zlibReader)
+	b, err := io.ReadAll(compReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read decompressed message: %v", err)
 	}
@@ -51,11 +48,6 @@ func DeserializeMessage(data []byte) (*Message, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize message: %v", err)
 	}
-
-	// message := &Message{}
-	// if err := json.Unmarshal(b, message); err != nil {
-	// 	return nil, fmt.Errorf("failed to unmarshal message: %v", err)
-	// }
 
 	return message, nil
 }
@@ -92,11 +84,6 @@ func SerializeGameState(state *gametypes.GameState) ([]byte, error) {
 		return nil, fmt.Errorf("failed to serialize game state: %v", err)
 	}
 
-	// b, err := json.Marshal(state)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to marshal game state: %v", err)
-	// }
-
 	return b, nil
 }
 
@@ -105,11 +92,6 @@ func DeserializeGameState(b []byte) (*gametypes.GameState, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize game state: %v", err)
 	}
-
-	// gameState := &gametypes.GameState{}
-	// if err := json.Unmarshal(b, gameState); err != nil {
-	// 	return nil, fmt.Errorf("failed to unmarshal game state: %v", err)
-	// }
 
 	return gameState, nil
 }

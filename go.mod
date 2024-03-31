@@ -6,6 +6,7 @@ require (
 	github.com/google/flatbuffers v24.3.25+incompatible
 	github.com/hajimehoshi/ebiten/v2 v2.6.6
 	github.com/jackc/pgx/v5 v5.5.1
+	github.com/klauspost/compress v1.17.7
 	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/solarlune/resolv v0.7.0
 	github.com/stretchr/testify v1.9.0
