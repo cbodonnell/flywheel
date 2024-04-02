@@ -1,4 +1,4 @@
-namespace pkg.messages.flatbuffers.gamestate;
+namespace flatbuffers.gamestate;
  
 table GameState {
     timestamp: int64;

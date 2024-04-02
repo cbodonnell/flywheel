@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 
+	gamestatefb "github.com/cbodonnell/flywheel/flatbuffers/gamestate"
+	messagefb "github.com/cbodonnell/flywheel/flatbuffers/message"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
-	gamestatefb "github.com/cbodonnell/flywheel/pkg/messages/flatbuffers/gamestate"
-	messagefb "github.com/cbodonnell/flywheel/pkg/messages/flatbuffers/message"
 	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/klauspost/compress/zstd"
 )

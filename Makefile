@@ -13,9 +13,17 @@ clean:
 mocks:
 	docker run -v "${PWD}":/src -w /src vektra/mockery --all
 
+# flatc --go ./flatbuffers/schemas/*.fbs
 .PHONY: flatbuffers
 flatbuffers:
-	flatc --go ./pkg/messages/flatbuffers/schemas/*.fbs
+	docker run -v "${PWD}":/src -w /src cheebz/flatbuffers --go /src/flatbuffers/schemas/*.fbs
+
+.PHONY: flatbuffers-image
+flatbuffers-image:
+	@docker build \
+	-t cheebz/flatbuffers:${VERSION} \
+	-t cheebz/flatbuffers:latest \
+	./flatbuffers
 
 .PHONY: test
 test:
