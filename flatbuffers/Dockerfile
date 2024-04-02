@@ -8,11 +8,7 @@ WORKDIR /flatbuffers
 
 RUN cmake -G "Unix Makefiles" && make
 
-FROM alpine:latest
-
-COPY --from=builder /flatbuffers/flatc /usr/local/bin/flatc
-
-CMD [ "flatc" ]
+ENTRYPOINT [ "/flatbuffers/flatc" ]
 
 
 
