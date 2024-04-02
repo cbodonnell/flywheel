@@ -19,7 +19,7 @@ flatbuffers:
 
 .PHONY: flatbuffers-image
 flatbuffers-image:
-	@docker build \
+	docker build \
 	-t cheebz/flatbuffers:${VERSION} \
 	-t cheebz/flatbuffers:latest \
 	./flatbuffers
