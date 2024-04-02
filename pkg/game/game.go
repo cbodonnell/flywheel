@@ -87,6 +87,7 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 	gameState.Timestamp = t.UnixMilli()
 	gm.processConnectionEvents(gameState)
 	gm.processClientMessages(gameState)
+	gm.updateServerObjects(gameState)
 	gm.broadcastGameState(gameState)
 
 	if err := gm.stateManager.Set(ctx, gameState); err != nil {
@@ -288,6 +289,15 @@ func ApplyInput(playerState *types.PlayerState, clientPlayerUpdate *messages.Cli
 	playerState.Object.Position.X = playerState.Position.X
 	playerState.Object.Position.Y = playerState.Position.Y
 	playerState.Object.Update()
+}
+
+// updateServerObjects updates server objects (e.g. npcs, items, projectiles, etc.)
+func (gm *GameManager) updateServerObjects(gameState *types.GameState) {
+	// move server objects
+	// check for collisions
+	// update game state
+
+	// spawn new server objects
 }
 
 // broadcastGameState sends the game state to connected clients.
