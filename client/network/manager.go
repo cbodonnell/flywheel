@@ -138,6 +138,7 @@ func (m *NetworkManager) startSyncTime(ctx context.Context) error {
 	return nil
 }
 
+// TODO: investigate 5.x ping times locally
 func (m *NetworkManager) syncTime() error {
 	clientSyncTime := &messages.ClientSyncTime{
 		Timestamp: time.Now().UnixMilli(),
