@@ -106,5 +106,7 @@ func main() {
 	})
 
 	log.Info("Starting game manager")
-	gameManager.Start(ctx)
+	if err := gameManager.Start(ctx); err != nil {
+		panic(fmt.Sprintf("Failed to start game manager: %v", err))
+	}
 }

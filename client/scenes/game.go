@@ -80,7 +80,6 @@ func (g *GameScene) processPendingServerMessages() error {
 
 		switch message.Type {
 		case messages.MessageTypeServerGameUpdate:
-			log.Trace("Received game state: %s", message.Payload)
 			gameState, err := messages.DeserializeGameState(message.Payload)
 			if err != nil {
 				log.Error("Failed to deserialize game state: %v", err)
@@ -247,6 +246,37 @@ func (g *GameScene) interpolateState(from *gametypes.GameState, to *gametypes.Ga
 		}
 	}
 
+	for npcID, npcState := range to.NPCs {
+		if _, ok := from.NPCs[npcID]; !ok {
+			continue
+		}
+		previousNPCState := from.NPCs[npcID]
+
+		id := fmt.Sprintf("npc-%d", npcID)
+		obj := g.GetRoot().GetChild(id)
+		if obj == nil {
+			// if _, ok := g.deletedObjects[id]; ok {
+			// 	log.Warn("Player object for client %d was recently deleted, not instancing as part of update", clientID)
+			// 	continue
+			// }
+			log.Debug("Adding new npc object with id %d", npcID)
+			npcObject, err := objects.NewNPC(id, npcState)
+			if err != nil {
+				return fmt.Errorf("failed to create new player object: %v", err)
+			}
+			// g.collisionSpace.Add(playerObject.State.Object)
+			if err := g.GetRoot().AddChild(id, npcObject); err != nil {
+				return fmt.Errorf("failed to add npc object: %v", err)
+			}
+		} else {
+			npcObject, ok := obj.(*objects.NPC)
+			if !ok {
+				return fmt.Errorf("failed to cast game object %s to *objects.NPC", id)
+			}
+			npcObject.InterpolateState(previousNPCState, npcState, interpolationFactor)
+		}
+	}
+
 	return nil
 }
 
@@ -274,6 +304,25 @@ func (g *GameScene) extrapolateState(from *gametypes.GameState, to *gametypes.Ga
 				return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
 			}
 			playerObject.ExtrapolateState(previousPlayerState, playerState, extrapolationFactor)
+		}
+	}
+
+	for npcID, npcState := range to.NPCs {
+		if _, ok := from.NPCs[npcID]; !ok {
+			continue
+		}
+		previousNPCState := from.NPCs[npcID]
+
+		id := fmt.Sprintf("npc-%d", npcID)
+		obj := g.GetRoot().GetChild(id)
+		if obj == nil {
+			log.Debug("NPC object with id %d not found, not instancing since we're extrapolating", npcID)
+		} else {
+			npcObject, ok := obj.(*objects.NPC)
+			if !ok {
+				return fmt.Errorf("failed to cast game object %s to *objects.NPC", id)
+			}
+			npcObject.ExtrapolateState(previousNPCState, npcState, extrapolationFactor)
 		}
 	}
 

@@ -56,18 +56,22 @@ func NewGameManager(opts NewGameManagerOptions) *GameManager {
 }
 
 // Start starts the game loop.
-func (gm *GameManager) Start(ctx context.Context) {
+func (gm *GameManager) Start(ctx context.Context) error {
+	if err := gm.initializeGameState(ctx); err != nil {
+		return fmt.Errorf("failed to initialize game state: %v", err)
+	}
+
 	ticker := time.NewTicker(gm.gameLoopInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case t := <-ticker.C:
 			err := gm.gameTick(ctx, t)
 			if err != nil {
-				log.Error("Failed to do game loop: %v", err)
+				log.Error("Failed to run game tick: %v", err)
 			}
 		}
 	}
@@ -77,6 +81,22 @@ func (gm *GameManager) Stop() {
 	// TODO: gracefully stop the game and save the game state
 }
 
+func (gm *GameManager) initializeGameState(ctx context.Context) error {
+	gameState, err := gm.stateManager.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get current game state: %v", err)
+	}
+
+	gameState.NPCs[1] = types.NewNPCState()
+	gm.collisionSpace.Add(gameState.NPCs[1].Object)
+
+	if err := gm.stateManager.Set(ctx, gameState); err != nil {
+		return fmt.Errorf("failed to set game state: %v", err)
+	}
+
+	return nil
+}
+
 // gameTick runs one iteration of the game loop.
 func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 	gameState, err := gm.stateManager.Get(ctx)
@@ -84,11 +104,10 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 		return fmt.Errorf("failed to get current game state: %v", err)
 	}
 
-	deltaTime := float64(t.Sub(time.UnixMilli(gameState.Timestamp)).Milliseconds())
 	gameState.Timestamp = t.UnixMilli()
 	gm.processConnectionEvents(gameState)
 	gm.processClientMessages(gameState)
-	gm.updateServerObjects(gameState, deltaTime)
+	gm.updateServerObjects(gameState, gm.gameLoopInterval.Seconds())
 	gm.broadcastGameState(gameState)
 
 	if err := gm.stateManager.Set(ctx, gameState); err != nil {

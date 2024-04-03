@@ -9,10 +9,10 @@ type NPCState struct {
 	Position Position `json:"position"`
 	Velocity Velocity `json:"velocity"`
 	// TODO: there's some redundancy here with the object reference
-	Object        *resolv.Object  `json:"-"`
-	IsOnGround    bool            `json:"isOnGround"`
-	Animation     PlayerAnimation `json:"animation"`
-	AnimationFlip bool            `json:"animationFlip"`
+	Object     *resolv.Object `json:"-"`
+	IsOnGround bool           `json:"isOnGround"`
+	// Animation     PlayerAnimation `json:"animation"`
+	// AnimationFlip bool            `json:"animationFlip"`
 }
 
 func NewNPCState() *NPCState {
@@ -25,6 +25,6 @@ func NewNPCState() *NPCState {
 			X: 0,
 			Y: 0,
 		},
-		Object: resolv.NewObject(constants.NPCStartingX, constants.NPCStartingY, constants.NPCWidth, constants.NPCHeight, CollisionSpaceTagPlayer),
+		Object: resolv.NewObject(constants.NPCStartingX, constants.NPCStartingY, constants.NPCWidth, constants.NPCHeight, CollisionSpaceTagNPC),
 	}
 }

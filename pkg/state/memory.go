@@ -17,9 +17,7 @@ func NewInMemoryStateManager() *InMemoryStateManager {
 	return &InMemoryStateManager{
 		gameState: &gametypes.GameState{
 			Players: make(map[uint32]*gametypes.PlayerState),
-			NPCs: map[uint32]*gametypes.NPCState{
-				1: gametypes.NewNPCState(),
-			},
+			NPCs:    make(map[uint32]*gametypes.NPCState),
 		},
 	}
 }
@@ -30,6 +28,7 @@ func (m *InMemoryStateManager) Get(ctx context.Context) (*gametypes.GameState, e
 	// TODO: assess usage of pointers here and whether values might be better
 	copy := &gametypes.GameState{
 		Players: make(map[uint32]*gametypes.PlayerState),
+		NPCs:    make(map[uint32]*gametypes.NPCState),
 	}
 	for k, v := range m.gameState.Players {
 		copy.Players[k] = &gametypes.PlayerState{
@@ -46,6 +45,20 @@ func (m *InMemoryStateManager) Get(ctx context.Context) (*gametypes.GameState, e
 			Animation:     v.Animation,
 			AnimationFlip: v.AnimationFlip,
 			Object:        v.Object, // TODO: this is a pointer, not a deep copy
+		}
+	}
+	for k, v := range m.gameState.NPCs {
+		copy.NPCs[k] = &gametypes.NPCState{
+			Position: gametypes.Position{
+				X: v.Position.X,
+				Y: v.Position.Y,
+			},
+			Velocity: gametypes.Velocity{
+				X: v.Velocity.X,
+				Y: v.Velocity.Y,
+			},
+			Object:     v.Object, // TODO: this is a pointer, not a deep copy
+			IsOnGround: v.IsOnGround,
 		}
 	}
 
