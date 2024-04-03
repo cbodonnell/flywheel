@@ -3,7 +3,7 @@ namespace flatbuffers.gamestate;
 table GameState {
     timestamp: int64;
     players: [PlayerStateKeyValue];
-    NPCs: [NPCStateKeyValue];
+    npcs: [NPCStateKeyValue];
 }
 
 table PlayerStateKeyValue {
@@ -30,9 +30,9 @@ table Velocity {
   y: float64;
 }
 
-table NPCKeyValue {
+table NPCStateKeyValue {
     key: uint32;
-    value: PlayerState;
+    value: NPCState;
 }
 
 table NPCState {
