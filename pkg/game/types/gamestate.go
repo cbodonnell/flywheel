@@ -1,5 +1,11 @@
 package types
 
+const (
+	CollisionSpaceTagPlayer string = "player"
+	CollisionSpaceTagNPC    string = "npc"
+	CollisionSpaceTagLevel  string = "level"
+)
+
 type GameState struct {
 	// Timestamp is the time at which the game state was generated
 	Timestamp int64 `json:"timestamp"`

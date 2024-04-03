@@ -1,6 +1,8 @@
 package game
 
-import "github.com/cbodonnell/flywheel/pkg/game/types"
+import (
+	"github.com/cbodonnell/flywheel/pkg/game/types"
+)
 
 type ServerObject interface {
 	Update(deltaTime float64)

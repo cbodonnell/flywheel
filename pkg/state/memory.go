@@ -17,6 +17,9 @@ func NewInMemoryStateManager() *InMemoryStateManager {
 	return &InMemoryStateManager{
 		gameState: &gametypes.GameState{
 			Players: make(map[uint32]*gametypes.PlayerState),
+			NPCs: map[uint32]*gametypes.NPCState{
+				1: gametypes.NewNPCState(),
+			},
 		},
 	}
 }

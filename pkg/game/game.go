@@ -84,10 +84,11 @@ func (gm *GameManager) gameTick(ctx context.Context, t time.Time) error {
 		return fmt.Errorf("failed to get current game state: %v", err)
 	}
 
+	deltaTime := float64(t.Sub(time.UnixMilli(gameState.Timestamp)).Milliseconds())
 	gameState.Timestamp = t.UnixMilli()
 	gm.processConnectionEvents(gameState)
 	gm.processClientMessages(gameState)
-	gm.updateServerObjects(gameState)
+	gm.updateServerObjects(gameState, deltaTime)
 	gm.broadcastGameState(gameState)
 
 	if err := gm.stateManager.Set(ctx, gameState); err != nil {
@@ -109,7 +110,7 @@ func (gm *GameManager) processConnectionEvents(gameState *types.GameState) {
 		switch event := item.(type) {
 		case *types.ConnectPlayerEvent:
 			playerState := event.PlayerState
-			playerState.Object = resolv.NewObject(playerState.Position.X, playerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer)
+			playerState.Object = resolv.NewObject(playerState.Position.X, playerState.Position.Y, constants.PlayerWidth, constants.PlayerHeight, types.CollisionSpaceTagPlayer)
 			// add the player to the game state
 			gameState.Players[event.ClientID] = playerState
 			// add the player object to the collision space
@@ -233,7 +234,7 @@ func ApplyInput(playerState *types.PlayerState, clientPlayerUpdate *messages.Cli
 	vx := kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
 
 	// Check for collisions
-	if collision := playerState.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
+	if collision := playerState.Object.Check(dx, 0, types.CollisionSpaceTagLevel); collision != nil {
 		dx = collision.ContactWithObject(collision.Objects[0]).X
 		vx = 0
 	}
@@ -251,7 +252,7 @@ func ApplyInput(playerState *types.PlayerState, clientPlayerUpdate *messages.Cli
 
 	// Check for collisions
 	isOnGround := false
-	if collision := playerState.Object.Check(0, dy, CollisionSpaceTagLevel); collision != nil {
+	if collision := playerState.Object.Check(0, dy, types.CollisionSpaceTagLevel); collision != nil {
 		dy = collision.ContactWithObject(collision.Objects[0]).Y
 		vy = 0
 		isOnGround = true
@@ -292,12 +293,55 @@ func ApplyInput(playerState *types.PlayerState, clientPlayerUpdate *messages.Cli
 }
 
 // updateServerObjects updates server objects (e.g. npcs, items, projectiles, etc.)
-func (gm *GameManager) updateServerObjects(gameState *types.GameState) {
-	// move server objects
-	// check for collisions
-	// update game state
+func (gm *GameManager) updateServerObjects(gameState *types.GameState, deltaTime float64) {
+	for _, npcState := range gameState.NPCs {
+		updateServerObject(npcState, deltaTime)
+	}
 
 	// spawn new server objects
+}
+
+// Update updates the server object (TODO: use the implementation in objects.go)
+func updateServerObject(npcState *types.NPCState, deltaTime float64) {
+	// X-axis
+	// TODO: some base movement logic
+	dx := 0.0
+	vx := 0.0
+
+	// Check for collisions
+	if collision := npcState.Object.Check(dx, 0, types.CollisionSpaceTagLevel); collision != nil {
+		dx = collision.ContactWithObject(collision.Objects[0]).X
+		vx = 0
+	}
+
+	// Y-axis
+	// TODO: some base movement logic
+	vy := 0.0
+
+	// Apply gravity
+	dy := kinematic.Displacement(vy, deltaTime, kinematic.Gravity*constants.NPCGravityMultiplier)
+	vy = kinematic.FinalVelocity(vy, deltaTime, kinematic.Gravity*constants.NPCGravityMultiplier)
+
+	// Check for collisions
+	isOnGround := false
+	if collision := npcState.Object.Check(0, dy, types.CollisionSpaceTagLevel); collision != nil {
+		dy = collision.ContactWithObject(collision.Objects[0]).Y
+		vy = 0
+		isOnGround = true
+	}
+
+	// Update player state
+	npcState.Position.X += dx
+	npcState.Velocity.X = vx
+	npcState.Position.Y += dy
+	npcState.Velocity.Y = vy
+	npcState.IsOnGround = isOnGround
+
+	// TODO: Update the npc animation
+
+	npcState.Object.Position.X = npcState.Position.X
+	npcState.Object.Position.Y = npcState.Position.Y
+	npcState.Object.Update()
 }
 
 // broadcastGameState sends the game state to connected clients.

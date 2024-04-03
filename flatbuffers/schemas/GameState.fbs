@@ -3,6 +3,7 @@ namespace flatbuffers.gamestate;
 table GameState {
     timestamp: int64;
     players: [PlayerStateKeyValue];
+    NPCs: [NPCStateKeyValue];
 }
 
 table PlayerStateKeyValue {
@@ -27,6 +28,19 @@ table Position {
 table Velocity {
   x: float64;
   y: float64;
+}
+
+table NPCKeyValue {
+    key: uint32;
+    value: PlayerState;
+}
+
+table NPCState {
+  position: Position;
+  velocity: Velocity;
+  is_on_ground: bool;
+  animation: uint8;
+  animation_flip: bool;
 }
  
 root_type GameState;

@@ -55,7 +55,7 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 		return nil, fmt.Errorf("client ID is required")
 	}
 
-	state.Object = resolv.NewObject(state.Position.X, state.Position.Y, constants.PlayerWidth, constants.PlayerHeight, game.CollisionSpaceTagPlayer)
+	state.Object = resolv.NewObject(state.Position.X, state.Position.Y, constants.PlayerWidth, constants.PlayerHeight, gametypes.CollisionSpaceTagPlayer)
 
 	return &Player{
 		BaseObject: BaseObject{
