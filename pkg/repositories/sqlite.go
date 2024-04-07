@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/kinematic"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -75,12 +76,12 @@ func (r *SQLiteRepository) SaveGameState(ctx context.Context, gameState *gametyp
 	return nil
 }
 
-func (r *SQLiteRepository) SavePlayerState(ctx context.Context, timestamp int64, clientID uint32, playerState *gametypes.PlayerState) error {
+func (r *SQLiteRepository) SavePlayerState(ctx context.Context, timestamp int64, clientID uint32, position kinematic.Vector) error {
 	q := `
 	INSERT OR REPLACE INTO players (player_id, timestamp, x, y)
 	VALUES (?, ?, ?, ?);
 	`
-	_, err := r.db.ExecContext(ctx, q, clientID, timestamp, playerState.Position.X, playerState.Position.Y)
+	_, err := r.db.ExecContext(ctx, q, clientID, timestamp, position.X, position.Y)
 	if err != nil {
 		return fmt.Errorf("failed to insert player: %v", err)
 	}
@@ -88,7 +89,7 @@ func (r *SQLiteRepository) SavePlayerState(ctx context.Context, timestamp int64,
 	return nil
 }
 
-func (r *SQLiteRepository) LoadPlayerState(ctx context.Context, clientID uint32) (*gametypes.PlayerState, error) {
+func (r *SQLiteRepository) LoadPlayerState(ctx context.Context, clientID uint32) (*kinematic.Vector, error) {
 	q := `
 	SELECT x, y FROM players WHERE player_id = $1;
 	`
@@ -101,10 +102,8 @@ func (r *SQLiteRepository) LoadPlayerState(ctx context.Context, clientID uint32)
 		return nil, fmt.Errorf("failed to scan player: %v", err)
 	}
 
-	return &gametypes.PlayerState{
-		Position: gametypes.Position{
-			X: x,
-			Y: y,
-		},
+	return &kinematic.Vector{
+		X: x,
+		Y: y,
 	}, nil
 }

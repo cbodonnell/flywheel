@@ -80,11 +80,12 @@ func (g *GameScene) processPendingServerMessages() error {
 
 		switch message.Type {
 		case messages.MessageTypeServerGameUpdate:
-			gameState, err := messages.DeserializeGameState(message.Payload)
+			serverGameUpdate, err := messages.DeserializeGameState(message.Payload)
 			if err != nil {
 				log.Error("Failed to deserialize game state: %v", err)
 				continue
 			}
+			gameState := game.GameStateFromServerUpdate(serverGameUpdate)
 
 			if gameState.Timestamp < g.lastGameStateReceived {
 				log.Warn("Received outdated game state: %d < %d", gameState.Timestamp, g.lastGameStateReceived)
@@ -110,7 +111,8 @@ func (g *GameScene) processPendingServerMessages() error {
 				continue
 			}
 			log.Debug("Adding new player object for client %d", playerConnect.ClientID)
-			playerObject, err := objects.NewPlayer(id, g.networkManager, playerConnect.PlayerState)
+			playerState := game.PlayerStateFromServerUpdate(playerConnect.PlayerState)
+			playerObject, err := objects.NewPlayer(id, g.networkManager, playerState)
 			if err != nil {
 				log.Error("Failed to create new player object: %v", err)
 				continue

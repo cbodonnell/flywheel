@@ -3,12 +3,13 @@ package messages
 import (
 	"testing"
 
-	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/kinematic"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSerializeDeserializeGameState(t *testing.T) {
 	type args struct {
-		state *gametypes.GameState
+		state *ServerGameUpdate
 	}
 	tests := []struct {
 		name    string
@@ -18,22 +19,35 @@ func TestSerializeDeserializeGameState(t *testing.T) {
 		{
 			name: "Basic game state",
 			args: args{
-				state: &gametypes.GameState{
+				state: &ServerGameUpdate{
 					Timestamp: 1,
-					Players: map[uint32]*gametypes.PlayerState{
+					Players: map[uint32]*PlayerStateUpdate{
 						1: {
 							LastProcessedTimestamp: 1,
-							Position: gametypes.Position{
+							Position: kinematic.Vector{
 								X: 0.0,
 								Y: 0.0,
 							},
-							Velocity: gametypes.Velocity{
+							Velocity: kinematic.Vector{
 								X: 0.0,
 								Y: 0.0,
 							},
 							IsOnGround:    true,
-							Animation:     gametypes.PlayerAnimationIdle,
+							Animation:     0,
 							AnimationFlip: false,
+						},
+					},
+					NPCs: map[uint32]*NPCStateUpdate{
+						1: {
+							Position: kinematic.Vector{
+								X: 0.0,
+								Y: 0.0,
+							},
+							Velocity: kinematic.Vector{
+								X: 0.0,
+								Y: 0.0,
+							},
+							IsOnGround: true,
 						},
 					},
 				},
@@ -55,9 +69,7 @@ func TestSerializeDeserializeGameState(t *testing.T) {
 				return
 			}
 
-			if !got.Players[1].Equal(tt.args.state.Players[1]) {
-				t.Errorf("DeserializeGameState() = %v, want %v", got, tt.args.state)
-			}
+			assert.Equal(t, tt.args.state, got)
 		})
 	}
 }

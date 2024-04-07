@@ -9,7 +9,6 @@ import (
 	"github.com/cbodonnell/flywheel/client/animations"
 	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
-	"github.com/cbodonnell/flywheel/pkg/game"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
@@ -131,7 +130,7 @@ func (p *Player) Update() error {
 		p.pastUpdates = p.pastUpdates[1:]
 	}
 
-	game.ApplyInput(p.State, cpu)
+	p.State.ApplyInput(cpu)
 
 	p.previousStates = append(p.previousStates, PreviousState{
 		Timestamp: cpu.Timestamp,
@@ -213,7 +212,7 @@ func (p *Player) ExtrapolateState(from *gametypes.PlayerState, to *gametypes.Pla
 // past updates that are after the last processed timestamp are replayed.
 func (p *Player) ReconcileState(state *gametypes.PlayerState) error {
 	if state.LastProcessedTimestamp == 0 {
-		// no previous state to reconcile with
+		// initial state received from the server, nothing to reconcile
 		return nil
 	}
 
@@ -237,10 +236,10 @@ func (p *Player) ReconcileState(state *gametypes.PlayerState) error {
 				p.State.Object.Position.X = state.Position.X
 				p.State.Object.Position.Y = state.Position.Y
 
-				// process all of the past updates that are after the last processed timestamp
+				// replay all of the past updates that are after the reconciled state
 				for j := 0; j < len(p.pastUpdates); j++ {
 					if p.pastUpdates[j].Timestamp > state.LastProcessedTimestamp {
-						game.ApplyInput(p.State, p.pastUpdates[j])
+						p.State.ApplyInput(p.pastUpdates[j])
 					}
 				}
 			}

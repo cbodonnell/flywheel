@@ -28,5 +28,5 @@ const (
 	// NPC Starting Y
 	NPCStartingY float64 = 100.0
 	// NPCGravityMultiplier
-	NPCGravityMultiplier float64 = 500.0
+	NPCGravityMultiplier float64 = 50.0
 )

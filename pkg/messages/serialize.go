@@ -7,7 +7,6 @@ import (
 
 	gamestatefb "github.com/cbodonnell/flywheel/flatbuffers/gamestate"
 	messagefb "github.com/cbodonnell/flywheel/flatbuffers/message"
-	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/klauspost/compress/zstd"
 )
@@ -77,7 +76,7 @@ func DeserializeMessageFlatbuffer(b []byte) (*Message, error) {
 	return message, nil
 }
 
-func SerializeGameState(state *gametypes.GameState) ([]byte, error) {
+func SerializeGameState(state *ServerGameUpdate) ([]byte, error) {
 	b, err := SerializeGameStateFlatbuffer(state)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize game state: %v", err)
@@ -86,7 +85,7 @@ func SerializeGameState(state *gametypes.GameState) ([]byte, error) {
 	return b, nil
 }
 
-func DeserializeGameState(b []byte) (*gametypes.GameState, error) {
+func DeserializeGameState(b []byte) (*ServerGameUpdate, error) {
 	gameState, err := DeserializeGameStateFlatbuffer(b)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize game state: %v", err)
@@ -95,7 +94,7 @@ func DeserializeGameState(b []byte) (*gametypes.GameState, error) {
 	return gameState, nil
 }
 
-func SerializeGameStateFlatbuffer(state *gametypes.GameState) ([]byte, error) {
+func SerializeGameStateFlatbuffer(state *ServerGameUpdate) ([]byte, error) {
 	builder := flatbuffers.NewBuilder(0)
 
 	playerStateKVs := make([]flatbuffers.UOffsetT, 0, len(state.Players))
@@ -147,7 +146,7 @@ func SerializeGameStateFlatbuffer(state *gametypes.GameState) ([]byte, error) {
 		gamestatefb.NPCStateStart(builder)
 		gamestatefb.NPCStateAddPosition(builder, position)
 		gamestatefb.NPCStateAddVelocity(builder, velocity)
-		gamestatefb.PlayerStateAddIsOnGround(builder, v.IsOnGround)
+		gamestatefb.NPCStateAddIsOnGround(builder, v.IsOnGround)
 		npcState := gamestatefb.NPCStateEnd(builder)
 
 		gamestatefb.NPCStateKeyValueStart(builder)
@@ -174,39 +173,39 @@ func SerializeGameStateFlatbuffer(state *gametypes.GameState) ([]byte, error) {
 	return b, nil
 }
 
-func DeserializeGameStateFlatbuffer(b []byte) (*gametypes.GameState, error) {
-	gameState := &gametypes.GameState{}
+func DeserializeGameStateFlatbuffer(b []byte) (*ServerGameUpdate, error) {
+	gameState := &ServerGameUpdate{}
 	gameStateFlatbuffer := gamestatefb.GetRootAsGameState(b, 0)
 	gameState.Timestamp = gameStateFlatbuffer.Timestamp()
-	players := make(map[uint32]*gametypes.PlayerState)
+	players := make(map[uint32]*PlayerStateUpdate)
 	for i := 0; i < gameStateFlatbuffer.PlayersLength(); i++ {
 		playerStateKV := &gamestatefb.PlayerStateKeyValue{}
 		if !gameStateFlatbuffer.Players(playerStateKV, i) {
 			return nil, fmt.Errorf("failed to get player state key value at index %d", i)
 		}
 
-		playerState := &gametypes.PlayerState{}
+		playerState := &PlayerStateUpdate{}
 		playerState.LastProcessedTimestamp = playerStateKV.Value(nil).LastProcessedTimestamp()
 		playerState.Position.X = playerStateKV.Value(nil).Position(nil).X()
 		playerState.Position.Y = playerStateKV.Value(nil).Position(nil).Y()
 		playerState.Velocity.X = playerStateKV.Value(nil).Velocity(nil).X()
 		playerState.Velocity.Y = playerStateKV.Value(nil).Velocity(nil).Y()
 		playerState.IsOnGround = playerStateKV.Value(nil).IsOnGround()
-		playerState.Animation = gametypes.PlayerAnimation(playerStateKV.Value(nil).Animation())
+		playerState.Animation = playerStateKV.Value(nil).Animation()
 		playerState.AnimationFlip = playerStateKV.Value(nil).AnimationFlip()
 
 		players[playerStateKV.Key()] = playerState
 	}
 	gameState.Players = players
 
-	npcs := make(map[uint32]*gametypes.NPCState)
+	npcs := make(map[uint32]*NPCStateUpdate)
 	for i := 0; i < gameStateFlatbuffer.NpcsLength(); i++ {
 		npcStateKV := &gamestatefb.NPCStateKeyValue{}
 		if !gameStateFlatbuffer.Npcs(npcStateKV, i) {
 			return nil, fmt.Errorf("failed to get npc state key value at index %d", i)
 		}
 
-		npcState := &gametypes.NPCState{}
+		npcState := &NPCStateUpdate{}
 		npcState.Position.X = npcStateKV.Value(nil).Position(nil).X()
 		npcState.Position.Y = npcStateKV.Value(nil).Position(nil).Y()
 		npcState.Velocity.X = npcStateKV.Value(nil).Velocity(nil).X()
