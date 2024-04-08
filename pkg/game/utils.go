@@ -20,6 +20,10 @@ func ServerGameUpdateFromState(state *types.GameState) *messages.ServerGameUpdat
 
 	npcs := make(map[uint32]*messages.NPCStateUpdate)
 	for npcID, npcState := range state.NPCs {
+		if !npcState.Exists() {
+			// don't send updates for NPCs that aren't in the game
+			continue
+		}
 		npcs[npcID] = &messages.NPCStateUpdate{
 			Position:   npcState.Position,
 			Velocity:   npcState.Velocity,
@@ -82,5 +86,21 @@ func PlayerStateFromServerUpdate(update *messages.PlayerStateUpdate) *types.Play
 		IsOnGround:             update.IsOnGround,
 		Animation:              types.PlayerAnimation(update.Animation),
 		AnimationFlip:          update.AnimationFlip,
+	}
+}
+
+func NPCStateUpdateFromState(state *types.NPCState) *messages.NPCStateUpdate {
+	return &messages.NPCStateUpdate{
+		Position:   state.Position,
+		Velocity:   state.Velocity,
+		IsOnGround: state.IsOnGround,
+	}
+}
+
+func NPCStateFromServerUpdate(update *messages.NPCStateUpdate) *types.NPCState {
+	return &types.NPCState{
+		Position:   update.Position,
+		Velocity:   update.Velocity,
+		IsOnGround: update.IsOnGround,
 	}
 }

@@ -25,6 +25,8 @@ const (
 	MessageTypeServerSyncTime
 	MessageTypeServerPlayerConnect
 	MessageTypeServerPlayerDisconnect
+	MessageTypeServerNPCSpawn
+	MessageTypeServerNPCDespawn
 )
 
 func (m MessageType) String() string {
@@ -38,6 +40,8 @@ func (m MessageType) String() string {
 		"ServerSyncTime",
 		"ServerPlayerConnect",
 		"ServerPlayerDisconnect",
+		"ServerNPCSpawn",
+		"ServerNPCDespawn",
 	}[m]
 }
 
@@ -139,3 +143,26 @@ type ServerPlayerDisconnect struct {
 	// ClientID is the ID of the player that has disconnected
 	ClientID uint32 `json:"clientID"`
 }
+
+// ServerNPCSpawn is a message sent by the server to notify clients that an NPC has spawned
+type ServerNPCSpawn struct {
+	// NPCID is the ID of the NPC that has spawned
+	NPCID uint32 `json:"npcID"`
+	// NPCState is the state of the NPC that has spawned
+	NPCState *NPCStateUpdate `json:"npcState"`
+}
+
+// ServerNPCDespawn is a message sent by the server to notify clients that an NPC has despawned
+type ServerNPCDespawn struct {
+	// NPCID is the ID of the NPC that has despawned
+	NPCID uint32 `json:"npcID"`
+	// Reason is the reason for the NPC despawn
+	Reason NPCDespawnReason `json:"reason"`
+}
+
+type NPCDespawnReason uint8
+
+const (
+	NPCDespawnReasonKilled NPCDespawnReason = iota
+	NPCDespawnReasonTTL
+)

@@ -222,11 +222,71 @@ func (gm *GameManager) processClientMessages() {
 
 // updateServerObjects updates server objects (e.g. npcs, items, projectiles, etc.)
 func (gm *GameManager) updateServerObjects(deltaTime float64) {
-	for _, npcState := range gm.gameState.NPCs {
-		npcState.Update(deltaTime)
-	}
+	for npcID, npcState := range gm.gameState.NPCs {
+		if !npcState.Exists() {
+			if npcState.RespawnTime() <= 0 {
+				npcState.Spawn()
 
-	// spawn new server objects
+				// send a message to connected clients to spawn the npc
+				npcSpawn := &messages.ServerNPCSpawn{
+					NPCID:    npcID,
+					NPCState: NPCStateUpdateFromState(npcState),
+				}
+				payload, err := json.Marshal(npcSpawn)
+				if err != nil {
+					log.Error("Failed to marshal npc spawn message: %v", err)
+					continue
+				}
+
+				for _, client := range gm.clientManager.GetClients() {
+					msg := &messages.Message{
+						ClientID: 0, // ClientID 0 means the message is from the server
+						Type:     messages.MessageTypeServerNPCSpawn,
+						Payload:  payload,
+					}
+
+					err := network.WriteMessageToTCP(client.TCPConn, msg)
+					if err != nil {
+						log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
+						continue
+					}
+				}
+			} else {
+				npcState.DecrementRespawnTime(deltaTime)
+			}
+		} else {
+			if npcState.TTL() <= 0 {
+				npcState.Despawn()
+
+				// send a message to connected clients to despawn the npc
+				npcDespawn := &messages.ServerNPCDespawn{
+					NPCID:  npcID,
+					Reason: messages.NPCDespawnReasonTTL,
+				}
+				payload, err := json.Marshal(npcDespawn)
+				if err != nil {
+					log.Error("Failed to marshal npc despawn message: %v", err)
+					continue
+				}
+
+				for _, client := range gm.clientManager.GetClients() {
+					msg := &messages.Message{
+						ClientID: 0, // ClientID 0 means the message is from the server
+						Type:     messages.MessageTypeServerNPCDespawn,
+						Payload:  payload,
+					}
+
+					err := network.WriteMessageToTCP(client.TCPConn, msg)
+					if err != nil {
+						log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
+						continue
+					}
+				}
+			} else {
+				npcState.Update(deltaTime)
+			}
+		}
+	}
 }
 
 // broadcastGameState sends the game state to connected clients.

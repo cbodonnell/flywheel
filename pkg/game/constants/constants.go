@@ -28,5 +28,9 @@ const (
 	// NPC Starting Y
 	NPCStartingY float64 = 100.0
 	// NPCGravityMultiplier
-	NPCGravityMultiplier float64 = 50.0
+	NPCGravityMultiplier float64 = 500.0
+	// NPCTTL is the time to live for an NPC
+	NPCTTL float64 = 10.0
+	// NPCRespawnTime is the time it takes for an NPC to respawn
+	NPCRespawnTime float64 = 5.0
 )

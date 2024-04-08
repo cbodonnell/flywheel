@@ -13,6 +13,10 @@ type NPCState struct {
 	IsOnGround bool
 	// Animation     PlayerAnimation
 	// AnimationFlip bool
+
+	ttl         float64
+	exists      bool
+	respawnTime float64
 }
 
 func NewNPCState(positionX float64, positionY float64) *NPCState {
@@ -35,6 +39,18 @@ func (n *NPCState) Copy() *NPCState {
 		Velocity:   n.Velocity,
 		IsOnGround: n.IsOnGround,
 	}
+}
+
+func (n *NPCState) TTL() float64 {
+	return n.ttl
+}
+
+func (n *NPCState) Exists() bool {
+	return n.exists
+}
+
+func (n *NPCState) RespawnTime() float64 {
+	return n.respawnTime
 }
 
 // Update updates the NPC state based on the current state and the time passed
@@ -78,4 +94,32 @@ func (n *NPCState) Update(deltaTime float64) {
 	n.Object.Position.X = n.Position.X
 	n.Object.Position.Y = n.Position.Y
 	n.Object.Update()
+
+	n.ttl -= deltaTime
+}
+
+func (n *NPCState) DecrementRespawnTime(deltaTime float64) {
+	n.respawnTime -= deltaTime
+}
+
+func (n *NPCState) Spawn() {
+	n.ttl = constants.NPCTTL
+	n.exists = true
+	n.respawnTime = 0
+
+	n.Position.X = constants.NPCStartingX
+	n.Position.Y = constants.NPCStartingY
+	n.Velocity.X = 0
+	n.Velocity.Y = 0
+	n.IsOnGround = false
+
+	n.Object.Position.X = n.Position.X
+	n.Object.Position.Y = n.Position.Y
+	n.Object.Update()
+}
+
+func (n *NPCState) Despawn() {
+	n.ttl = 0
+	n.exists = false
+	n.respawnTime = constants.NPCRespawnTime
 }
