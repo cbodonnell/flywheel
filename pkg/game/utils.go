@@ -25,9 +25,11 @@ func ServerGameUpdateFromState(state *types.GameState) *messages.ServerGameUpdat
 			continue
 		}
 		npcs[npcID] = &messages.NPCStateUpdate{
-			Position:   npcState.Position,
-			Velocity:   npcState.Velocity,
-			IsOnGround: npcState.IsOnGround,
+			Position:      npcState.Position,
+			Velocity:      npcState.Velocity,
+			IsOnGround:    npcState.IsOnGround,
+			Animation:     uint8(npcState.Animation),
+			AnimationFlip: npcState.AnimationFlip,
 		}
 	}
 
@@ -54,9 +56,11 @@ func GameStateFromServerUpdate(update *messages.ServerGameUpdate) *types.GameSta
 	npcs := make(map[uint32]*types.NPCState)
 	for npcID, npcState := range update.NPCs {
 		npcs[npcID] = &types.NPCState{
-			Position:   npcState.Position,
-			Velocity:   npcState.Velocity,
-			IsOnGround: npcState.IsOnGround,
+			Position:      npcState.Position,
+			Velocity:      npcState.Velocity,
+			IsOnGround:    npcState.IsOnGround,
+			Animation:     types.NPCAnimation(npcState.Animation),
+			AnimationFlip: npcState.AnimationFlip,
 		}
 	}
 
@@ -91,16 +95,20 @@ func PlayerStateFromServerUpdate(update *messages.PlayerStateUpdate) *types.Play
 
 func NPCStateUpdateFromState(state *types.NPCState) *messages.NPCStateUpdate {
 	return &messages.NPCStateUpdate{
-		Position:   state.Position,
-		Velocity:   state.Velocity,
-		IsOnGround: state.IsOnGround,
+		Position:      state.Position,
+		Velocity:      state.Velocity,
+		IsOnGround:    state.IsOnGround,
+		Animation:     uint8(state.Animation),
+		AnimationFlip: state.AnimationFlip,
 	}
 }
 
 func NPCStateFromServerUpdate(update *messages.NPCStateUpdate) *types.NPCState {
 	return &types.NPCState{
-		Position:   update.Position,
-		Velocity:   update.Velocity,
-		IsOnGround: update.IsOnGround,
+		Position:      update.Position,
+		Velocity:      update.Velocity,
+		IsOnGround:    update.IsOnGround,
+		Animation:     types.NPCAnimation(update.Animation),
+		AnimationFlip: update.AnimationFlip,
 	}
 }

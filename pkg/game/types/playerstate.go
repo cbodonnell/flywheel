@@ -126,6 +126,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		}
 	}
 
+	// Update the player collision object
 	p.Object.Position.X = p.Position.X
 	p.Object.Position.Y = p.Position.Y
 	p.Object.Update()

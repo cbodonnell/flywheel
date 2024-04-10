@@ -7,17 +7,26 @@ import (
 )
 
 type NPCState struct {
-	Position   kinematic.Vector
-	Velocity   kinematic.Vector
-	Object     *resolv.Object
-	IsOnGround bool
-	// Animation     PlayerAnimation
-	// AnimationFlip bool
+	Position      kinematic.Vector
+	Velocity      kinematic.Vector
+	Object        *resolv.Object
+	IsOnGround    bool
+	Animation     NPCAnimation
+	AnimationFlip bool
 
 	ttl         float64
 	exists      bool
 	respawnTime float64
 }
+
+type NPCAnimation uint8
+
+const (
+	NPCAnimationIdle NPCAnimation = iota
+	// NPCAnimationRun
+	// NPCAnimationJump
+	// NPCAnimationFall
+)
 
 func NewNPCState(positionX float64, positionY float64) *NPCState {
 	return &NPCState{
@@ -68,7 +77,7 @@ func (n *NPCState) Update(deltaTime float64) {
 
 	// Y-axis
 	// TODO: some base movement logic
-	vy := 0.0
+	vy := n.Velocity.Y
 
 	// Apply gravity
 	dy := kinematic.Displacement(vy, deltaTime, kinematic.Gravity*constants.NPCGravityMultiplier)
@@ -89,12 +98,21 @@ func (n *NPCState) Update(deltaTime float64) {
 	n.Velocity.Y = vy
 	n.IsOnGround = isOnGround
 
-	// TODO: Update the npc animation
+	// Update the npc animation
+	if n.Velocity.X > 0 {
+		n.AnimationFlip = false
+	} else if n.Velocity.X < 0 {
+		n.AnimationFlip = true
+	}
 
+	n.Animation = NPCAnimationIdle
+
+	// Update the npc collision object
 	n.Object.Position.X = n.Position.X
 	n.Object.Position.Y = n.Position.Y
 	n.Object.Update()
 
+	// Decrement the time to live
 	n.ttl -= deltaTime
 }
 

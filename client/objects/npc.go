@@ -3,6 +3,7 @@ package objects
 import (
 	"image/color"
 
+	"github.com/cbodonnell/flywheel/client/animations"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -18,7 +19,7 @@ type NPC struct {
 	// TODO: make this private with a getter and setter
 	State *gametypes.NPCState
 
-	// animations map[gametypes.PlayerAnimation]*animations.Animation
+	animations map[gametypes.NPCAnimation]*animations.Animation
 }
 
 func NewNPC(id string, state *gametypes.NPCState) (*NPC, error) {
@@ -29,19 +30,19 @@ func NewNPC(id string, state *gametypes.NPCState) (*NPC, error) {
 			Children: make(map[string]GameObject),
 		},
 		ID:    id,
-		debug: true,
+		debug: false,
 		State: state,
-		// animations: map[gametypes.PlayerAnimation]*animations.Animation{
-		// 	gametypes.PlayerAnimationIdle: animations.NewPlayerIdleAnimation(),
-		// 	gametypes.PlayerAnimationRun:  animations.NewPlayerRunAnimation(),
-		// 	gametypes.PlayerAnimationJump: animations.NewPlayerJumpAnimation(),
-		// 	gametypes.PlayerAnimationFall: animations.NewPlayerJumpAnimation(),
-		// },
+		animations: map[gametypes.NPCAnimation]*animations.Animation{
+			gametypes.NPCAnimationIdle: animations.NewNPCIdleAnimation(),
+			// gametypes.NPCAnimationRun:  animations.NewNPCRunAnimation(),
+			// gametypes.NPCAnimationJump: animations.NewNPCJumpAnimation(),
+			// gametypes.NPCAnimationFall: animations.NewNPCFallAnimation(),
+		},
 	}, nil
 }
 
 func (p *NPC) Update() error {
-	// p.animations[p.State.Animation].Update()
+	p.animations[p.State.Animation].Update()
 	return nil
 }
 
@@ -57,19 +58,19 @@ func (p *NPC) Draw(screen *ebiten.Image) {
 		vector.StrokeRect(screen, float32(npcObject.Position.X), float32(float64(screen.Bounds().Dy())-npcObject.Size.Y)-float32(npcObject.Position.Y), float32(npcObject.Size.X), float32(npcObject.Size.Y), strokeWidth, npcColor, false)
 	}
 
-	// frameWidth, frameHeight := p.animations[p.State.Animation].Size()
-	// scaleX, scaleY := 1.0, 1.0
-	// translateX := playerObject.Position.X
-	// translateY := float64(screen.Bounds().Dy()-frameHeight) - playerObject.Position.Y
-	// if p.State.AnimationFlip {
-	// 	scaleX = -1.0
-	// 	translateX = (-1.0 * translateX) - float64(frameWidth)
-	// }
+	frameWidth, frameHeight := p.animations[p.State.Animation].Size()
+	scaleX, scaleY := 1.0, 1.0
+	translateX := npcObject.Position.X
+	translateY := float64(screen.Bounds().Dy()-frameHeight) - npcObject.Position.Y
+	if p.State.AnimationFlip {
+		scaleX = -1.0
+		translateX = (-1.0 * translateX) - float64(frameWidth)
+	}
 
-	// op := p.animations[p.State.Animation].DefaultOptions()
-	// op.GeoM.Translate(translateX, translateY)
-	// op.GeoM.Scale(scaleX, scaleY)
-	// screen.DrawImage(p.animations[p.State.Animation].CurrentImage(), op)
+	op := p.animations[p.State.Animation].DefaultOptions()
+	op.GeoM.Translate(translateX, translateY)
+	op.GeoM.Scale(scaleX, scaleY)
+	screen.DrawImage(p.animations[p.State.Animation].CurrentImage(), op)
 }
 
 func (p *NPC) InterpolateState(from *gametypes.NPCState, to *gametypes.NPCState, factor float64) {
@@ -78,8 +79,8 @@ func (p *NPC) InterpolateState(from *gametypes.NPCState, to *gametypes.NPCState,
 	p.State.Velocity.X = to.Velocity.X
 	p.State.Velocity.Y = to.Velocity.X
 	p.State.IsOnGround = to.IsOnGround
-	// p.State.Animation = to.Animation
-	// p.State.AnimationFlip = to.AnimationFlip
+	p.State.Animation = to.Animation
+	p.State.AnimationFlip = to.AnimationFlip
 	p.State.Object.Position.X = p.State.Position.X
 	p.State.Object.Position.Y = p.State.Position.Y
 }
@@ -90,8 +91,8 @@ func (p *NPC) ExtrapolateState(from *gametypes.NPCState, to *gametypes.NPCState,
 	p.State.Velocity.X = to.Velocity.X
 	p.State.Velocity.Y = to.Velocity.Y
 	p.State.IsOnGround = to.IsOnGround
-	// p.State.Animation = to.Animation
-	// p.State.AnimationFlip = to.AnimationFlip
+	p.State.Animation = to.Animation
+	p.State.AnimationFlip = to.AnimationFlip
 	p.State.Object.Position.X = p.State.Position.X
 	p.State.Object.Position.Y = p.State.Position.Y
 }
