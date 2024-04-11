@@ -5,6 +5,7 @@ import (
 
 	gameconstants "github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/kinematic"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/network"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -49,25 +50,23 @@ func (w *ClientEventWorker) Start() {
 }
 
 func (w *ClientEventWorker) handleClientConnect(event network.ClientEvent) {
-	var playerState *gametypes.PlayerState
+	var position *kinematic.Vector
 	if lastKnownState, err := w.repository.LoadPlayerState(context.Background(), event.ClientID); err == nil {
-		playerState = lastKnownState
+		position = lastKnownState
 	} else {
 		if !repositories.IsNotFound(err) {
 			log.Error("Failed to get player state for client %d: %v", event.ClientID, err)
 		}
 		log.Debug("Adding client %d with default values", event.ClientID)
-		playerState = &gametypes.PlayerState{
-			Position: gametypes.Position{
-				X: gameconstants.PlayerStartingX,
-				Y: gameconstants.PlayerStartingY,
-			},
+		position = &kinematic.Vector{
+			X: gameconstants.PlayerStartingX,
+			Y: gameconstants.PlayerStartingY,
 		}
 	}
 
 	if err := w.connectionEventQueue.Enqueue(&gametypes.ConnectPlayerEvent{
-		ClientID:    event.ClientID,
-		PlayerState: playerState,
+		ClientID: event.ClientID,
+		Position: position,
 	}); err != nil {
 		log.Error("Failed to enqueue connect player event: %v", err)
 	}

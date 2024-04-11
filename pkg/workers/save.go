@@ -7,20 +7,19 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
-	"github.com/cbodonnell/flywheel/pkg/state"
 )
 
 type SaveGameStateWorker struct {
 	repository          repositories.Repository
 	savePlayerStateChan <-chan SavePlayerStateRequest
-	stateManager        state.StateManager
+	gameState           *types.GameState
 	interval            time.Duration
 }
 
 type NewSaveGameStateWorkerOptions struct {
 	Repository          repositories.Repository
 	SavePlayerStateChan <-chan SavePlayerStateRequest
-	StateManager        state.StateManager
+	GameState           *types.GameState
 	Interval            time.Duration
 }
 
@@ -37,7 +36,7 @@ func NewSaveGameStateWorker(opts NewSaveGameStateWorkerOptions) *SaveGameStateWo
 	return &SaveGameStateWorker{
 		repository:          opts.Repository,
 		savePlayerStateChan: opts.SavePlayerStateChan,
-		stateManager:        opts.StateManager,
+		gameState:           opts.GameState,
 		interval:            opts.Interval,
 	}
 }
@@ -52,20 +51,15 @@ func (w *SaveGameStateWorker) Start(ctx context.Context) {
 			return
 		case saveRequest := <-w.savePlayerStateChan:
 			w.savePlayerState(ctx, saveRequest)
-		case t := <-ticker.C:
-			gameState, err := w.stateManager.Get(ctx)
-			if err != nil {
-				log.Error("Failed to get current game state: %v", err)
-				continue
-			}
-			gameState.Timestamp = t.UnixMilli()
+		case <-ticker.C:
+			gameState := w.gameState.Copy()
 			w.saveGameState(ctx, gameState)
 		}
 	}
 }
 
 func (w *SaveGameStateWorker) savePlayerState(ctx context.Context, saveRequest SavePlayerStateRequest) {
-	err := w.repository.SavePlayerState(ctx, saveRequest.Timestamp, saveRequest.ClientID, saveRequest.PlayerState)
+	err := w.repository.SavePlayerState(ctx, saveRequest.Timestamp, saveRequest.ClientID, saveRequest.PlayerState.Position)
 	if err != nil {
 		log.Error("Failed to save player state: %v", err)
 	}

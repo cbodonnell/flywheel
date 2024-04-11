@@ -73,8 +73,28 @@ func (rcv *GameState) PlayersLength() int {
 	return 0
 }
 
+func (rcv *GameState) Npcs(obj *NPCStateKeyValue, j int) bool {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	if o != 0 {
+		x := rcv._tab.Vector(o)
+		x += flatbuffers.UOffsetT(j) * 4
+		x = rcv._tab.Indirect(x)
+		obj.Init(rcv._tab.Bytes, x)
+		return true
+	}
+	return false
+}
+
+func (rcv *GameState) NpcsLength() int {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	if o != 0 {
+		return rcv._tab.VectorLen(o)
+	}
+	return 0
+}
+
 func GameStateStart(builder *flatbuffers.Builder) {
-	builder.StartObject(2)
+	builder.StartObject(3)
 }
 func GameStateAddTimestamp(builder *flatbuffers.Builder, timestamp int64) {
 	builder.PrependInt64Slot(0, timestamp, 0)
@@ -83,6 +103,12 @@ func GameStateAddPlayers(builder *flatbuffers.Builder, players flatbuffers.UOffs
 	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(players), 0)
 }
 func GameStateStartPlayersVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
+	return builder.StartVector(4, numElems, 4)
+}
+func GameStateAddNpcs(builder *flatbuffers.Builder, npcs flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(npcs), 0)
+}
+func GameStateStartNpcsVector(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT {
 	return builder.StartVector(4, numElems, 4)
 }
 func GameStateEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {

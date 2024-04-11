@@ -5,15 +5,13 @@ import (
 	"fmt"
 	"io"
 
-	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
-	gamestatefb "github.com/cbodonnell/flywheel/pkg/messages/flatbuffers/gamestate"
-	messagefb "github.com/cbodonnell/flywheel/pkg/messages/flatbuffers/message"
+	gamestatefb "github.com/cbodonnell/flywheel/flatbuffers/gamestate"
+	messagefb "github.com/cbodonnell/flywheel/flatbuffers/message"
 	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/klauspost/compress/zstd"
 )
 
 func SerializeMessage(m *Message) ([]byte, error) {
-	// TODO: investigate compressed json vs flatbuffers
 	b, err := SerializeMessageFlatbuffer(m)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize message: %v", err)
@@ -78,7 +76,7 @@ func DeserializeMessageFlatbuffer(b []byte) (*Message, error) {
 	return message, nil
 }
 
-func SerializeGameState(state *gametypes.GameState) ([]byte, error) {
+func SerializeGameState(state *ServerGameUpdate) ([]byte, error) {
 	b, err := SerializeGameStateFlatbuffer(state)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize game state: %v", err)
@@ -87,7 +85,7 @@ func SerializeGameState(state *gametypes.GameState) ([]byte, error) {
 	return b, nil
 }
 
-func DeserializeGameState(b []byte) (*gametypes.GameState, error) {
+func DeserializeGameState(b []byte) (*ServerGameUpdate, error) {
 	gameState, err := DeserializeGameStateFlatbuffer(b)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize game state: %v", err)
@@ -96,7 +94,7 @@ func DeserializeGameState(b []byte) (*gametypes.GameState, error) {
 	return gameState, nil
 }
 
-func SerializeGameStateFlatbuffer(state *gametypes.GameState) ([]byte, error) {
+func SerializeGameStateFlatbuffer(state *ServerGameUpdate) ([]byte, error) {
 	builder := flatbuffers.NewBuilder(0)
 
 	playerStateKVs := make([]flatbuffers.UOffsetT, 0, len(state.Players))
@@ -133,9 +131,43 @@ func SerializeGameStateFlatbuffer(state *gametypes.GameState) ([]byte, error) {
 	}
 	playerStates := builder.EndVector(len(state.Players))
 
+	npcStateKVs := make([]flatbuffers.UOffsetT, 0, len(state.NPCs))
+	for k, v := range state.NPCs {
+		gamestatefb.PositionStart(builder)
+		gamestatefb.PositionAddX(builder, v.Position.X)
+		gamestatefb.PositionAddY(builder, v.Position.Y)
+		position := gamestatefb.PositionEnd(builder)
+
+		gamestatefb.VelocityStart(builder)
+		gamestatefb.VelocityAddX(builder, v.Velocity.X)
+		gamestatefb.VelocityAddY(builder, v.Velocity.Y)
+		velocity := gamestatefb.VelocityEnd(builder)
+
+		gamestatefb.NPCStateStart(builder)
+		gamestatefb.NPCStateAddPosition(builder, position)
+		gamestatefb.NPCStateAddVelocity(builder, velocity)
+		gamestatefb.NPCStateAddIsOnGround(builder, v.IsOnGround)
+		gamestatefb.NPCStateAddAnimation(builder, byte(v.Animation))
+		gamestatefb.NPCStateAddAnimationFlip(builder, v.AnimationFlip)
+		npcState := gamestatefb.NPCStateEnd(builder)
+
+		gamestatefb.NPCStateKeyValueStart(builder)
+		gamestatefb.NPCStateKeyValueAddKey(builder, k)
+		gamestatefb.NPCStateKeyValueAddValue(builder, npcState)
+		npcStateKV := gamestatefb.NPCStateKeyValueEnd(builder)
+
+		npcStateKVs = append(npcStateKVs, npcStateKV)
+	}
+	gamestatefb.GameStateStartNpcsVector(builder, len(state.NPCs))
+	for i := len(state.NPCs) - 1; i >= 0; i-- {
+		builder.PrependUOffsetT(npcStateKVs[i])
+	}
+	npcStates := builder.EndVector(len(state.NPCs))
+
 	gamestatefb.GameStateStart(builder)
 	gamestatefb.GameStateAddTimestamp(builder, state.Timestamp)
 	gamestatefb.GameStateAddPlayers(builder, playerStates)
+	gamestatefb.GameStateAddNpcs(builder, npcStates)
 	gamestateOffset := gamestatefb.GameStateEnd(builder)
 	builder.Finish(gamestateOffset)
 	b := builder.FinishedBytes()
@@ -143,30 +175,50 @@ func SerializeGameStateFlatbuffer(state *gametypes.GameState) ([]byte, error) {
 	return b, nil
 }
 
-func DeserializeGameStateFlatbuffer(b []byte) (*gametypes.GameState, error) {
-	gameState := &gametypes.GameState{}
+func DeserializeGameStateFlatbuffer(b []byte) (*ServerGameUpdate, error) {
+	gameState := &ServerGameUpdate{}
 	gameStateFlatbuffer := gamestatefb.GetRootAsGameState(b, 0)
 	gameState.Timestamp = gameStateFlatbuffer.Timestamp()
-	players := make(map[uint32]*gametypes.PlayerState)
+	players := make(map[uint32]*PlayerStateUpdate)
 	for i := 0; i < gameStateFlatbuffer.PlayersLength(); i++ {
 		playerStateKV := &gamestatefb.PlayerStateKeyValue{}
 		if !gameStateFlatbuffer.Players(playerStateKV, i) {
 			return nil, fmt.Errorf("failed to get player state key value at index %d", i)
 		}
 
-		playerState := &gametypes.PlayerState{}
+		playerState := &PlayerStateUpdate{}
 		playerState.LastProcessedTimestamp = playerStateKV.Value(nil).LastProcessedTimestamp()
 		playerState.Position.X = playerStateKV.Value(nil).Position(nil).X()
 		playerState.Position.Y = playerStateKV.Value(nil).Position(nil).Y()
 		playerState.Velocity.X = playerStateKV.Value(nil).Velocity(nil).X()
 		playerState.Velocity.Y = playerStateKV.Value(nil).Velocity(nil).Y()
 		playerState.IsOnGround = playerStateKV.Value(nil).IsOnGround()
-		playerState.Animation = gametypes.PlayerAnimation(playerStateKV.Value(nil).Animation())
+		playerState.Animation = playerStateKV.Value(nil).Animation()
 		playerState.AnimationFlip = playerStateKV.Value(nil).AnimationFlip()
 
 		players[playerStateKV.Key()] = playerState
 	}
 	gameState.Players = players
+
+	npcs := make(map[uint32]*NPCStateUpdate)
+	for i := 0; i < gameStateFlatbuffer.NpcsLength(); i++ {
+		npcStateKV := &gamestatefb.NPCStateKeyValue{}
+		if !gameStateFlatbuffer.Npcs(npcStateKV, i) {
+			return nil, fmt.Errorf("failed to get npc state key value at index %d", i)
+		}
+
+		npcState := &NPCStateUpdate{}
+		npcState.Position.X = npcStateKV.Value(nil).Position(nil).X()
+		npcState.Position.Y = npcStateKV.Value(nil).Position(nil).Y()
+		npcState.Velocity.X = npcStateKV.Value(nil).Velocity(nil).X()
+		npcState.Velocity.Y = npcStateKV.Value(nil).Velocity(nil).Y()
+		npcState.IsOnGround = npcStateKV.Value(nil).IsOnGround()
+		npcState.Animation = npcStateKV.Value(nil).Animation()
+		npcState.AnimationFlip = npcStateKV.Value(nil).AnimationFlip()
+
+		npcs[npcStateKV.Key()] = npcState
+	}
+	gameState.NPCs = npcs
 
 	return gameState, nil
 }

@@ -21,6 +21,14 @@ type Animation struct {
 	frameCount int
 	// frameSpeed is the number of updates before the frame index is incremented.
 	frameSpeed int
+	// scaleX is the horizontal scale factor.
+	scaleX float64
+	// scaleY is the vertical scale factor.
+	scaleY float64
+	// shiftX is the horizontal shift.
+	shiftX float64
+	// shiftY is the vertical shift.
+	shiftY float64
 
 	// updateCount is the number of times the animation has been updated.
 	updateCount int
@@ -36,6 +44,10 @@ type NewAnimationOptions struct {
 	FrameHeight int
 	FrameCount  int
 	FrameSpeed  int
+	ScaleX      float64
+	ScaleY      float64
+	ShiftX      float64
+	ShiftY      float64
 }
 
 func NewAnimation(opts NewAnimationOptions) *Animation {
@@ -47,6 +59,10 @@ func NewAnimation(opts NewAnimationOptions) *Animation {
 		frameHeight: opts.FrameHeight,
 		frameCount:  opts.FrameCount,
 		frameSpeed:  opts.FrameSpeed,
+		scaleX:      opts.ScaleX,
+		scaleY:      opts.ScaleY,
+		shiftX:      opts.ShiftX,
+		shiftY:      opts.ShiftY,
 	}
 }
 
@@ -60,6 +76,23 @@ func (a *Animation) Reset() {
 	a.frameIndex = 0
 }
 
+func (a *Animation) Draw(screen *ebiten.Image, positionX float64, positionY float64, flip bool) {
+	frameWidth, frameHeight := a.Size()
+	scaleX, scaleY := a.Scale()
+	shiftX, shiftY := a.Shift()
+	translateX := positionX + (shiftX * scaleX)
+	translateY := float64(screen.Bounds().Dy()) - (scaleY * float64(frameHeight)) - positionY - (shiftY * scaleY)
+	if flip {
+		scaleX = -scaleX
+		translateX = translateX + (-scaleX * float64(frameWidth))
+	}
+
+	op := a.DefaultOptions()
+	op.GeoM.Scale(scaleX, scaleY)
+	op.GeoM.Translate(translateX, translateY)
+	screen.DrawImage(a.CurrentImage(), op)
+}
+
 func (a *Animation) DefaultOptions() *ebiten.DrawImageOptions {
 	return &ebiten.DrawImageOptions{
 		Filter: ebiten.FilterNearest,
@@ -71,6 +104,14 @@ func (a *Animation) CurrentImage() *ebiten.Image {
 	return a.image.SubImage(image.Rect(sx, sy, sx+a.frameWidth, sy+a.frameHeight)).(*ebiten.Image)
 }
 
-func (a *Animation) Size() (int, int) {
+func (a *Animation) Size() (w int, h int) {
 	return a.frameWidth, a.frameHeight
+}
+
+func (a *Animation) Scale() (x float64, y float64) {
+	return a.scaleX, a.scaleY
+}
+
+func (a *Animation) Shift() (x float64, y float64) {
+	return a.shiftX, a.shiftY
 }

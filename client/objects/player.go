@@ -9,7 +9,6 @@ import (
 	"github.com/cbodonnell/flywheel/client/animations"
 	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
-	"github.com/cbodonnell/flywheel/pkg/game"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
@@ -55,7 +54,7 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 		return nil, fmt.Errorf("client ID is required")
 	}
 
-	state.Object = resolv.NewObject(state.Position.X, state.Position.Y, constants.PlayerWidth, constants.PlayerHeight, game.CollisionSpaceTagPlayer)
+	state.Object = resolv.NewObject(state.Position.X, state.Position.Y, constants.PlayerWidth, constants.PlayerHeight, gametypes.CollisionSpaceTagPlayer)
 
 	return &Player{
 		BaseObject: BaseObject{
@@ -131,7 +130,7 @@ func (p *Player) Update() error {
 		p.pastUpdates = p.pastUpdates[1:]
 	}
 
-	game.ApplyInput(p.State, cpu)
+	p.State.ApplyInput(cpu)
 
 	p.previousStates = append(p.previousStates, PreviousState{
 		Timestamp: cpu.Timestamp,
@@ -145,7 +144,7 @@ func (p *Player) Update() error {
 }
 
 func (p *Player) Draw(screen *ebiten.Image) {
-	playerObject := p.State.Object
+	p.animations[p.State.Animation].Draw(screen, p.State.Position.X, p.State.Position.Y, p.State.AnimationFlip)
 
 	if p.debug {
 		strokeWidth := float32(1)
@@ -162,22 +161,8 @@ func (p *Player) Draw(screen *ebiten.Image) {
 				playerColor = color.RGBA{200, 0, 200, 255} // Purple
 			}
 		}
-		vector.StrokeRect(screen, float32(playerObject.Position.X), float32(float64(screen.Bounds().Dy())-playerObject.Size.Y)-float32(playerObject.Position.Y), float32(playerObject.Size.X), float32(playerObject.Size.Y), strokeWidth, playerColor, false)
+		vector.StrokeRect(screen, float32(p.State.Position.X), float32(float64(screen.Bounds().Dy())-constants.PlayerHeight)-float32(p.State.Position.Y), float32(constants.PlayerWidth), float32(constants.PlayerHeight), strokeWidth, playerColor, false)
 	}
-
-	frameWidth, frameHeight := p.animations[p.State.Animation].Size()
-	scaleX, scaleY := 1.0, 1.0
-	translateX := playerObject.Position.X
-	translateY := float64(screen.Bounds().Dy()-frameHeight) - playerObject.Position.Y
-	if p.State.AnimationFlip {
-		scaleX = -1.0
-		translateX = (-1.0 * translateX) - float64(frameWidth)
-	}
-
-	op := p.animations[p.State.Animation].DefaultOptions()
-	op.GeoM.Translate(translateX, translateY)
-	op.GeoM.Scale(scaleX, scaleY)
-	screen.DrawImage(p.animations[p.State.Animation].CurrentImage(), op)
 }
 
 func (p *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {
@@ -213,7 +198,7 @@ func (p *Player) ExtrapolateState(from *gametypes.PlayerState, to *gametypes.Pla
 // past updates that are after the last processed timestamp are replayed.
 func (p *Player) ReconcileState(state *gametypes.PlayerState) error {
 	if state.LastProcessedTimestamp == 0 {
-		// no previous state to reconcile with
+		// initial state received from the server, nothing to reconcile
 		return nil
 	}
 
@@ -237,10 +222,10 @@ func (p *Player) ReconcileState(state *gametypes.PlayerState) error {
 				p.State.Object.Position.X = state.Position.X
 				p.State.Object.Position.Y = state.Position.Y
 
-				// process all of the past updates that are after the last processed timestamp
+				// replay all of the past updates that are after the reconciled state
 				for j := 0; j < len(p.pastUpdates); j++ {
 					if p.pastUpdates[j].Timestamp > state.LastProcessedTimestamp {
-						game.ApplyInput(p.State, p.pastUpdates[j])
+						p.State.ApplyInput(p.pastUpdates[j])
 					}
 				}
 			}

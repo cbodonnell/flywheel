@@ -1,8 +1,9 @@
-namespace pkg.messages.flatbuffers.gamestate;
+namespace flatbuffers.gamestate;
  
 table GameState {
     timestamp: int64;
     players: [PlayerStateKeyValue];
+    npcs: [NPCStateKeyValue];
 }
 
 table PlayerStateKeyValue {
@@ -27,6 +28,19 @@ table Position {
 table Velocity {
   x: float64;
   y: float64;
+}
+
+table NPCStateKeyValue {
+    key: uint32;
+    value: NPCState;
+}
+
+table NPCState {
+  position: Position;
+  velocity: Velocity;
+  is_on_ground: bool;
+  animation: uint8;
+  animation_flip: bool;
 }
  
 root_type GameState;

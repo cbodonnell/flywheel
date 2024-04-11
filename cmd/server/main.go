@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/cbodonnell/flywheel/pkg/game"
+	"github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/network"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
-	"github.com/cbodonnell/flywheel/pkg/state"
 	"github.com/cbodonnell/flywheel/pkg/version"
 	"github.com/cbodonnell/flywheel/pkg/workers"
 )
@@ -80,15 +80,15 @@ func main() {
 	})
 	go clientEventWorker.Start()
 
-	stateManager := state.NewInMemoryStateManager()
 	savePlayerStateChannelSize := 100
 	savePlayerStateChan := make(chan workers.SavePlayerStateRequest, savePlayerStateChannelSize)
 
+	gameState := types.NewGameState(game.NewCollisionSpace())
 	saveLoopInterval := 10 * time.Second
 	saveGameStateWorker := workers.NewSaveGameStateWorker(workers.NewSaveGameStateWorkerOptions{
 		Repository:          repository,
 		SavePlayerStateChan: savePlayerStateChan,
-		StateManager:        stateManager,
+		GameState:           gameState,
 		Interval:            saveLoopInterval,
 	})
 	go saveGameStateWorker.Start(ctx)
@@ -99,12 +99,13 @@ func main() {
 		ClientMessageQueue:   clientMessageQueue,
 		ConnectionEventQueue: connectionEventQueue,
 		Repository:           repository,
-		StateManager:         stateManager,
+		GameState:            gameState,
 		SavePlayerStateChan:  savePlayerStateChan,
 		GameLoopInterval:     gameLoopInterval,
-		CollisionSpace:       game.NewCollisionSpace(),
 	})
 
 	log.Info("Starting game manager")
-	gameManager.Start(ctx)
+	if err := gameManager.Start(ctx); err != nil {
+		panic(fmt.Sprintf("Failed to start game manager: %v", err))
+	}
 }

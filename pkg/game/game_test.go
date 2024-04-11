@@ -8,6 +8,7 @@ import (
 	mocks "github.com/cbodonnell/flywheel/mocks/github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	"github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/kinematic"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/solarlune/resolv"
@@ -19,14 +20,11 @@ func TestGameManager_processClientMessages(t *testing.T) {
 
 	type fields struct {
 		clientMessageQueue queue.Queue
-	}
-	type args struct {
-		gameState *types.GameState
+		gameState          *types.GameState
 	}
 	tests := []struct {
 		name   string
 		fields fields
-		args   args
 		setup  func()
 		want   *types.GameState
 	}{
@@ -34,20 +32,18 @@ func TestGameManager_processClientMessages(t *testing.T) {
 			name: "basic movement",
 			fields: fields{
 				clientMessageQueue: mockQueue,
-			},
-			args: args{
 				gameState: &types.GameState{
 					Players: map[uint32]*types.PlayerState{
 						1: {
-							Position: types.Position{
+							Position: kinematic.Vector{
 								X: 0,
 								Y: 0,
 							},
-							Velocity: types.Velocity{
+							Velocity: kinematic.Vector{
 								X: 0,
 								Y: 0,
 							},
-							Object: resolv.NewObject(constants.PlayerStartingX, constants.PlayerStartingY, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer),
+							Object: resolv.NewObject(constants.PlayerStartingX, constants.PlayerStartingY, constants.PlayerWidth, constants.PlayerHeight, types.CollisionSpaceTagPlayer),
 						},
 					},
 				},
@@ -86,11 +82,11 @@ func TestGameManager_processClientMessages(t *testing.T) {
 			want: &types.GameState{
 				Players: map[uint32]*types.PlayerState{
 					1: {
-						Position: types.Position{
+						Position: kinematic.Vector{
 							X: 50,
 							Y: -98,
 						},
-						Velocity: types.Velocity{
+						Velocity: kinematic.Vector{
 							X: 500,
 							Y: -980,
 						},
@@ -102,20 +98,18 @@ func TestGameManager_processClientMessages(t *testing.T) {
 			name: "no messages",
 			fields: fields{
 				clientMessageQueue: mockQueue,
-			},
-			args: args{
 				gameState: &types.GameState{
 					Players: map[uint32]*types.PlayerState{
 						1: {
-							Position: types.Position{
+							Position: kinematic.Vector{
 								X: 0,
 								Y: 0,
 							},
-							Velocity: types.Velocity{
+							Velocity: kinematic.Vector{
 								X: 0,
 								Y: 0,
 							},
-							Object: resolv.NewObject(constants.PlayerStartingX, constants.PlayerStartingY, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer),
+							Object: resolv.NewObject(constants.PlayerStartingX, constants.PlayerStartingY, constants.PlayerWidth, constants.PlayerHeight, types.CollisionSpaceTagPlayer),
 						},
 					},
 				},
@@ -126,11 +120,11 @@ func TestGameManager_processClientMessages(t *testing.T) {
 			want: &types.GameState{
 				Players: map[uint32]*types.PlayerState{
 					1: {
-						Position: types.Position{
+						Position: kinematic.Vector{
 							X: 0,
 							Y: 0,
 						},
-						Velocity: types.Velocity{
+						Velocity: kinematic.Vector{
 							X: 0,
 							Y: 0,
 						},
@@ -142,20 +136,18 @@ func TestGameManager_processClientMessages(t *testing.T) {
 			name: "out of order messages",
 			fields: fields{
 				clientMessageQueue: mockQueue,
-			},
-			args: args{
 				gameState: &types.GameState{
 					Players: map[uint32]*types.PlayerState{
 						1: {
-							Position: types.Position{
+							Position: kinematic.Vector{
 								X: 0,
 								Y: 0,
 							},
-							Velocity: types.Velocity{
+							Velocity: kinematic.Vector{
 								X: 0,
 								Y: 0,
 							},
-							Object: resolv.NewObject(constants.PlayerStartingX, constants.PlayerStartingY, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer),
+							Object: resolv.NewObject(constants.PlayerStartingX, constants.PlayerStartingY, constants.PlayerWidth, constants.PlayerHeight, types.CollisionSpaceTagPlayer),
 						},
 					},
 				},
@@ -194,11 +186,11 @@ func TestGameManager_processClientMessages(t *testing.T) {
 			want: &types.GameState{
 				Players: map[uint32]*types.PlayerState{
 					1: {
-						Position: types.Position{
+						Position: kinematic.Vector{
 							X: 0.0,
 							Y: -24.500000000000004,
 						},
-						Velocity: types.Velocity{
+						Velocity: kinematic.Vector{
 							X: 0,
 							Y: -490,
 						},
@@ -214,12 +206,13 @@ func TestGameManager_processClientMessages(t *testing.T) {
 			}
 			gm := &GameManager{
 				clientMessageQueue: tt.fields.clientMessageQueue,
+				gameState:          tt.fields.gameState,
 			}
-			gm.processClientMessages(tt.args.gameState)
+			gm.processClientMessages()
 			if tt.want != nil {
 				for clientID, wantPlayerState := range tt.want.Players {
-					assert.Equal(t, wantPlayerState.Position, tt.args.gameState.Players[clientID].Position, fmt.Sprintf("Position for clientID %d", clientID))
-					assert.Equal(t, wantPlayerState.Velocity, tt.args.gameState.Players[clientID].Velocity, fmt.Sprintf("Velocity for clientID %d", clientID))
+					assert.Equal(t, wantPlayerState.Position, tt.fields.gameState.Players[clientID].Position, fmt.Sprintf("Position for clientID %d", clientID))
+					assert.Equal(t, wantPlayerState.Velocity, tt.fields.gameState.Players[clientID].Velocity, fmt.Sprintf("Velocity for clientID %d", clientID))
 				}
 			}
 		})

@@ -80,12 +80,12 @@ func (g *GameScene) processPendingServerMessages() error {
 
 		switch message.Type {
 		case messages.MessageTypeServerGameUpdate:
-			log.Trace("Received game state: %s", message.Payload)
-			gameState, err := messages.DeserializeGameState(message.Payload)
+			serverGameUpdate, err := messages.DeserializeGameState(message.Payload)
 			if err != nil {
 				log.Error("Failed to deserialize game state: %v", err)
 				continue
 			}
+			gameState := game.GameStateFromServerUpdate(serverGameUpdate)
 
 			if gameState.Timestamp < g.lastGameStateReceived {
 				log.Warn("Received outdated game state: %d < %d", gameState.Timestamp, g.lastGameStateReceived)
@@ -111,7 +111,8 @@ func (g *GameScene) processPendingServerMessages() error {
 				continue
 			}
 			log.Debug("Adding new player object for client %d", playerConnect.ClientID)
-			playerObject, err := objects.NewPlayer(id, g.networkManager, playerConnect.PlayerState)
+			playerState := game.PlayerStateFromServerUpdate(playerConnect.PlayerState)
+			playerObject, err := objects.NewPlayer(id, g.networkManager, playerState)
 			if err != nil {
 				log.Error("Failed to create new player object: %v", err)
 				continue
@@ -144,6 +145,51 @@ func (g *GameScene) processPendingServerMessages() error {
 			g.collisionSpace.Remove(playerObject.State.Object)
 			if err := g.GetRoot().RemoveChild(id); err != nil {
 				log.Error("Failed to remove player object: %v", err)
+				continue
+			}
+			g.deletedObjects[id] = time.Now().UnixMilli()
+		case messages.MessageTypeServerNPCSpawn:
+			npcSpawn := &messages.ServerNPCSpawn{}
+			if err := json.Unmarshal(message.Payload, npcSpawn); err != nil {
+				log.Error("Failed to unmarshal NPC spawn message: %v", err)
+				continue
+			}
+
+			id := fmt.Sprintf("npc-%d", npcSpawn.NPCID)
+			obj := g.GetRoot().GetChild(id)
+			if obj != nil {
+				log.Warn("NPC object with id %d already exists", npcSpawn.NPCID)
+				continue
+			}
+			log.Debug("Adding new npc object with id %d", npcSpawn.NPCID)
+			npcState := game.NPCStateFromServerUpdate(npcSpawn.NPCState)
+			npcObject, err := objects.NewNPC(id, npcState)
+			if err != nil {
+				log.Error("Failed to create new npc object: %v", err)
+				continue
+			}
+			// we don't need to add NPCs to the client's collision space
+			if err := g.GetRoot().AddChild(id, npcObject); err != nil {
+				log.Error("Failed to add npc object: %v", err)
+				continue
+			}
+			delete(g.deletedObjects, id)
+		case messages.MessageTypeServerNPCDespawn:
+			npcDespawn := &messages.ServerNPCDespawn{}
+			if err := json.Unmarshal(message.Payload, npcDespawn); err != nil {
+				log.Error("Failed to unmarshal NPC despawn message: %v", err)
+				continue
+			}
+
+			id := fmt.Sprintf("npc-%d", npcDespawn.NPCID)
+			obj := g.GetRoot().GetChild(id)
+			if obj == nil {
+				log.Warn("NPC object with id %d not found", npcDespawn.NPCID)
+				continue
+			}
+			log.Debug("Removing npc object with id %d", npcDespawn.NPCID)
+			if err := g.GetRoot().RemoveChild(id); err != nil {
+				log.Error("Failed to remove npc object: %v", err)
 				continue
 			}
 			g.deletedObjects[id] = time.Now().UnixMilli()
@@ -225,8 +271,9 @@ func (g *GameScene) interpolateState(from *gametypes.GameState, to *gametypes.Ga
 		id := fmt.Sprintf("player-%d", clientID)
 		obj := g.GetRoot().GetChild(id)
 		if obj == nil {
+			// TODO: handle edge case where the client misses the disconnect message, but receives some updates with the player still in the game
 			if _, ok := g.deletedObjects[id]; ok {
-				log.Warn("Player object for client %d was recently deleted, not instancing as part of update", clientID)
+				log.Debug("Player object for client %d was recently deleted, not instancing as part of update", clientID)
 				continue
 			}
 			log.Debug("Adding new player object for client %d", clientID)
@@ -244,6 +291,38 @@ func (g *GameScene) interpolateState(from *gametypes.GameState, to *gametypes.Ga
 				return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
 			}
 			playerObject.InterpolateState(previousPlayerState, playerState, interpolationFactor)
+		}
+	}
+
+	for npcID, npcState := range to.NPCs {
+		if _, ok := from.NPCs[npcID]; !ok {
+			continue
+		}
+		previousNPCState := from.NPCs[npcID]
+
+		id := fmt.Sprintf("npc-%d", npcID)
+		obj := g.GetRoot().GetChild(id)
+		if obj == nil {
+			// TODO: handle edge case where the client misses the despawn message, but receives some updates with the npc still in the game
+			if _, ok := g.deletedObjects[id]; ok {
+				log.Debug("NPC object with id %d was recently deleted, not instancing as part of update", npcID)
+				continue
+			}
+			log.Debug("Adding new npc object with id %d", npcID)
+			npcObject, err := objects.NewNPC(id, npcState)
+			if err != nil {
+				return fmt.Errorf("failed to create new player object: %v", err)
+			}
+			// we don't need to add NPCs to the client's collision space
+			if err := g.GetRoot().AddChild(id, npcObject); err != nil {
+				return fmt.Errorf("failed to add npc object: %v", err)
+			}
+		} else {
+			npcObject, ok := obj.(*objects.NPC)
+			if !ok {
+				return fmt.Errorf("failed to cast game object %s to *objects.NPC", id)
+			}
+			npcObject.InterpolateState(previousNPCState, npcState, interpolationFactor)
 		}
 	}
 
@@ -277,6 +356,25 @@ func (g *GameScene) extrapolateState(from *gametypes.GameState, to *gametypes.Ga
 		}
 	}
 
+	for npcID, npcState := range to.NPCs {
+		if _, ok := from.NPCs[npcID]; !ok {
+			continue
+		}
+		previousNPCState := from.NPCs[npcID]
+
+		id := fmt.Sprintf("npc-%d", npcID)
+		obj := g.GetRoot().GetChild(id)
+		if obj == nil {
+			log.Debug("NPC object with id %d not found, not instancing since we're extrapolating", npcID)
+		} else {
+			npcObject, ok := obj.(*objects.NPC)
+			if !ok {
+				return fmt.Errorf("failed to cast game object %s to *objects.NPC", id)
+			}
+			npcObject.ExtrapolateState(previousNPCState, npcState, extrapolationFactor)
+		}
+	}
+
 	return nil
 }
 
@@ -291,7 +389,7 @@ func (g *GameScene) cleanupDeletedObjects() error {
 
 func (g *GameScene) Draw(screen *ebiten.Image) {
 	for _, obj := range g.collisionSpace.Objects() {
-		if obj.HasTags(game.CollisionSpaceTagLevel) {
+		if obj.HasTags(gametypes.CollisionSpaceTagLevel) {
 			levelColor := color.RGBA{0x80, 0x80, 0x80, 0xff} // white
 			vector.DrawFilledRect(screen, float32(obj.Position.X), float32(obj.Position.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
 		}

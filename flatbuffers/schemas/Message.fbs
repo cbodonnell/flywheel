@@ -1,4 +1,4 @@
-namespace pkg.messages.flatbuffers.message;
+namespace flatbuffers.message;
 
 table Message {
     client_id: uint32;
