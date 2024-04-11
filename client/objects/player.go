@@ -144,7 +144,7 @@ func (p *Player) Update() error {
 }
 
 func (p *Player) Draw(screen *ebiten.Image) {
-	playerObject := p.State.Object
+	p.animations[p.State.Animation].Draw(screen, p.State.Position.X, p.State.Position.Y, p.State.AnimationFlip)
 
 	if p.debug {
 		strokeWidth := float32(1)
@@ -161,22 +161,8 @@ func (p *Player) Draw(screen *ebiten.Image) {
 				playerColor = color.RGBA{200, 0, 200, 255} // Purple
 			}
 		}
-		vector.StrokeRect(screen, float32(playerObject.Position.X), float32(float64(screen.Bounds().Dy())-playerObject.Size.Y)-float32(playerObject.Position.Y), float32(playerObject.Size.X), float32(playerObject.Size.Y), strokeWidth, playerColor, false)
+		vector.StrokeRect(screen, float32(p.State.Position.X), float32(float64(screen.Bounds().Dy())-constants.PlayerHeight)-float32(p.State.Position.Y), float32(constants.PlayerWidth), float32(constants.PlayerHeight), strokeWidth, playerColor, false)
 	}
-
-	frameWidth, frameHeight := p.animations[p.State.Animation].Size()
-	scaleX, scaleY := 1.0, 1.0
-	translateX := playerObject.Position.X
-	translateY := float64(screen.Bounds().Dy()-frameHeight) - playerObject.Position.Y
-	if p.State.AnimationFlip {
-		scaleX = -1.0
-		translateX = (-1.0 * translateX) - float64(frameWidth)
-	}
-
-	op := p.animations[p.State.Animation].DefaultOptions()
-	op.GeoM.Translate(translateX, translateY)
-	op.GeoM.Scale(scaleX, scaleY)
-	screen.DrawImage(p.animations[p.State.Animation].CurrentImage(), op)
 }
 
 func (p *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {

@@ -30,6 +30,10 @@ func NewPlayerIdleAnimation() *Animation {
 		FrameHeight: 32,
 		FrameCount:  5,
 		FrameSpeed:  5,
+		ScaleX:      1.0,
+		ScaleY:      1.0,
+		ShiftX:      0,
+		ShiftY:      0,
 	})
 }
 
@@ -42,6 +46,10 @@ func NewPlayerRunAnimation() *Animation {
 		FrameHeight: 32,
 		FrameCount:  8,
 		FrameSpeed:  5,
+		ScaleX:      1.0,
+		ScaleY:      1.0,
+		ShiftX:      0,
+		ShiftY:      0,
 	})
 }
 
@@ -54,5 +62,9 @@ func NewPlayerJumpAnimation() *Animation {
 		FrameHeight: 32,
 		FrameCount:  4,
 		FrameSpeed:  5,
+		ScaleX:      1.0,
+		ScaleY:      1.0,
+		ShiftX:      0,
+		ShiftY:      0,
 	})
 }

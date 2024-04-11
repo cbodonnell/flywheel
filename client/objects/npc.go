@@ -47,7 +47,7 @@ func (p *NPC) Update() error {
 }
 
 func (p *NPC) Draw(screen *ebiten.Image) {
-	npcObject := p.State.Object
+	p.animations[p.State.Animation].Draw(screen, p.State.Position.X, p.State.Position.Y, p.State.AnimationFlip)
 
 	if p.debug {
 		strokeWidth := float32(1)
@@ -55,22 +55,8 @@ func (p *NPC) Draw(screen *ebiten.Image) {
 		if p.State.IsOnGround {
 			npcColor = color.RGBA{200, 0, 200, 255} // Purple
 		}
-		vector.StrokeRect(screen, float32(npcObject.Position.X), float32(float64(screen.Bounds().Dy())-npcObject.Size.Y)-float32(npcObject.Position.Y), float32(npcObject.Size.X), float32(npcObject.Size.Y), strokeWidth, npcColor, false)
+		vector.StrokeRect(screen, float32(p.State.Position.X), float32(float64(screen.Bounds().Dy())-constants.NPCHeight)-float32(p.State.Position.Y), float32(constants.NPCHeight), float32(constants.NPCWidth), strokeWidth, npcColor, false)
 	}
-
-	frameWidth, frameHeight := p.animations[p.State.Animation].Size()
-	scaleX, scaleY := 1.0, 1.0
-	translateX := npcObject.Position.X
-	translateY := float64(screen.Bounds().Dy()-frameHeight) - npcObject.Position.Y
-	if p.State.AnimationFlip {
-		scaleX = -1.0
-		translateX = (-1.0 * translateX) - float64(frameWidth)
-	}
-
-	op := p.animations[p.State.Animation].DefaultOptions()
-	op.GeoM.Translate(translateX, translateY)
-	op.GeoM.Scale(scaleX, scaleY)
-	screen.DrawImage(p.animations[p.State.Animation].CurrentImage(), op)
 }
 
 func (p *NPC) InterpolateState(from *gametypes.NPCState, to *gametypes.NPCState, factor float64) {
