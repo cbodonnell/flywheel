@@ -16,6 +16,7 @@ table PlayerState {
   position: Position;
   velocity: Velocity;
   is_on_ground: bool;
+  is_attacking: bool;
   animation: uint8;
   animation_flip: bool;
 }

@@ -114,6 +114,7 @@ func SerializeGameStateFlatbuffer(state *ServerGameUpdate) ([]byte, error) {
 		gamestatefb.PlayerStateAddPosition(builder, position)
 		gamestatefb.PlayerStateAddVelocity(builder, velocity)
 		gamestatefb.PlayerStateAddIsOnGround(builder, v.IsOnGround)
+		gamestatefb.PlayerStateAddIsAttacking(builder, v.IsAttacking)
 		gamestatefb.PlayerStateAddAnimation(builder, byte(v.Animation))
 		gamestatefb.PlayerStateAddAnimationFlip(builder, v.AnimationFlip)
 		playerState := gamestatefb.PlayerStateEnd(builder)
@@ -193,6 +194,7 @@ func DeserializeGameStateFlatbuffer(b []byte) (*ServerGameUpdate, error) {
 		playerState.Velocity.X = playerStateKV.Value(nil).Velocity(nil).X()
 		playerState.Velocity.Y = playerStateKV.Value(nil).Velocity(nil).Y()
 		playerState.IsOnGround = playerStateKV.Value(nil).IsOnGround()
+		playerState.IsAttacking = playerStateKV.Value(nil).IsAttacking()
 		playerState.Animation = playerStateKV.Value(nil).Animation()
 		playerState.AnimationFlip = playerStateKV.Value(nil).AnimationFlip()
 

@@ -59,6 +59,6 @@ func IsDownPressed() bool {
 	return ebiten.IsKeyPressed(ebiten.KeyDown) || ebiten.IsKeyPressed(ebiten.KeyS)
 }
 
-func IsJumpPressed() bool {
-	return ebiten.IsKeyPressed(ebiten.KeySpace)
+func IsJumpJustPressed() bool {
+	return inpututil.IsKeyJustPressed(ebiten.KeySpace)
 }

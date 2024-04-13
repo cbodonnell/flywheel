@@ -73,6 +73,8 @@ type ClientPlayerUpdate struct {
 	InputY float64 `json:"inputY"`
 	// InputJump is the jump input from the client
 	InputJump bool `json:"inputJump"`
+	// InputAttack is the attack input from the client
+	InputAttack bool `json:"inputAttack"`
 	// DeltaTime is the time since the last update as recorded by the client
 	DeltaTime float64 `json:"deltaTime"`
 	// PastUpdates is a list of past updates from the client to
@@ -100,6 +102,8 @@ type PlayerStateUpdate struct {
 	Velocity kinematic.Vector `json:"velocity"`
 	// IsOnGround is a flag indicating whether the player is on the ground
 	IsOnGround bool `json:"isOnGround"`
+	// IsAttacking is a flag indicating whether the player is attacking
+	IsAttacking bool `json:"isAttacking"`
 	// Animation is the current animation of the player
 	Animation uint8 `json:"animation"`
 	// AnimationFlip is a flag indicating whether the animation should be flipped

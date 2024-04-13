@@ -13,6 +13,8 @@ type PlayerState struct {
 	Velocity               kinematic.Vector
 	Object                 *resolv.Object
 	IsOnGround             bool
+	IsAttacking            bool
+	AttackDurationLeft     float64
 	Animation              PlayerAnimation
 	AnimationFlip          bool
 }
@@ -24,6 +26,7 @@ const (
 	PlayerAnimationRun
 	PlayerAnimationJump
 	PlayerAnimationFall
+	PlayerAnimationAttack
 )
 
 func NewPlayerState(positionX, positionY float64) *PlayerState {
@@ -47,6 +50,7 @@ func (p *PlayerState) Equal(other *PlayerState) bool {
 		p.Velocity.X == other.Velocity.X &&
 		p.Velocity.Y == other.Velocity.Y &&
 		p.IsOnGround == other.IsOnGround &&
+		p.IsAttacking == other.IsAttacking &&
 		p.Animation == other.Animation &&
 		p.AnimationFlip == other.AnimationFlip
 }
@@ -58,6 +62,7 @@ func (p *PlayerState) Copy() *PlayerState {
 		Position:               p.Position,
 		Velocity:               p.Velocity,
 		IsOnGround:             p.IsOnGround,
+		IsAttacking:            p.IsAttacking,
 		Animation:              p.Animation,
 		AnimationFlip:          p.AnimationFlip,
 	}
@@ -67,10 +72,29 @@ func (p *PlayerState) Copy() *PlayerState {
 // client's input and the game state.
 // The player state is updated in place.
 func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate) {
+	// Attack
+	if p.AttackDurationLeft > 0 {
+		p.AttackDurationLeft -= clientPlayerUpdate.DeltaTime
+	} else {
+		p.IsAttacking = false
+	}
+
+	if !p.IsAttacking && clientPlayerUpdate.InputAttack {
+		p.IsAttacking = clientPlayerUpdate.InputAttack
+		p.AttackDurationLeft = constants.PlayerAttackDuration
+	}
+
 	// X-axis
-	// Apply input
-	dx := kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
-	vx := kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+
+	var dx, vx float64
+	if !p.IsAttacking {
+		dx = kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+		vx = kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+	} else if !p.IsOnGround {
+		// keep moving in the direction of the attack
+		dx = kinematic.Displacement(p.Velocity.X, clientPlayerUpdate.DeltaTime, 0)
+		vx = kinematic.FinalVelocity(p.Velocity.X, clientPlayerUpdate.DeltaTime, 0)
+	}
 
 	// Check for collisions
 	if collision := p.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
@@ -112,17 +136,21 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		p.AnimationFlip = true
 	}
 
-	if isOnGround {
-		if clientPlayerUpdate.InputX != 0 {
-			p.Animation = PlayerAnimationRun
-		} else {
-			p.Animation = PlayerAnimationIdle
-		}
+	if p.IsAttacking {
+		p.Animation = PlayerAnimationAttack
 	} else {
-		if vy < 0 {
-			p.Animation = PlayerAnimationJump
+		if isOnGround {
+			if clientPlayerUpdate.InputX != 0 {
+				p.Animation = PlayerAnimationRun
+			} else {
+				p.Animation = PlayerAnimationIdle
+			}
 		} else {
-			p.Animation = PlayerAnimationFall
+			if vy < 0 {
+				p.Animation = PlayerAnimationJump
+			} else {
+				p.Animation = PlayerAnimationFall
+			}
 		}
 	}
 

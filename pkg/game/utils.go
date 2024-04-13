@@ -13,6 +13,7 @@ func ServerGameUpdateFromState(state *types.GameState) *messages.ServerGameUpdat
 			Position:               playerState.Position,
 			Velocity:               playerState.Velocity,
 			IsOnGround:             playerState.IsOnGround,
+			IsAttacking:            playerState.IsAttacking,
 			Animation:              uint8(playerState.Animation),
 			AnimationFlip:          playerState.AnimationFlip,
 		}
@@ -48,6 +49,7 @@ func GameStateFromServerUpdate(update *messages.ServerGameUpdate) *types.GameSta
 			Position:               playerState.Position,
 			Velocity:               playerState.Velocity,
 			IsOnGround:             playerState.IsOnGround,
+			IsAttacking:            playerState.IsAttacking,
 			Animation:              types.PlayerAnimation(playerState.Animation),
 			AnimationFlip:          playerState.AnimationFlip,
 		}
@@ -77,6 +79,7 @@ func PlayerStateUpdateFromState(state *types.PlayerState) *messages.PlayerStateU
 		Position:               state.Position,
 		Velocity:               state.Velocity,
 		IsOnGround:             state.IsOnGround,
+		IsAttacking:            state.IsAttacking,
 		Animation:              uint8(state.Animation),
 		AnimationFlip:          state.AnimationFlip,
 	}
@@ -88,6 +91,7 @@ func PlayerStateFromServerUpdate(update *messages.PlayerStateUpdate) *types.Play
 		Position:               update.Position,
 		Velocity:               update.Velocity,
 		IsOnGround:             update.IsOnGround,
+		IsAttacking:            update.IsAttacking,
 		Animation:              types.PlayerAnimation(update.Animation),
 		AnimationFlip:          update.AnimationFlip,
 	}
