@@ -105,7 +105,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	// Y-axis
 	// Apply input
 	vy := p.Velocity.Y
-	if p.IsOnGround && clientPlayerUpdate.InputJump {
+	if !p.IsAttacking && p.IsOnGround && clientPlayerUpdate.InputJump {
 		vy = constants.PlayerJumpSpeed
 	}
 

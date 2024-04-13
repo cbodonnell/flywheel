@@ -17,7 +17,7 @@ const (
 	// PlayerGravityMultiplier
 	PlayerGravityMultiplier float64 = 300.0
 	// PlayerAttackDuration is the duration of the attack action
-	PlayerAttackDuration float64 = 0.6 // seconds
+	PlayerAttackDuration float64 = 0.3 // seconds
 
 	// NPCSpeed is the speed at which NPCs move
 	NPCSpeed float64 = 100.0

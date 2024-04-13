@@ -33,7 +33,7 @@ func init() {
 		panic(fmt.Sprintf("failed to decode image: %v", err))
 	}
 
-	swordsmanAttackSpritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.PlayerSwordsmanAttack1))
+	swordsmanAttackSpritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.PlayerSwordsmanAttack2))
 	if err != nil {
 		panic(fmt.Sprintf("failed to decode image: %v", err))
 	}
@@ -52,6 +52,7 @@ func NewPlayerIdleAnimation() *Animation {
 		ScaleY:      0.5,
 		ShiftX:      -32,
 		ShiftY:      0,
+		IsLooping:   true,
 	})
 }
 
@@ -63,11 +64,12 @@ func NewPlayerRunAnimation() *Animation {
 		FrameWidth:  128,
 		FrameHeight: 128,
 		FrameCount:  8,
-		FrameSpeed:  8,
+		FrameSpeed:  4,
 		ScaleX:      0.5,
 		ScaleY:      0.5,
 		ShiftX:      -32,
 		ShiftY:      0,
+		IsLooping:   true,
 	})
 }
 
@@ -84,6 +86,7 @@ func NewPlayerJumpAnimation() *Animation {
 		ScaleY:      0.5,
 		ShiftX:      -32,
 		ShiftY:      0,
+		IsLooping:   true,
 	})
 }
 
@@ -94,7 +97,7 @@ func NewPlayerAttackAnimation() *Animation {
 		FrameOY:     0,
 		FrameWidth:  128,
 		FrameHeight: 128,
-		FrameCount:  6,
+		FrameCount:  3,
 		FrameSpeed:  6,
 		ScaleX:      0.5,
 		ScaleY:      0.5,
