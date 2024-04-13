@@ -214,9 +214,49 @@ func (gm *GameManager) processClientMessages() {
 			// TODO: check for previousUpdates that have not been processed
 			// TODO: validate the update before applying it
 			playerState.ApplyInput(clientPlayerUpdate)
+
+			// do hit detection
+			gm.checkPlayerCollisions(message.ClientID, playerState)
 		default:
 			log.Error("Unhandled message type: %s", message.Type)
 		}
+	}
+}
+
+// checkPlayerCollisions checks for collisions between a player and other objects in the game.
+func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types.PlayerState) {
+	// do attack hit detection
+	if !playerState.IsAttackHitting {
+		return
+	}
+
+	// create an attack hitbox for the player
+	attackHitbox := playerState.Object.Clone()
+	attackHitbox.Size.X = constants.PlayerAttackHitboxWidth
+	if !playerState.AnimationFlip {
+		attackHitbox.Position.X += constants.PlayerAttackHitboxOffset
+	} else {
+		attackHitbox.Position.X -= constants.PlayerAttackHitboxOffset
+	}
+	gm.gameState.CollisionSpace.Add(attackHitbox)
+
+	for npcID, npcState := range gm.gameState.NPCs {
+		if !npcState.Exists() || npcState.IsDead() {
+			continue
+		}
+
+		if !attackHitbox.SharesCells(npcState.Object) {
+			continue
+		}
+
+		log.Debug("Player %d hit NPC %d", clientID, npcID)
+		npcState.TakeDamage(constants.PlayerAttackDamage)
+
+		if !npcState.IsDead() {
+			continue
+		}
+
+		log.Debug("Player %d killed NPC %d", clientID, npcID)
 	}
 }
 
@@ -226,6 +266,7 @@ func (gm *GameManager) updateServerObjects(deltaTime float64) {
 		if !npcState.Exists() {
 			if npcState.RespawnTime() <= 0 {
 				npcState.Spawn()
+				gm.gameState.CollisionSpace.Add(npcState.Object)
 
 				// send a message to connected clients to spawn the npc
 				npcSpawn := &messages.ServerNPCSpawn{
@@ -255,8 +296,37 @@ func (gm *GameManager) updateServerObjects(deltaTime float64) {
 				npcState.DecrementRespawnTime(deltaTime)
 			}
 		} else {
-			if npcState.TTL() <= 0 {
+			if npcState.IsDead() {
 				npcState.Despawn()
+				gm.gameState.CollisionSpace.Remove(npcState.Object)
+
+				// send a message to connected clients to despawn the npc
+				npcDespawn := &messages.ServerNPCDespawn{
+					NPCID:  npcID,
+					Reason: messages.NPCDespawnReasonKilled,
+				}
+				payload, err := json.Marshal(npcDespawn)
+				if err != nil {
+					log.Error("Failed to marshal npc despawn message: %v", err)
+					continue
+				}
+
+				for _, client := range gm.clientManager.GetClients() {
+					msg := &messages.Message{
+						ClientID: 0, // ClientID 0 means the message is from the server
+						Type:     messages.MessageTypeServerNPCDespawn,
+						Payload:  payload,
+					}
+
+					err := network.WriteMessageToTCP(client.TCPConn, msg)
+					if err != nil {
+						log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
+						continue
+					}
+				}
+			} else if npcState.TTL() <= 0 {
+				npcState.Despawn()
+				gm.gameState.CollisionSpace.Remove(npcState.Object)
 
 				// send a message to connected clients to despawn the npc
 				npcDespawn := &messages.ServerNPCDespawn{
@@ -284,6 +354,7 @@ func (gm *GameManager) updateServerObjects(deltaTime float64) {
 				}
 			} else {
 				npcState.Update(deltaTime)
+				npcState.DecrementTTL(deltaTime)
 			}
 		}
 	}

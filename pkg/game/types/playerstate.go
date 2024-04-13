@@ -14,7 +14,9 @@ type PlayerState struct {
 	Object                 *resolv.Object
 	IsOnGround             bool
 	IsAttacking            bool
-	AttackDurationLeft     float64
+	AttackTimeLeft         float64
+	IsAttackHitting        bool
+	DidAttackHit           bool
 	Animation              PlayerAnimation
 	AnimationFlip          bool
 }
@@ -68,24 +70,36 @@ func (p *PlayerState) Copy() *PlayerState {
 	}
 }
 
-// ApplyInput updates the player's position and velocity based on the
-// client's input and the game state.
+// ApplyInput updates the player's state based on the client's input.
 // The player state is updated in place.
 func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate) {
 	// Attack
-	if p.AttackDurationLeft > 0 {
-		p.AttackDurationLeft -= clientPlayerUpdate.DeltaTime
+
+	if p.AttackTimeLeft > 0 {
+		p.AttackTimeLeft -= clientPlayerUpdate.DeltaTime
+		if !p.DidAttackHit {
+			if p.AttackTimeLeft <= constants.PlayerAttackDuration-constants.PlayerAttackChannelTime {
+				// register the hit only once
+				p.IsAttackHitting = true
+				p.DidAttackHit = true
+			}
+		} else {
+			p.IsAttackHitting = false
+		}
 	} else {
 		p.IsAttacking = false
+		p.IsAttackHitting = false
+		p.DidAttackHit = false
 	}
 
 	if !p.IsAttacking && clientPlayerUpdate.InputAttack {
-		p.IsAttacking = clientPlayerUpdate.InputAttack
-		p.AttackDurationLeft = constants.PlayerAttackDuration
+		p.IsAttacking = true
+		p.AttackTimeLeft = constants.PlayerAttackDuration
 	}
 
-	// X-axis
+	// Movement
 
+	// X-axis
 	var dx, vx float64
 	if !p.IsAttacking {
 		dx = kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
@@ -130,11 +144,20 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	p.IsOnGround = isOnGround
 
 	// Update the player animation
-	if clientPlayerUpdate.InputX > 0 {
-		p.AnimationFlip = false
-	} else if clientPlayerUpdate.InputX < 0 {
-		p.AnimationFlip = true
+	if !p.IsAttacking {
+		if clientPlayerUpdate.InputX > 0 {
+			p.AnimationFlip = false
+		} else if clientPlayerUpdate.InputX < 0 {
+			p.AnimationFlip = true
+		}
 	}
+
+	// Update the player collision object
+	p.Object.Position.X = p.Position.X
+	p.Object.Position.Y = p.Position.Y
+	p.Object.Update()
+
+	// Animation
 
 	if p.IsAttacking {
 		p.Animation = PlayerAnimationAttack
@@ -153,9 +176,4 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 			}
 		}
 	}
-
-	// Update the player collision object
-	p.Object.Position.X = p.Position.X
-	p.Object.Position.Y = p.Position.Y
-	p.Object.Update()
 }

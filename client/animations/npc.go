@@ -10,12 +10,12 @@ import (
 )
 
 var (
-	npcSpritesheet image.Image
+	npcIdleSpritesheet image.Image
 )
 
 func init() {
 	var err error
-	npcSpritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.SkeletonIdle))
+	npcIdleSpritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.SkeletonIdle))
 	if err != nil {
 		panic(fmt.Sprintf("failed to decode image: %v", err))
 	}
@@ -23,7 +23,7 @@ func init() {
 
 func NewNPCIdleAnimation() *Animation {
 	return NewAnimation(NewAnimationOptions{
-		Image:       ebiten.NewImageFromImage(npcSpritesheet),
+		Image:       ebiten.NewImageFromImage(npcIdleSpritesheet),
 		FrameOX:     0,
 		FrameOY:     0,
 		FrameWidth:  128,

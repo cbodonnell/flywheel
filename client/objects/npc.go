@@ -29,8 +29,8 @@ func NewNPC(id string, state *gametypes.NPCState) (*NPC, error) {
 		BaseObject: BaseObject{
 			Children: make(map[string]GameObject),
 		},
-		ID:    id,
-		debug: false,
+		ID: id,
+		// debug: true,
 		State: state,
 		animations: map[gametypes.NPCAnimation]*animations.Animation{
 			gametypes.NPCAnimationIdle: animations.NewNPCIdleAnimation(),

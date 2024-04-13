@@ -63,13 +63,13 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 		ID:             id,
 		networkManager: networkManager,
 		isLocalPlayer:  id == fmt.Sprintf("player-%d", networkManager.ClientID()),
-		debug:          false,
-		State:          state,
+		// debug:          true,
+		State: state,
 		animations: map[gametypes.PlayerAnimation]*animations.Animation{
 			gametypes.PlayerAnimationIdle:   animations.NewPlayerIdleAnimation(),
 			gametypes.PlayerAnimationRun:    animations.NewPlayerRunAnimation(),
 			gametypes.PlayerAnimationJump:   animations.NewPlayerJumpAnimation(),
-			gametypes.PlayerAnimationFall:   animations.NewPlayerJumpAnimation(),
+			gametypes.PlayerAnimationFall:   animations.NewPlayerJumpAnimation(), // same animation as jump for now
 			gametypes.PlayerAnimationAttack: animations.NewPlayerAttackAnimation(),
 		},
 	}, nil
@@ -102,7 +102,7 @@ func (p *Player) Update() error {
 
 	inputJump := input.IsJumpJustPressed()
 
-	inputAttack := input.IsPositiveJustPressed()
+	inputAttack := input.IsAttackJustPressed()
 
 	cpu := &messages.ClientPlayerUpdate{
 		Timestamp:   time.Now().UnixMilli(),

@@ -16,8 +16,19 @@ const (
 	PlayerStartingY float64 = 240.0
 	// PlayerGravityMultiplier
 	PlayerGravityMultiplier float64 = 300.0
-	// PlayerAttackDuration is the duration of the attack action
-	PlayerAttackDuration float64 = 0.3 // seconds
+
+	// Attack channel time is attack duration
+
+	// PlayerAttackDuration is the duration of the attack (channel time + cooldown time)
+	PlayerAttackDuration float64 = 0.6 // seconds
+	// PlayerAttackChannelTime is the time it takes for the attack to register
+	PlayerAttackChannelTime float64 = 0.3 // seconds
+	// PlayerAttackHitboxWidth is the width of the attack hitbox
+	PlayerAttackHitboxWidth float64 = PlayerWidth
+	// PlayerAttackHitboxOffset is the offset from the player's position to the attack hitbox
+	PlayerAttackHitboxOffset float64 = PlayerWidth / 2
+	// PlayerAttackDamage is the amount of damage a player does
+	PlayerAttackDamage int16 = 25
 
 	// NPCSpeed is the speed at which NPCs move
 	NPCSpeed float64 = 100.0
@@ -32,7 +43,9 @@ const (
 	// NPCGravityMultiplier
 	NPCGravityMultiplier float64 = 300.0
 	// NPCTTL is the time to live for an NPC
-	NPCTTL float64 = 10.0
+	NPCTTL float64 = 20.0
 	// NPCRespawnTime is the time it takes for an NPC to respawn
 	NPCRespawnTime float64 = 5.0
+	// NPC Hitpoints
+	NPCHitpoints int16 = 100
 )

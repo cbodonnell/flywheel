@@ -72,15 +72,17 @@ func NewAnimation(opts NewAnimationOptions) *Animation {
 }
 
 func (a *Animation) Update() {
-	a.updateCount++
-	if a.isLooping {
-		a.frameIndex = (a.updateCount / a.frameSpeed) % a.frameCount
-	} else {
-		a.frameIndex = (a.updateCount / a.frameSpeed) % a.frameCount
-		if a.frameIndex == a.frameCount-1 {
-			a.frameIndex = a.frameCount - 1
+	if a.updateCount%a.frameSpeed == 0 {
+		a.frameIndex++
+		if a.frameIndex >= a.frameCount {
+			if a.isLooping {
+				a.frameIndex = 0
+			} else {
+				a.frameIndex = a.frameCount - 1
+			}
 		}
 	}
+	a.updateCount++
 }
 
 func (a *Animation) IsFinished() bool {

@@ -388,6 +388,9 @@ func (g *GameScene) cleanupDeletedObjects() error {
 }
 
 func (g *GameScene) Draw(screen *ebiten.Image) {
+	// light blue sky background
+	vector.DrawFilledRect(screen, 0, 0, float32(screen.Bounds().Dx()), float32(screen.Bounds().Dy()), color.RGBA{0x87, 0xce, 0xeb, 0xff}, false)
+
 	for _, obj := range g.collisionSpace.Objects() {
 		if obj.HasTags(gametypes.CollisionSpaceTagLevel) {
 			levelColor := color.RGBA{0x80, 0x80, 0x80, 0xff} // white
