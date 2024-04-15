@@ -50,6 +50,7 @@ func TestSerializeDeserializeGameState(t *testing.T) {
 							IsOnGround:    true,
 							Animation:     0,
 							AnimationFlip: false,
+							Hitpoints:     100,
 						},
 					},
 				},

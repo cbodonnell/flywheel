@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/cbodonnell/flywheel/client/network"
@@ -148,51 +149,12 @@ func (g *GameScene) processPendingServerMessages() error {
 				continue
 			}
 			g.deletedObjects[id] = time.Now().UnixMilli()
-		case messages.MessageTypeServerNPCSpawn:
-			npcSpawn := &messages.ServerNPCSpawn{}
-			if err := json.Unmarshal(message.Payload, npcSpawn); err != nil {
-				log.Error("Failed to unmarshal NPC spawn message: %v", err)
-				continue
-			}
-
-			id := fmt.Sprintf("npc-%d", npcSpawn.NPCID)
-			obj := g.GetRoot().GetChild(id)
-			if obj != nil {
-				log.Warn("NPC object with id %d already exists", npcSpawn.NPCID)
-				continue
-			}
-			log.Debug("Adding new npc object with id %d", npcSpawn.NPCID)
-			npcState := game.NPCStateFromServerUpdate(npcSpawn.NPCState)
-			npcObject, err := objects.NewNPC(id, npcState)
-			if err != nil {
-				log.Error("Failed to create new npc object: %v", err)
-				continue
-			}
-			// we don't need to add NPCs to the client's collision space
-			if err := g.GetRoot().AddChild(id, npcObject); err != nil {
-				log.Error("Failed to add npc object: %v", err)
-				continue
-			}
-			delete(g.deletedObjects, id)
-		case messages.MessageTypeServerNPCDespawn:
-			npcDespawn := &messages.ServerNPCDespawn{}
-			if err := json.Unmarshal(message.Payload, npcDespawn); err != nil {
-				log.Error("Failed to unmarshal NPC despawn message: %v", err)
-				continue
-			}
-
-			id := fmt.Sprintf("npc-%d", npcDespawn.NPCID)
-			obj := g.GetRoot().GetChild(id)
-			if obj == nil {
-				log.Warn("NPC object with id %d not found", npcDespawn.NPCID)
-				continue
-			}
-			log.Debug("Removing npc object with id %d", npcDespawn.NPCID)
-			if err := g.GetRoot().RemoveChild(id); err != nil {
-				log.Error("Failed to remove npc object: %v", err)
-				continue
-			}
-			g.deletedObjects[id] = time.Now().UnixMilli()
+		case messages.MessageTypeServerNPCHit:
+			log.Debug("Received NPC hit message: %s", message.Payload)
+			// TODO: display hit effect
+		case messages.MessageTypeServerNPCKill:
+			log.Debug("Received NPC kill message: %s", message.Payload)
+			// TODO: display kill effect
 		default:
 			log.Warn("Received unexpected message type from server: %s", message.Type)
 			continue
@@ -398,8 +360,18 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 		}
 	}
 
+	// TODO: draw with z-index/layering instead of doing this
+	for id, obj := range g.GetRoot().GetChildren() {
+		if strings.HasPrefix(id, "player-") {
+			continue
+		}
+		objects.DrawTree(obj, screen)
+	}
 	playerObjectID := fmt.Sprintf("player-%d", g.networkManager.ClientID())
 	for id, obj := range g.GetRoot().GetChildren() {
+		if !strings.HasPrefix(id, "player-") {
+			continue
+		}
 		if id == playerObjectID {
 			// skip the player object, we'll draw it last so it's on top
 			continue

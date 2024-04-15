@@ -150,6 +150,7 @@ func SerializeGameStateFlatbuffer(state *ServerGameUpdate) ([]byte, error) {
 		gamestatefb.NPCStateAddIsOnGround(builder, v.IsOnGround)
 		gamestatefb.NPCStateAddAnimation(builder, byte(v.Animation))
 		gamestatefb.NPCStateAddAnimationFlip(builder, v.AnimationFlip)
+		gamestatefb.NPCStateAddHitpoints(builder, v.Hitpoints)
 		npcState := gamestatefb.NPCStateEnd(builder)
 
 		gamestatefb.NPCStateKeyValueStart(builder)
@@ -217,6 +218,7 @@ func DeserializeGameStateFlatbuffer(b []byte) (*ServerGameUpdate, error) {
 		npcState.IsOnGround = npcStateKV.Value(nil).IsOnGround()
 		npcState.Animation = npcStateKV.Value(nil).Animation()
 		npcState.AnimationFlip = npcStateKV.Value(nil).AnimationFlip()
+		npcState.Hitpoints = npcStateKV.Value(nil).Hitpoints()
 
 		npcs[npcStateKV.Key()] = npcState
 	}

@@ -25,8 +25,8 @@ const (
 	MessageTypeServerSyncTime
 	MessageTypeServerPlayerConnect
 	MessageTypeServerPlayerDisconnect
-	MessageTypeServerNPCSpawn
-	MessageTypeServerNPCDespawn
+	MessageTypeServerNPCHit
+	MessageTypeServerNPCKill
 )
 
 func (m MessageType) String() string {
@@ -40,8 +40,8 @@ func (m MessageType) String() string {
 		"ServerSyncTime",
 		"ServerPlayerConnect",
 		"ServerPlayerDisconnect",
-		"ServerNPCSpawn",
-		"ServerNPCDespawn",
+		"ServerNPCHit",
+		"ServerNPCKill",
 	}[m]
 }
 
@@ -122,6 +122,8 @@ type NPCStateUpdate struct {
 	Animation uint8 `json:"animation"`
 	// AnimationFlip is a flag indicating whether the animation should be flipped
 	AnimationFlip bool `json:"animationFlip"`
+	// Hitpoints is the current hitpoints of the NPC
+	Hitpoints int16 `json:"hitpoints"`
 }
 
 // ClientSyncTime is a message sent by the client to request a time sync with the server
@@ -152,25 +154,20 @@ type ServerPlayerDisconnect struct {
 	ClientID uint32 `json:"clientID"`
 }
 
-// ServerNPCSpawn is a message sent by the server to notify clients that an NPC has spawned
-type ServerNPCSpawn struct {
-	// NPCID is the ID of the NPC that has spawned
+// ServerNPCHit is a message sent by the server to notify clients that an NPC has been hit
+type ServerNPCHit struct {
+	// NPCID is the ID of the NPC that has been hit
 	NPCID uint32 `json:"npcID"`
-	// NPCState is the state of the NPC that has spawned
-	NPCState *NPCStateUpdate `json:"npcState"`
+	// PlayerID is the ID of the player that hit the NPC
+	PlayerID uint32 `json:"playerID"`
+	// Damage is the amount of damage dealt to the NPC
+	Damage int16 `json:"damage"`
 }
 
-// ServerNPCDespawn is a message sent by the server to notify clients that an NPC has despawned
-type ServerNPCDespawn struct {
-	// NPCID is the ID of the NPC that has despawned
+// ServerNPCKill is a message sent by the server to notify clients that an NPC has been killed
+type ServerNPCKill struct {
+	// NPCID is the ID of the NPC that has been killed
 	NPCID uint32 `json:"npcID"`
-	// Reason is the reason for the NPC despawn
-	Reason NPCDespawnReason `json:"reason"`
+	// PlayerID is the ID of the player that killed the NPC
+	PlayerID uint32 `json:"playerID"`
 }
-
-type NPCDespawnReason uint8
-
-const (
-	NPCDespawnReasonKilled NPCDespawnReason = iota
-	NPCDespawnReasonTTL
-)

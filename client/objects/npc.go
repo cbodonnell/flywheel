@@ -34,9 +34,7 @@ func NewNPC(id string, state *gametypes.NPCState) (*NPC, error) {
 		State: state,
 		animations: map[gametypes.NPCAnimation]*animations.Animation{
 			gametypes.NPCAnimationIdle: animations.NewNPCIdleAnimation(),
-			// gametypes.NPCAnimationRun:  animations.NewNPCRunAnimation(),
-			// gametypes.NPCAnimationJump: animations.NewNPCJumpAnimation(),
-			// gametypes.NPCAnimationFall: animations.NewNPCFallAnimation(),
+			gametypes.NPCAnimationDead: animations.NewNPCDeadAnimation(),
 		},
 	}, nil
 }
@@ -48,6 +46,25 @@ func (p *NPC) Update() error {
 
 func (p *NPC) Draw(screen *ebiten.Image) {
 	p.animations[p.State.Animation].Draw(screen, p.State.Position.X, p.State.Position.Y, p.State.AnimationFlip)
+
+	if !p.State.IsDead() {
+		// Draw hitpoints bar
+		hitpointsBarWidth := float32(constants.NPCWidth)
+		hitpointsBarHeight := float32(5)
+		hitpointsBarYOffset := float32(10)
+		hitpointsBarX := float32(p.State.Position.X)
+		hitpointsBarY := float32(float64(screen.Bounds().Dy())-constants.NPCHeight) - float32(p.State.Position.Y) - hitpointsBarHeight - hitpointsBarYOffset
+		hitpointsBarColor := color.RGBA{255, 0, 0, 255} // Red
+		vector.DrawFilledRect(screen, hitpointsBarX, hitpointsBarY, hitpointsBarWidth, hitpointsBarHeight, hitpointsBarColor, false)
+
+		// Draw hitpoints
+		hitpointsWidth := float32(float64(hitpointsBarWidth) * (float64(p.State.Hitpoints) / float64(constants.NPCHitpoints)))
+		hitpointsHeight := float32(hitpointsBarHeight)
+		hitpointsX := hitpointsBarX
+		hitpointsY := hitpointsBarY
+		hitpointsColor := color.RGBA{0, 255, 0, 255} // Green
+		vector.DrawFilledRect(screen, hitpointsX, hitpointsY, hitpointsWidth, hitpointsHeight, hitpointsColor, false)
+	}
 
 	if p.debug {
 		strokeWidth := float32(1)
@@ -67,6 +84,7 @@ func (p *NPC) InterpolateState(from *gametypes.NPCState, to *gametypes.NPCState,
 	p.State.IsOnGround = to.IsOnGround
 	p.State.Animation = to.Animation
 	p.State.AnimationFlip = to.AnimationFlip
+	p.State.Hitpoints = to.Hitpoints
 	p.State.Object.Position.X = p.State.Position.X
 	p.State.Object.Position.Y = p.State.Position.Y
 }
@@ -79,6 +97,7 @@ func (p *NPC) ExtrapolateState(from *gametypes.NPCState, to *gametypes.NPCState,
 	p.State.IsOnGround = to.IsOnGround
 	p.State.Animation = to.Animation
 	p.State.AnimationFlip = to.AnimationFlip
+	p.State.Hitpoints = to.Hitpoints
 	p.State.Object.Position.X = p.State.Position.X
 	p.State.Object.Position.Y = p.State.Position.Y
 }

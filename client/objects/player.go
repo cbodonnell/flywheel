@@ -69,7 +69,7 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 			gametypes.PlayerAnimationIdle:   animations.NewPlayerIdleAnimation(),
 			gametypes.PlayerAnimationRun:    animations.NewPlayerRunAnimation(),
 			gametypes.PlayerAnimationJump:   animations.NewPlayerJumpAnimation(),
-			gametypes.PlayerAnimationFall:   animations.NewPlayerJumpAnimation(), // same animation as jump for now
+			gametypes.PlayerAnimationFall:   animations.NewPlayerFallAnimation(),
 			gametypes.PlayerAnimationAttack: animations.NewPlayerAttackAnimation(),
 		},
 	}, nil

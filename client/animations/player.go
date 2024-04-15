@@ -76,12 +76,29 @@ func NewPlayerRunAnimation() *Animation {
 func NewPlayerJumpAnimation() *Animation {
 	return NewAnimation(NewAnimationOptions{
 		Image:       ebiten.NewImageFromImage(swordsmanJumpSpritesheet),
-		FrameOX:     0,
+		FrameOX:     128 * 3, // start at the 4th frame
 		FrameOY:     0,
 		FrameWidth:  128,
 		FrameHeight: 128,
-		FrameCount:  8,
-		FrameSpeed:  8,
+		FrameCount:  1,
+		FrameSpeed:  1,
+		ScaleX:      0.5,
+		ScaleY:      0.5,
+		ShiftX:      -32,
+		ShiftY:      0,
+		IsLooping:   true,
+	})
+}
+
+func NewPlayerFallAnimation() *Animation {
+	return NewAnimation(NewAnimationOptions{
+		Image:       ebiten.NewImageFromImage(swordsmanJumpSpritesheet),
+		FrameOX:     128 * 6, // start at the 7th frame
+		FrameOY:     0,
+		FrameWidth:  128,
+		FrameHeight: 128,
+		FrameCount:  1,
+		FrameSpeed:  1,
 		ScaleX:      0.5,
 		ScaleY:      0.5,
 		ShiftX:      -32,

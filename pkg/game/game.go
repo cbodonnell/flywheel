@@ -240,6 +240,7 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 	}
 	gm.gameState.CollisionSpace.Add(attackHitbox)
 
+	// TODO: check for collision and get the ID from the collision shape data
 	for npcID, npcState := range gm.gameState.NPCs {
 		if !npcState.Exists() || npcState.IsDead() {
 			continue
@@ -250,112 +251,77 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 		}
 
 		log.Debug("Player %d hit NPC %d", clientID, npcID)
-		npcState.TakeDamage(constants.PlayerAttackDamage)
+		damage := constants.PlayerAttackDamage
+		npcState.TakeDamage(damage)
+
+		npcHit := &messages.ServerNPCHit{
+			NPCID:    npcID,
+			PlayerID: clientID,
+			Damage:   damage,
+		}
+		payload, err := json.Marshal(npcHit)
+		if err != nil {
+			log.Error("Failed to marshal NPC hit message: %v", err)
+			continue
+		}
+
+		for _, client := range gm.clientManager.GetClients() {
+			msg := &messages.Message{
+				ClientID: 0, // ClientID 0 means the message is from the server
+				Type:     messages.MessageTypeServerNPCHit,
+				Payload:  payload,
+			}
+
+			err := network.WriteMessageToTCP(client.TCPConn, msg)
+			if err != nil {
+				log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
+				continue
+			}
+		}
 
 		if !npcState.IsDead() {
 			continue
 		}
 
 		log.Debug("Player %d killed NPC %d", clientID, npcID)
+		npcKill := &messages.ServerNPCKill{
+			NPCID:    npcID,
+			PlayerID: clientID,
+		}
+		payload, err = json.Marshal(npcKill)
+		if err != nil {
+			log.Error("Failed to marshal NPC kill message: %v", err)
+			continue
+		}
+
+		for _, client := range gm.clientManager.GetClients() {
+			msg := &messages.Message{
+				ClientID: 0, // ClientID 0 means the message is from the server
+				Type:     messages.MessageTypeServerNPCKill,
+				Payload:  payload,
+			}
+
+			err := network.WriteMessageToTCP(client.TCPConn, msg)
+			if err != nil {
+				log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
+				continue
+			}
+		}
 	}
 }
 
 // updateServerObjects updates server objects (e.g. npcs, items, projectiles, etc.)
 func (gm *GameManager) updateServerObjects(deltaTime float64) {
-	for npcID, npcState := range gm.gameState.NPCs {
+	for _, npcState := range gm.gameState.NPCs {
+		npcState.Update(deltaTime)
 		if !npcState.Exists() {
 			if npcState.RespawnTime() <= 0 {
 				npcState.Spawn()
-				gm.gameState.CollisionSpace.Add(npcState.Object)
-
-				// send a message to connected clients to spawn the npc
-				npcSpawn := &messages.ServerNPCSpawn{
-					NPCID:    npcID,
-					NPCState: NPCStateUpdateFromState(npcState),
-				}
-				payload, err := json.Marshal(npcSpawn)
-				if err != nil {
-					log.Error("Failed to marshal npc spawn message: %v", err)
-					continue
-				}
-
-				for _, client := range gm.clientManager.GetClients() {
-					msg := &messages.Message{
-						ClientID: 0, // ClientID 0 means the message is from the server
-						Type:     messages.MessageTypeServerNPCSpawn,
-						Payload:  payload,
-					}
-
-					err := network.WriteMessageToTCP(client.TCPConn, msg)
-					if err != nil {
-						log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-						continue
-					}
-				}
 			} else {
 				npcState.DecrementRespawnTime(deltaTime)
 			}
-		} else {
-			if npcState.IsDead() {
-				npcState.Despawn()
-				gm.gameState.CollisionSpace.Remove(npcState.Object)
-
-				// send a message to connected clients to despawn the npc
-				npcDespawn := &messages.ServerNPCDespawn{
-					NPCID:  npcID,
-					Reason: messages.NPCDespawnReasonKilled,
-				}
-				payload, err := json.Marshal(npcDespawn)
-				if err != nil {
-					log.Error("Failed to marshal npc despawn message: %v", err)
-					continue
-				}
-
-				for _, client := range gm.clientManager.GetClients() {
-					msg := &messages.Message{
-						ClientID: 0, // ClientID 0 means the message is from the server
-						Type:     messages.MessageTypeServerNPCDespawn,
-						Payload:  payload,
-					}
-
-					err := network.WriteMessageToTCP(client.TCPConn, msg)
-					if err != nil {
-						log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-						continue
-					}
-				}
-			} else if npcState.TTL() <= 0 {
-				npcState.Despawn()
-				gm.gameState.CollisionSpace.Remove(npcState.Object)
-
-				// send a message to connected clients to despawn the npc
-				npcDespawn := &messages.ServerNPCDespawn{
-					NPCID:  npcID,
-					Reason: messages.NPCDespawnReasonTTL,
-				}
-				payload, err := json.Marshal(npcDespawn)
-				if err != nil {
-					log.Error("Failed to marshal npc despawn message: %v", err)
-					continue
-				}
-
-				for _, client := range gm.clientManager.GetClients() {
-					msg := &messages.Message{
-						ClientID: 0, // ClientID 0 means the message is from the server
-						Type:     messages.MessageTypeServerNPCDespawn,
-						Payload:  payload,
-					}
-
-					err := network.WriteMessageToTCP(client.TCPConn, msg)
-					if err != nil {
-						log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-						continue
-					}
-				}
-			} else {
-				npcState.Update(deltaTime)
-				npcState.DecrementTTL(deltaTime)
-			}
+		} else if npcState.IsDead() {
+			npcState.Despawn()
 		}
 	}
 }
@@ -363,6 +329,7 @@ func (gm *GameManager) updateServerObjects(deltaTime float64) {
 // broadcastGameState sends the game state to connected clients.
 func (gm *GameManager) broadcastGameState() {
 	serverGameUpdate := ServerGameUpdateFromState(gm.gameState)
+
 	payload, err := messages.SerializeGameState(serverGameUpdate)
 	if err != nil {
 		log.Error("Failed to serialize game state: %v", err)

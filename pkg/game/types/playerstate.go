@@ -170,9 +170,9 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 			}
 		} else {
 			if vy < 0 {
-				p.Animation = PlayerAnimationJump
-			} else {
 				p.Animation = PlayerAnimationFall
+			} else {
+				p.Animation = PlayerAnimationJump
 			}
 		}
 	}
