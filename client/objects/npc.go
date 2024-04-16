@@ -12,7 +12,7 @@ import (
 )
 
 type NPC struct {
-	BaseObject
+	*BaseObject
 
 	ID    string
 	debug bool
@@ -26,10 +26,8 @@ func NewNPC(id string, state *gametypes.NPCState) (*NPC, error) {
 	state.Object = resolv.NewObject(state.Position.X, state.Position.Y, constants.NPCWidth, constants.NPCHeight, gametypes.CollisionSpaceTagNPC)
 
 	return &NPC{
-		BaseObject: BaseObject{
-			Children: make(map[string]GameObject),
-		},
-		ID: id,
+		BaseObject: NewBaseObject(id),
+		ID:         id,
 		// debug: true,
 		State: state,
 		animations: map[gametypes.NPCAnimation]*animations.Animation{

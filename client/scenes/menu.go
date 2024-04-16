@@ -11,7 +11,7 @@ type MenuScene struct {
 func NewMenuScene() (Scene, error) {
 	return &MenuScene{
 		BaseScene{
-			Root: objects.NewTextOverlayObject("Press to Start!"),
+			Root: objects.NewTextOverlayObject("overlay-menu", "Press to Start!"),
 		},
 	}, nil
 }

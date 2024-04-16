@@ -24,7 +24,7 @@ const (
 )
 
 type Player struct {
-	BaseObject
+	*BaseObject
 
 	ID             string
 	networkManager *network.NetworkManager
@@ -57,9 +57,7 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 	state.Object = resolv.NewObject(state.Position.X, state.Position.Y, constants.PlayerWidth, constants.PlayerHeight, gametypes.CollisionSpaceTagPlayer)
 
 	return &Player{
-		BaseObject: BaseObject{
-			Children: make(map[string]GameObject),
-		},
+		BaseObject:     NewBaseObject(id),
 		ID:             id,
 		networkManager: networkManager,
 		isLocalPlayer:  id == fmt.Sprintf("player-%d", networkManager.ClientID()),

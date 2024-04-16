@@ -38,7 +38,7 @@ type GameScene struct {
 func NewGameScene(networkManager *network.NetworkManager) (Scene, error) {
 	return &GameScene{
 		BaseScene: BaseScene{
-			Root: objects.NewBaseObject(),
+			Root: objects.NewBaseObject("game-root"),
 		},
 		networkManager: networkManager,
 		collisionSpace: game.NewCollisionSpace(),
@@ -361,18 +361,18 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 	}
 
 	// TODO: draw with z-index/layering instead of doing this
-	for id, obj := range g.GetRoot().GetChildren() {
-		if strings.HasPrefix(id, "player-") {
+	for _, obj := range g.GetRoot().GetChildren() {
+		if strings.HasPrefix(obj.GetID(), "player-") {
 			continue
 		}
 		objects.DrawTree(obj, screen)
 	}
 	playerObjectID := fmt.Sprintf("player-%d", g.networkManager.ClientID())
-	for id, obj := range g.GetRoot().GetChildren() {
-		if !strings.HasPrefix(id, "player-") {
+	for _, obj := range g.GetRoot().GetChildren() {
+		if !strings.HasPrefix(obj.GetID(), "player-") {
 			continue
 		}
-		if id == playerObjectID {
+		if obj.GetID() == playerObjectID {
 			// skip the player object, we'll draw it last so it's on top
 			continue
 		}

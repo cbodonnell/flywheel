@@ -11,17 +11,15 @@ import (
 )
 
 type TextOverlayObject struct {
-	BaseObject
+	*BaseObject
 
 	text string
 }
 
-func NewTextOverlayObject(text string) GameObject {
+func NewTextOverlayObject(id string, text string) GameObject {
 	return &TextOverlayObject{
-		BaseObject: BaseObject{
-			Children: make(map[string]GameObject),
-		},
-		text: text,
+		BaseObject: NewBaseObject(id),
+		text:       text,
 	}
 }
 
