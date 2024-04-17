@@ -33,6 +33,7 @@ func TestSerializeDeserializeGameState(t *testing.T) {
 								Y: 0.0,
 							},
 							IsOnGround:    true,
+							IsAttacking:   false,
 							Animation:     0,
 							AnimationFlip: false,
 						},
