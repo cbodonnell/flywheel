@@ -215,7 +215,6 @@ func (gm *GameManager) processClientMessages() {
 			// TODO: validate the update before applying it
 			playerState.ApplyInput(clientPlayerUpdate)
 
-			// do hit detection
 			gm.checkPlayerCollisions(message.ClientID, playerState)
 		default:
 			log.Error("Unhandled message type: %s", message.Type)
@@ -329,7 +328,6 @@ func (gm *GameManager) updateServerObjects(deltaTime float64) {
 // broadcastGameState sends the game state to connected clients.
 func (gm *GameManager) broadcastGameState() {
 	serverGameUpdate := ServerGameUpdateFromState(gm.gameState)
-
 	payload, err := messages.SerializeGameState(serverGameUpdate)
 	if err != nil {
 		log.Error("Failed to serialize game state: %v", err)
