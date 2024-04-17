@@ -17,8 +17,6 @@ const (
 	// PlayerGravityMultiplier
 	PlayerGravityMultiplier float64 = 300.0
 
-	// Attack channel time is attack duration
-
 	// PlayerAttackDuration is the duration of the attack (channel time + cooldown time)
 	PlayerAttackDuration float64 = 0.4 // seconds
 	// PlayerAttackChannelTime is the time it takes for the attack to register
