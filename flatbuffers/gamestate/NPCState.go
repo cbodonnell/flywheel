@@ -103,8 +103,20 @@ func (rcv *NPCState) MutateAnimationFlip(n bool) bool {
 	return rcv._tab.MutateBoolSlot(12, n)
 }
 
+func (rcv *NPCState) Hitpoints() int16 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
+	if o != 0 {
+		return rcv._tab.GetInt16(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *NPCState) MutateHitpoints(n int16) bool {
+	return rcv._tab.MutateInt16Slot(14, n)
+}
+
 func NPCStateStart(builder *flatbuffers.Builder) {
-	builder.StartObject(5)
+	builder.StartObject(6)
 }
 func NPCStateAddPosition(builder *flatbuffers.Builder, position flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(0, flatbuffers.UOffsetT(position), 0)
@@ -120,6 +132,9 @@ func NPCStateAddAnimation(builder *flatbuffers.Builder, animation byte) {
 }
 func NPCStateAddAnimationFlip(builder *flatbuffers.Builder, animationFlip bool) {
 	builder.PrependBoolSlot(4, animationFlip, false)
+}
+func NPCStateAddHitpoints(builder *flatbuffers.Builder, hitpoints int16) {
+	builder.PrependInt16Slot(5, hitpoints, 0)
 }
 func NPCStateEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

@@ -24,7 +24,7 @@ const (
 )
 
 type Player struct {
-	BaseObject
+	*BaseObject
 
 	ID             string
 	networkManager *network.NetworkManager
@@ -57,19 +57,18 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 	state.Object = resolv.NewObject(state.Position.X, state.Position.Y, constants.PlayerWidth, constants.PlayerHeight, gametypes.CollisionSpaceTagPlayer)
 
 	return &Player{
-		BaseObject: BaseObject{
-			Children: make(map[string]GameObject),
-		},
+		BaseObject:     NewBaseObject(id),
 		ID:             id,
 		networkManager: networkManager,
 		isLocalPlayer:  id == fmt.Sprintf("player-%d", networkManager.ClientID()),
-		debug:          false,
-		State:          state,
+		// debug:          true,
+		State: state,
 		animations: map[gametypes.PlayerAnimation]*animations.Animation{
-			gametypes.PlayerAnimationIdle: animations.NewPlayerIdleAnimation(),
-			gametypes.PlayerAnimationRun:  animations.NewPlayerRunAnimation(),
-			gametypes.PlayerAnimationJump: animations.NewPlayerJumpAnimation(),
-			gametypes.PlayerAnimationFall: animations.NewPlayerJumpAnimation(),
+			gametypes.PlayerAnimationIdle:   animations.NewPlayerIdleAnimation(),
+			gametypes.PlayerAnimationRun:    animations.NewPlayerRunAnimation(),
+			gametypes.PlayerAnimationJump:   animations.NewPlayerJumpAnimation(),
+			gametypes.PlayerAnimationFall:   animations.NewPlayerFallAnimation(),
+			gametypes.PlayerAnimationAttack: animations.NewPlayerAttackAnimation(),
 		},
 	}, nil
 }
@@ -99,13 +98,16 @@ func (p *Player) Update() error {
 		inputY = 1.0
 	}
 
-	inputJump := input.IsJumpPressed()
+	inputJump := input.IsJumpJustPressed()
+
+	inputAttack := input.IsAttackJustPressed()
 
 	cpu := &messages.ClientPlayerUpdate{
 		Timestamp:   time.Now().UnixMilli(),
 		InputX:      inputX,
 		InputY:      inputY,
 		InputJump:   inputJump,
+		InputAttack: inputAttack,
 		DeltaTime:   1.0 / float64(ebiten.TPS()),
 		PastUpdates: p.pastUpdates,
 	}
@@ -145,6 +147,9 @@ func (p *Player) Update() error {
 
 func (p *Player) Draw(screen *ebiten.Image) {
 	p.animations[p.State.Animation].Draw(screen, p.State.Position.X, p.State.Position.Y, p.State.AnimationFlip)
+	if !p.State.IsAttacking {
+		p.animations[gametypes.PlayerAnimationAttack].Reset()
+	}
 
 	if p.debug {
 		strokeWidth := float32(1)
@@ -172,6 +177,7 @@ func (p *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.Pla
 	p.State.Velocity.X = to.Velocity.X
 	p.State.Velocity.Y = to.Velocity.X
 	p.State.IsOnGround = to.IsOnGround
+	p.State.IsAttacking = to.IsAttacking
 	p.State.Animation = to.Animation
 	p.State.AnimationFlip = to.AnimationFlip
 	p.State.Object.Position.X = p.State.Position.X
@@ -185,6 +191,7 @@ func (p *Player) ExtrapolateState(from *gametypes.PlayerState, to *gametypes.Pla
 	p.State.Velocity.X = to.Velocity.X
 	p.State.Velocity.Y = to.Velocity.Y
 	p.State.IsOnGround = to.IsOnGround
+	p.State.IsAttacking = to.IsAttacking
 	p.State.Animation = to.Animation
 	p.State.AnimationFlip = to.AnimationFlip
 	p.State.Object.Position.X = p.State.Position.X
@@ -217,6 +224,7 @@ func (p *Player) ReconcileState(state *gametypes.PlayerState) error {
 				p.State.Velocity.X = state.Velocity.X
 				p.State.Velocity.Y = state.Velocity.Y
 				p.State.IsOnGround = state.IsOnGround
+				p.State.IsAttacking = state.IsAttacking
 				p.State.Animation = state.Animation
 				p.State.AnimationFlip = state.AnimationFlip
 				p.State.Object.Position.X = state.Position.X

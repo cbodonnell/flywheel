@@ -44,21 +44,25 @@ func IsNegativeJustPressed() bool {
 }
 
 func IsRightPressed() bool {
-	return ebiten.IsKeyPressed(ebiten.KeyRight) || ebiten.IsKeyPressed(ebiten.KeyD)
+	return ebiten.IsKeyPressed(ebiten.KeyRight)
 }
 
 func IsLeftPressed() bool {
-	return ebiten.IsKeyPressed(ebiten.KeyLeft) || ebiten.IsKeyPressed(ebiten.KeyA)
+	return ebiten.IsKeyPressed(ebiten.KeyLeft)
 }
 
 func IsUpPressed() bool {
-	return ebiten.IsKeyPressed(ebiten.KeyUp) || ebiten.IsKeyPressed(ebiten.KeyW)
+	return ebiten.IsKeyPressed(ebiten.KeyUp)
 }
 
 func IsDownPressed() bool {
-	return ebiten.IsKeyPressed(ebiten.KeyDown) || ebiten.IsKeyPressed(ebiten.KeyS)
+	return ebiten.IsKeyPressed(ebiten.KeyDown)
 }
 
-func IsJumpPressed() bool {
-	return ebiten.IsKeyPressed(ebiten.KeySpace)
+func IsJumpJustPressed() bool {
+	return inpututil.IsKeyJustPressed(ebiten.KeySpace)
+}
+
+func IsAttackJustPressed() bool {
+	return inpututil.IsKeyJustPressed(ebiten.KeyQ)
 }

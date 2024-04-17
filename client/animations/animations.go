@@ -30,6 +30,9 @@ type Animation struct {
 	// shiftY is the vertical shift.
 	shiftY float64
 
+	// isLooping is true if the animation should loop.
+	isLooping bool
+
 	// updateCount is the number of times the animation has been updated.
 	updateCount int
 	// frameIndex is the current frame index.
@@ -48,6 +51,7 @@ type NewAnimationOptions struct {
 	ScaleY      float64
 	ShiftX      float64
 	ShiftY      float64
+	IsLooping   bool
 }
 
 func NewAnimation(opts NewAnimationOptions) *Animation {
@@ -63,12 +67,26 @@ func NewAnimation(opts NewAnimationOptions) *Animation {
 		scaleY:      opts.ScaleY,
 		shiftX:      opts.ShiftX,
 		shiftY:      opts.ShiftY,
+		isLooping:   opts.IsLooping,
 	}
 }
 
 func (a *Animation) Update() {
+	if a.updateCount%a.frameSpeed == 0 {
+		a.frameIndex++
+		if a.frameIndex >= a.frameCount {
+			if a.isLooping {
+				a.frameIndex = 0
+			} else {
+				a.frameIndex = a.frameCount - 1
+			}
+		}
+	}
 	a.updateCount++
-	a.frameIndex = (a.updateCount / a.frameSpeed) % a.frameCount
+}
+
+func (a *Animation) IsFinished() bool {
+	return a.frameIndex == a.frameCount-1
 }
 
 func (a *Animation) Reset() {

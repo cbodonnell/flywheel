@@ -9,7 +9,7 @@ type ErrorScene struct {
 func NewErrorScene(msg string) (Scene, error) {
 	return &MenuScene{
 		BaseScene{
-			Root: objects.NewTextOverlayObject(msg),
+			Root: objects.NewTextOverlayObject("overlay-error", msg),
 		},
 	}, nil
 }

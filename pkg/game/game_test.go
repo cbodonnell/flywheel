@@ -83,12 +83,12 @@ func TestGameManager_processClientMessages(t *testing.T) {
 				Players: map[uint32]*types.PlayerState{
 					1: {
 						Position: kinematic.Vector{
-							X: 50,
-							Y: -98,
+							X: 35,
+							Y: -58.80000000000001,
 						},
 						Velocity: kinematic.Vector{
-							X: 500,
-							Y: -980,
+							X: 350,
+							Y: -588,
 						},
 					},
 				},
@@ -188,11 +188,11 @@ func TestGameManager_processClientMessages(t *testing.T) {
 					1: {
 						Position: kinematic.Vector{
 							X: 0.0,
-							Y: -24.500000000000004,
+							Y: -14.700000000000003,
 						},
 						Velocity: kinematic.Vector{
 							X: 0,
-							Y: -490,
+							Y: -294,
 						},
 					},
 				},

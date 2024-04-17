@@ -14,24 +14,67 @@ import (
 type GameObject interface {
 	Lifecycle
 
-	// Child management methods
-	GetChildren() map[string]GameObject
+	GetID() string
+	GetChildren() []GameObject
 	GetChild(id string) GameObject
 	AddChild(id string, child GameObject) error
 	RemoveChild(id string) error
 }
 
+type IndexedObjectList struct {
+	objects []GameObject
+	idxID   map[string]int
+}
+
+func NewIndexedObjectList() *IndexedObjectList {
+	return &IndexedObjectList{
+		objects: make([]GameObject, 0),
+		idxID:   make(map[string]int),
+	}
+}
+
+func (l *IndexedObjectList) Add(id string, object GameObject) {
+	l.objects = append(l.objects, object)
+	l.idxID[id] = len(l.objects) - 1
+}
+
+func (l *IndexedObjectList) Remove(id string) {
+	idx, ok := l.idxID[id]
+	if !ok {
+		return
+	}
+	l.objects = append(l.objects[:idx], l.objects[idx+1:]...)
+	for i := idx; i < len(l.objects); i++ {
+		l.idxID[l.objects[i].GetID()] = i
+	}
+	delete(l.idxID, id)
+}
+
+func (l *IndexedObjectList) Get(id string) GameObject {
+	idx, ok := l.idxID[id]
+	if !ok {
+		return nil
+	}
+	return l.objects[idx]
+}
+
+func (l *IndexedObjectList) GetAll() []GameObject {
+	return l.objects
+}
+
 // BaseObject is a base implementation of GameObject.
 // All game objects should embed this struct to inherit its methods.
 type BaseObject struct {
-	Children map[string]GameObject
+	id       string
+	children *IndexedObjectList
 }
 
 var _ GameObject = &BaseObject{}
 
-func NewBaseObject() *BaseObject {
+func NewBaseObject(id string) *BaseObject {
 	return &BaseObject{
-		Children: make(map[string]GameObject),
+		id:       id,
+		children: NewIndexedObjectList(),
 	}
 }
 
@@ -49,33 +92,38 @@ func (o *BaseObject) Update() error {
 
 func (o *BaseObject) Draw(screen *ebiten.Image) {}
 
-func (o *BaseObject) GetChildren() map[string]GameObject {
-	return o.Children
+func (o *BaseObject) GetID() string {
+	return o.id
+}
+
+func (o *BaseObject) GetChildren() []GameObject {
+	return o.children.GetAll()
 }
 
 func (o *BaseObject) GetChild(id string) GameObject {
-	return o.Children[id]
+	return o.children.Get(id)
 }
 
 func (o *BaseObject) AddChild(id string, child GameObject) error {
-	if _, ok := o.Children[id]; ok {
-		return fmt.Errorf("child object already exists")
+	if _, ok := o.children.idxID[id]; ok {
+		return fmt.Errorf("child object with id already exists")
 	}
 	if err := InitTree(child); err != nil {
 		return fmt.Errorf("failed to initialize child object tree: %v", err)
 	}
-	o.Children[id] = child
+	o.children.Add(id, child)
 	return nil
 }
 
 func (o *BaseObject) RemoveChild(id string) error {
-	if _, ok := o.Children[id]; !ok {
-		return fmt.Errorf("child object not found")
+	child := o.children.Get(id)
+	if child == nil {
+		return fmt.Errorf("child object with id does not exist")
 	}
-	if err := DestroyTree(o.Children[id]); err != nil {
+	if err := DestroyTree(child); err != nil {
 		return fmt.Errorf("failed to destroy child object tree: %v", err)
 	}
-	delete(o.Children, id)
+	o.children.Remove(id)
 	return nil
 }
 

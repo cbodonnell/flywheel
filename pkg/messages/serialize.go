@@ -114,6 +114,7 @@ func SerializeGameStateFlatbuffer(state *ServerGameUpdate) ([]byte, error) {
 		gamestatefb.PlayerStateAddPosition(builder, position)
 		gamestatefb.PlayerStateAddVelocity(builder, velocity)
 		gamestatefb.PlayerStateAddIsOnGround(builder, v.IsOnGround)
+		gamestatefb.PlayerStateAddIsAttacking(builder, v.IsAttacking)
 		gamestatefb.PlayerStateAddAnimation(builder, byte(v.Animation))
 		gamestatefb.PlayerStateAddAnimationFlip(builder, v.AnimationFlip)
 		playerState := gamestatefb.PlayerStateEnd(builder)
@@ -149,6 +150,7 @@ func SerializeGameStateFlatbuffer(state *ServerGameUpdate) ([]byte, error) {
 		gamestatefb.NPCStateAddIsOnGround(builder, v.IsOnGround)
 		gamestatefb.NPCStateAddAnimation(builder, byte(v.Animation))
 		gamestatefb.NPCStateAddAnimationFlip(builder, v.AnimationFlip)
+		gamestatefb.NPCStateAddHitpoints(builder, v.Hitpoints)
 		npcState := gamestatefb.NPCStateEnd(builder)
 
 		gamestatefb.NPCStateKeyValueStart(builder)
@@ -193,6 +195,7 @@ func DeserializeGameStateFlatbuffer(b []byte) (*ServerGameUpdate, error) {
 		playerState.Velocity.X = playerStateKV.Value(nil).Velocity(nil).X()
 		playerState.Velocity.Y = playerStateKV.Value(nil).Velocity(nil).Y()
 		playerState.IsOnGround = playerStateKV.Value(nil).IsOnGround()
+		playerState.IsAttacking = playerStateKV.Value(nil).IsAttacking()
 		playerState.Animation = playerStateKV.Value(nil).Animation()
 		playerState.AnimationFlip = playerStateKV.Value(nil).AnimationFlip()
 
@@ -215,6 +218,7 @@ func DeserializeGameStateFlatbuffer(b []byte) (*ServerGameUpdate, error) {
 		npcState.IsOnGround = npcStateKV.Value(nil).IsOnGround()
 		npcState.Animation = npcStateKV.Value(nil).Animation()
 		npcState.AnimationFlip = npcStateKV.Value(nil).AnimationFlip()
+		npcState.Hitpoints = npcStateKV.Value(nil).Hitpoints()
 
 		npcs[npcStateKV.Key()] = npcState
 	}

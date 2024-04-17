@@ -91,8 +91,20 @@ func (rcv *PlayerState) MutateIsOnGround(n bool) bool {
 	return rcv._tab.MutateBoolSlot(10, n)
 }
 
-func (rcv *PlayerState) Animation() byte {
+func (rcv *PlayerState) IsAttacking() bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
+	if o != 0 {
+		return rcv._tab.GetBool(o + rcv._tab.Pos)
+	}
+	return false
+}
+
+func (rcv *PlayerState) MutateIsAttacking(n bool) bool {
+	return rcv._tab.MutateBoolSlot(12, n)
+}
+
+func (rcv *PlayerState) Animation() byte {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
 	if o != 0 {
 		return rcv._tab.GetByte(o + rcv._tab.Pos)
 	}
@@ -100,11 +112,11 @@ func (rcv *PlayerState) Animation() byte {
 }
 
 func (rcv *PlayerState) MutateAnimation(n byte) bool {
-	return rcv._tab.MutateByteSlot(12, n)
+	return rcv._tab.MutateByteSlot(14, n)
 }
 
 func (rcv *PlayerState) AnimationFlip() bool {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(16))
 	if o != 0 {
 		return rcv._tab.GetBool(o + rcv._tab.Pos)
 	}
@@ -112,11 +124,11 @@ func (rcv *PlayerState) AnimationFlip() bool {
 }
 
 func (rcv *PlayerState) MutateAnimationFlip(n bool) bool {
-	return rcv._tab.MutateBoolSlot(14, n)
+	return rcv._tab.MutateBoolSlot(16, n)
 }
 
 func PlayerStateStart(builder *flatbuffers.Builder) {
-	builder.StartObject(6)
+	builder.StartObject(7)
 }
 func PlayerStateAddLastProcessedTimestamp(builder *flatbuffers.Builder, lastProcessedTimestamp int64) {
 	builder.PrependInt64Slot(0, lastProcessedTimestamp, 0)
@@ -130,11 +142,14 @@ func PlayerStateAddVelocity(builder *flatbuffers.Builder, velocity flatbuffers.U
 func PlayerStateAddIsOnGround(builder *flatbuffers.Builder, isOnGround bool) {
 	builder.PrependBoolSlot(3, isOnGround, false)
 }
+func PlayerStateAddIsAttacking(builder *flatbuffers.Builder, isAttacking bool) {
+	builder.PrependBoolSlot(4, isAttacking, false)
+}
 func PlayerStateAddAnimation(builder *flatbuffers.Builder, animation byte) {
-	builder.PrependByteSlot(4, animation, 0)
+	builder.PrependByteSlot(5, animation, 0)
 }
 func PlayerStateAddAnimationFlip(builder *flatbuffers.Builder, animationFlip bool) {
-	builder.PrependBoolSlot(5, animationFlip, false)
+	builder.PrependBoolSlot(6, animationFlip, false)
 }
 func PlayerStateEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

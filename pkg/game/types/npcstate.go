@@ -13,8 +13,9 @@ type NPCState struct {
 	IsOnGround    bool
 	Animation     NPCAnimation
 	AnimationFlip bool
+	Hitpoints     int16
 
-	ttl         float64
+	// TODO: combine exists and dead into a single state
 	exists      bool
 	respawnTime float64
 }
@@ -23,9 +24,7 @@ type NPCAnimation uint8
 
 const (
 	NPCAnimationIdle NPCAnimation = iota
-	// NPCAnimationRun
-	// NPCAnimationJump
-	// NPCAnimationFall
+	NPCAnimationDead
 )
 
 func NewNPCState(positionX float64, positionY float64) *NPCState {
@@ -38,20 +37,20 @@ func NewNPCState(positionX float64, positionY float64) *NPCState {
 			X: 0,
 			Y: 0,
 		},
-		Object: resolv.NewObject(positionX, positionY, constants.NPCWidth, constants.NPCHeight, CollisionSpaceTagNPC),
+		Object:    resolv.NewObject(positionX, positionY, constants.NPCWidth, constants.NPCHeight, CollisionSpaceTagNPC),
+		Hitpoints: constants.NPCHitpoints,
 	}
 }
 
 func (n *NPCState) Copy() *NPCState {
 	return &NPCState{
-		Position:   n.Position,
-		Velocity:   n.Velocity,
-		IsOnGround: n.IsOnGround,
+		Position:      n.Position,
+		Velocity:      n.Velocity,
+		IsOnGround:    n.IsOnGround,
+		Animation:     n.Animation,
+		AnimationFlip: n.AnimationFlip,
+		Hitpoints:     n.Hitpoints,
 	}
-}
-
-func (n *NPCState) TTL() float64 {
-	return n.ttl
 }
 
 func (n *NPCState) Exists() bool {
@@ -105,15 +104,26 @@ func (n *NPCState) Update(deltaTime float64) {
 		n.AnimationFlip = true
 	}
 
-	n.Animation = NPCAnimationIdle
-
 	// Update the npc collision object
 	n.Object.Position.X = n.Position.X
 	n.Object.Position.Y = n.Position.Y
 	n.Object.Update()
 
-	// Decrement the time to live
-	n.ttl -= deltaTime
+	// Animation
+
+	if n.IsDead() {
+		n.Animation = NPCAnimationDead
+	} else {
+		n.Animation = NPCAnimationIdle
+	}
+}
+
+func (n *NPCState) TakeDamage(damage int16) {
+	n.Hitpoints -= damage
+}
+
+func (n *NPCState) IsDead() bool {
+	return n.Hitpoints <= 0
 }
 
 func (n *NPCState) DecrementRespawnTime(deltaTime float64) {
@@ -121,7 +131,6 @@ func (n *NPCState) DecrementRespawnTime(deltaTime float64) {
 }
 
 func (n *NPCState) Spawn() {
-	n.ttl = constants.NPCTTL
 	n.exists = true
 	n.respawnTime = 0
 
@@ -131,13 +140,14 @@ func (n *NPCState) Spawn() {
 	n.Velocity.Y = 0
 	n.IsOnGround = false
 
+	n.Hitpoints = constants.NPCHitpoints
+
 	n.Object.Position.X = n.Position.X
 	n.Object.Position.Y = n.Position.Y
 	n.Object.Update()
 }
 
 func (n *NPCState) Despawn() {
-	n.ttl = 0
 	n.exists = false
 	n.respawnTime = constants.NPCRespawnTime
 }

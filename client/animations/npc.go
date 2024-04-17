@@ -10,12 +10,18 @@ import (
 )
 
 var (
-	npcSpritesheet image.Image
+	npcIdleSpritesheet image.Image
+	npcDeadSpritesheet image.Image
 )
 
 func init() {
 	var err error
-	npcSpritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.SkeletonIdle))
+	npcIdleSpritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.SkeletonIdle))
+	if err != nil {
+		panic(fmt.Sprintf("failed to decode image: %v", err))
+	}
+
+	npcDeadSpritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.SkeletonDead))
 	if err != nil {
 		panic(fmt.Sprintf("failed to decode image: %v", err))
 	}
@@ -23,7 +29,7 @@ func init() {
 
 func NewNPCIdleAnimation() *Animation {
 	return NewAnimation(NewAnimationOptions{
-		Image:       ebiten.NewImageFromImage(npcSpritesheet),
+		Image:       ebiten.NewImageFromImage(npcIdleSpritesheet),
 		FrameOX:     0,
 		FrameOY:     0,
 		FrameWidth:  128,
@@ -34,5 +40,23 @@ func NewNPCIdleAnimation() *Animation {
 		ScaleY:      0.5,
 		ShiftX:      -32,
 		ShiftY:      0,
+		IsLooping:   true,
+	})
+}
+
+func NewNPCDeadAnimation() *Animation {
+	return NewAnimation(NewAnimationOptions{
+		Image:       ebiten.NewImageFromImage(npcDeadSpritesheet),
+		FrameOX:     0,
+		FrameOY:     0,
+		FrameWidth:  128,
+		FrameHeight: 128,
+		FrameCount:  3,
+		FrameSpeed:  3,
+		ScaleX:      0.5,
+		ScaleY:      0.5,
+		ShiftX:      -32,
+		ShiftY:      0,
+		IsLooping:   false,
 	})
 }
