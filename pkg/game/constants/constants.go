@@ -20,9 +20,9 @@ const (
 	// Attack channel time is attack duration
 
 	// PlayerAttackDuration is the duration of the attack (channel time + cooldown time)
-	PlayerAttackDuration float64 = 0.6 // seconds
+	PlayerAttackDuration float64 = 0.4 // seconds
 	// PlayerAttackChannelTime is the time it takes for the attack to register
-	PlayerAttackChannelTime float64 = 0.3 // seconds
+	PlayerAttackChannelTime float64 = 0.1 // seconds
 	// PlayerAttackHitboxWidth is the width of the attack hitbox
 	PlayerAttackHitboxWidth float64 = PlayerWidth
 	// PlayerAttackHitboxOffset is the offset from the player's position to the attack hitbox

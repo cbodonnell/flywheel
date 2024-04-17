@@ -33,7 +33,7 @@ func init() {
 		panic(fmt.Sprintf("failed to decode image: %v", err))
 	}
 
-	swordsmanAttackSpritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.PlayerSwordsmanAttack1))
+	swordsmanAttackSpritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.PlayerSwordsmanAttack3))
 	if err != nil {
 		panic(fmt.Sprintf("failed to decode image: %v", err))
 	}
@@ -114,8 +114,8 @@ func NewPlayerAttackAnimation() *Animation {
 		FrameOY:     0,
 		FrameWidth:  128,
 		FrameHeight: 128,
-		FrameCount:  6,
-		FrameSpeed:  6,
+		FrameCount:  4,
+		FrameSpeed:  4,
 		ScaleX:      0.5,
 		ScaleY:      0.5,
 		ShiftX:      -32,
