@@ -13,10 +13,6 @@ func ServerGameUpdateFromState(state *types.GameState) *messages.ServerGameUpdat
 
 	npcs := make(map[uint32]*messages.NPCStateUpdate)
 	for npcID, npcState := range state.NPCs {
-		// if !npcState.Exists() {
-		// 	// don't send updates for NPCs that aren't in the game
-		// 	continue
-		// }
 		npcs[npcID] = NPCStateUpdateFromState(npcState)
 	}
 
