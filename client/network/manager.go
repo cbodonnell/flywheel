@@ -88,6 +88,11 @@ func (m *NetworkManager) Start() error {
 		}
 	}(ctx)
 
+	// TODO: send login message to the server
+	// TODO: await client ID assignment
+	// TODO: start sync time
+	// TODO: start UDP client and ping
+
 	// Connect to the server via UDP.
 	m.clientWaitGroup.Add(1)
 	go func(ctx context.Context) {

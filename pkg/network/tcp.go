@@ -72,6 +72,8 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 
 	log.Debug("TCP Connection established for client %d", clientID)
 
+	// TODO: require a login message from the client
+
 	assignID := messages.AssignID{
 		ClientID: clientID,
 	}

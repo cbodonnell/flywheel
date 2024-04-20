@@ -7,7 +7,7 @@ type GameOverScene struct {
 }
 
 func NewGameOverScene() (Scene, error) {
-	return &MenuScene{
+	return &GameOverScene{
 		BaseScene{
 			Root: objects.NewTextOverlayObject("overlay-gameover", "Game Over!"),
 		},

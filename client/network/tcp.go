@@ -38,6 +38,8 @@ func (c *TCPClient) Connect(ctx context.Context) error {
 	defer conn.Close()
 	c.conn = conn
 
+	// TODO: return here once we have a connection and handle receiving messages in a separate goroutine
+
 	for {
 		select {
 		case <-ctx.Done():

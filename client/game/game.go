@@ -80,7 +80,13 @@ func (g *Game) SetScene(scene scenes.Scene) error {
 }
 
 func (g *Game) loadMenu() error {
-	menu, err := scenes.NewMenuScene()
+	menu, err := scenes.NewMenuScene(scenes.MenuSceneOptions{
+		OnStartGame: func() {
+			if err := g.loadGame(); err != nil {
+				log.Error("Failed to load game scene: %v", err)
+			}
+		},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create menu scene: %v", err)
 	}
@@ -189,11 +195,11 @@ func (g *Game) checkNetworkManagerErrors() error {
 func (g *Game) handleInput() error {
 	switch g.mode {
 	case GameModeMenu:
-		if input.IsPositiveJustPressed() {
-			if err := g.loadGame(); err != nil {
-				return fmt.Errorf("failed to load game scene: %v", err)
-			}
-		}
+		// if input.IsPositiveJustPressed() {
+		// 	if err := g.loadGame(); err != nil {
+		// 		return fmt.Errorf("failed to load game scene: %v", err)
+		// 	}
+		// }
 	case GameModePlay:
 		if input.IsNegativeJustPressed() {
 			if err := g.loadGameOver(); err != nil {
