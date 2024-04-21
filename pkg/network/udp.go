@@ -51,6 +51,11 @@ func (s *UDPServer) Start() {
 			continue
 		}
 
+		if message.ClientID == 0 {
+			log.Warn("Received UDP message from unknown client, ignoring")
+			continue
+		}
+
 		if !s.ClientManager.Exists(message.ClientID) {
 			log.Warn("Received UDP message from %d, but client is not connected", message.ClientID)
 			continue
@@ -58,11 +63,9 @@ func (s *UDPServer) Start() {
 
 		log.Trace("Received UDP message of type %s from %d", message.Type, message.ClientID)
 
-		// TODO: real identity verification
-		s.ClientManager.SetUDPAddress(message.ClientID, addr)
-
 		switch message.Type {
 		case messages.MessageTypeClientPing:
+			s.ClientManager.SetUDPAddress(message.ClientID, addr)
 			m := &messages.Message{
 				ClientID: 0,
 				Type:     messages.MessageTypeServerPong,

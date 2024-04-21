@@ -57,57 +57,69 @@ func (s *TCPServer) Start() {
 
 // handleTCPConnection handles a TCP connection.
 func (s *TCPServer) handleTCPConnection(conn net.Conn) {
-	clientID, err := s.ClientManager.ConnectClient(conn)
-	if err != nil {
-		log.Error("Failed to add client: %v", err)
-		conn.Close()
-		return
-	}
-
-	defer func() {
-		log.Debug("TCP Connection closed for client %d", clientID)
-		s.ClientManager.DisconnectClient(clientID)
-		conn.Close()
-	}()
-
-	log.Debug("TCP Connection established for client %d", clientID)
-
-	// TODO: require a login message from the client
-
-	assignID := messages.AssignID{
-		ClientID: clientID,
-	}
-
-	payload, err := json.Marshal(assignID)
-	if err != nil {
-		log.Error("Failed to marshal assignID: %v", err)
-		return
-	}
-
-	// Send the client its ID
-	message := &messages.Message{
-		ClientID: 0,
-		Type:     messages.MessageTypeServerAssignID,
-		Payload:  payload,
-	}
-	if err := WriteMessageToTCP(conn, message); err != nil {
-		log.Error("Error writing TCP message of type %s to client %d: %v", message.Type, clientID, err)
-		return
-	}
-
+	var connectedClientID uint32 // set after login
 	for {
 		message, err := ReadMessageFromTCP(conn)
 		if err != nil {
 			if _, ok := err.(*ErrConnectionClosed); ok {
-				log.Debug("Client %d disconnected", clientID)
+				log.Debug("Client %d disconnected", connectedClientID)
 				return
 			}
-			log.Error("Error reading TCP message from client %d: %v", clientID, err)
+			log.Error("Error reading TCP message from client %d: %v", connectedClientID, err)
 			continue
 		}
-		log.Trace("Received TCP message of type %s from client %d", message.Type, message.ClientID)
+
+		if message.ClientID == 0 && message.Type != messages.MessageTypeClientLogin {
+			log.Warn("Received message from unknown client that is not a login message")
+			continue
+		}
 
 		switch message.Type {
+		case messages.MessageTypeClientLogin:
+			clientLogin := &messages.ClientLogin{}
+			if err := json.Unmarshal(message.Payload, clientLogin); err != nil {
+				log.Error("Failed to unmarshal client login: %v", err)
+				continue
+			}
+
+			// TODO: verify client login token and extract relevant claims
+
+			clientID, err := s.ClientManager.ConnectClient(conn)
+			if err != nil {
+				log.Error("Failed to add client: %v", err)
+				conn.Close()
+				return
+			}
+			connectedClientID = clientID
+
+			log.Debug("Client %d logged in", clientID)
+
+			defer func() {
+				log.Debug("TCP Connection closed for client %d", clientID)
+				s.ClientManager.DisconnectClient(clientID)
+				conn.Close()
+			}()
+
+			assignID := messages.ServerLoginSuccess{
+				ClientID: clientID,
+			}
+
+			payload, err := json.Marshal(assignID)
+			if err != nil {
+				log.Error("Failed to marshal assignID: %v", err)
+				return
+			}
+
+			// Send the client its ID
+			message := &messages.Message{
+				ClientID: 0,
+				Type:     messages.MessageTypeServerLoginSuccess,
+				Payload:  payload,
+			}
+			if err := WriteMessageToTCP(conn, message); err != nil {
+				log.Error("Error writing TCP message of type %s to client %d: %v", message.Type, clientID, err)
+				return
+			}
 		case messages.MessageTypeClientSyncTime:
 			clientSyncTime := &messages.ClientSyncTime{}
 			if err := json.Unmarshal(message.Payload, clientSyncTime); err != nil {

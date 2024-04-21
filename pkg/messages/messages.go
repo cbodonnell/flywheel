@@ -16,7 +16,8 @@ const (
 type MessageType uint8
 
 const (
-	MessageTypeServerAssignID MessageType = iota
+	MessageTypeClientLogin MessageType = iota
+	MessageTypeServerLoginSuccess
 	MessageTypeClientPing
 	MessageTypeServerPong
 	MessageTypeClientPlayerUpdate
@@ -31,7 +32,8 @@ const (
 
 func (m MessageType) String() string {
 	return [...]string{
-		"ServerAssignID",
+		"ClientLogin",
+		"ServerLoginSuccess",
 		"ClientPing",
 		"ServerPong",
 		"ClientPlayerUpdate",
@@ -52,7 +54,11 @@ type Message struct {
 	Payload  json.RawMessage `json:"payload"`
 }
 
-type AssignID struct {
+type ClientLogin struct {
+	Token string `json:"token"`
+}
+
+type ServerLoginSuccess struct {
 	ClientID uint32 `json:"clientID"`
 }
 

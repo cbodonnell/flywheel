@@ -30,16 +30,17 @@ func NewTCPClient(serverAddr string, messageQueue queue.Queue, clientIDChan chan
 	}
 }
 
-func (c *TCPClient) Connect(ctx context.Context) error {
+func (c *TCPClient) Connect() error {
 	conn, err := net.Dial("tcp", c.serverAddr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %v", err)
 	}
-	defer conn.Close()
 	c.conn = conn
+	return nil
+}
 
-	// TODO: return here once we have a connection and handle receiving messages in a separate goroutine
-
+func (c *TCPClient) HandleMessages(ctx context.Context) error {
+	defer c.conn.Close()
 	for {
 		select {
 		case <-ctx.Done():
@@ -47,7 +48,7 @@ func (c *TCPClient) Connect(ctx context.Context) error {
 		default:
 		}
 
-		msg, err := ReceiveTCPMessage(conn)
+		msg, err := ReceiveTCPMessage(c.conn)
 		if err != nil {
 			if _, ok := err.(*ErrConnectionClosedByServer); ok {
 				return err
@@ -61,8 +62,8 @@ func (c *TCPClient) Connect(ctx context.Context) error {
 		log.Trace("Received message from TCP server of type %s", msg.Type)
 
 		switch msg.Type {
-		case messages.MessageTypeServerAssignID:
-			assignID := &messages.AssignID{}
+		case messages.MessageTypeServerLoginSuccess:
+			assignID := &messages.ServerLoginSuccess{}
 			err := json.Unmarshal(msg.Payload, assignID)
 			if err != nil {
 				log.Error("Failed to deserialize server assign ID message: %v", err)

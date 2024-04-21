@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 )
@@ -38,7 +39,6 @@ const (
 type ClientManager struct {
 	clients     map[uint32]*Client
 	clientsLock sync.RWMutex
-	nextID      uint32
 	// UDP connection for broadcasting to clients
 	udpConn         *net.UDPConn
 	clientEventChan chan ClientEvent
@@ -48,7 +48,6 @@ type ClientManager struct {
 func NewClientManager() *ClientManager {
 	return &ClientManager{
 		clients:         make(map[uint32]*Client),
-		nextID:          1,
 		clientEventChan: make(chan ClientEvent, ClientEventChannelSize),
 	}
 }
@@ -117,6 +116,19 @@ func (cm *ClientManager) ConnectClient(tcpConn net.Conn) (uint32, error) {
 	return clientID, nil
 }
 
+// GetClientIDByTCPConn returns the ID of a client by its TCP connection.
+// Returns 0 if the client is not found
+func (cm *ClientManager) GetClientIDByTCPConn(conn net.Conn) uint32 {
+	cm.clientsLock.RLock()
+	defer cm.clientsLock.RUnlock()
+	for _, client := range cm.clients {
+		if client.TCPConn == conn {
+			return client.ID
+		}
+	}
+	return 0
+}
+
 // DisconnectClient removes a client from the manager
 func (cm *ClientManager) DisconnectClient(clientID uint32) {
 	cm.clientsLock.Lock()
@@ -155,12 +167,13 @@ func (cm *ClientManager) Exists(clientID uint32) bool {
 // it reads from the clients, so it needs to be locked before calling
 func (cm *ClientManager) generateUniqueID(maxRetries int) (uint32, error) {
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		id := cm.nextID
+		id := rand.Uint32()
+		if id == 0 {
+			continue
+		}
 		if _, ok := cm.clients[id]; !ok {
-			cm.nextID++
 			return id, nil
 		}
-		cm.nextID++
 	}
 
 	return 0, fmt.Errorf("failed to generate a unique ID after %d attempts", maxRetries)
