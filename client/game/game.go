@@ -81,9 +81,9 @@ func (g *Game) SetScene(scene scenes.Scene) error {
 
 func (g *Game) loadMenu() error {
 	menu, err := scenes.NewMenuScene(scenes.MenuSceneOptions{
-		OnStartGame: func() {
-			if err := g.loadGame(); err != nil {
-				log.Error("Failed to load game scene: %v", err)
+		OnLogin: func(username, password string) {
+			if err := g.login(username, password); err != nil {
+				log.Error("Failed to start game: %v", err)
 			}
 		},
 	})
@@ -97,16 +97,28 @@ func (g *Game) loadMenu() error {
 	return nil
 }
 
-func (g *Game) loadGame() error {
-	if err := g.networkManager.Start(); err != nil {
+func (g *Game) login(username, password string) error {
+
+	// TODO: get token from auth server
+	log.Debug("Logging in with username %s and password %s", username, password)
+	token := "TODO"
+
+	if err := g.networkManager.Start(token); err != nil {
 		log.Error("Failed to start network manager: %v", err)
-		g.networkManager.Stop()
 		if err := g.loadNetworkError(); err != nil {
 			return fmt.Errorf("failed to load network error scene: %v", err)
 		}
 		return nil
 	}
 
+	if err := g.loadGame(); err != nil {
+		return fmt.Errorf("failed to load game scene: %v", err)
+	}
+
+	return nil
+}
+
+func (g *Game) loadGame() error {
 	gameScene, err := scenes.NewGameScene(g.networkManager)
 	if err != nil {
 		return fmt.Errorf("failed to create game scene: %v", err)
@@ -116,11 +128,11 @@ func (g *Game) loadGame() error {
 	}
 	g.mode = GameModePlay
 	return nil
+
 }
 
 func (g *Game) loadGameOver() error {
 	g.networkManager.Stop()
-
 	gameOver, err := scenes.NewGameOverScene()
 	if err != nil {
 		return fmt.Errorf("failed to create game over scene: %v", err)
