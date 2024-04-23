@@ -1,11 +1,17 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/client/scenes"
+	"github.com/cbodonnell/flywheel/pkg/auth"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -15,6 +21,8 @@ import (
 type Game struct {
 	// debug is a boolean value indicating whether debug mode is enabled.
 	debug bool
+	// authURL is the URL of the authentication server.
+	authURL string
 	// networkManager is the network manager.
 	networkManager *network.NetworkManager
 	// mode is the current game mode.
@@ -22,6 +30,10 @@ type Game struct {
 	// scene is the current scene.
 	scene scenes.Scene
 }
+
+const (
+	DefaultAuthServerURL = "http://localhost:8080"
+)
 
 type GameMode int
 
@@ -48,12 +60,14 @@ func (m GameMode) String() string {
 
 type NewGameOptions struct {
 	Debug          bool
+	AuthURL        string
 	NetworkManager *network.NetworkManager
 }
 
 func NewGame(opts NewGameOptions) (ebiten.Game, error) {
 	g := &Game{
 		debug:          opts.Debug,
+		authURL:        opts.AuthURL,
 		networkManager: opts.NetworkManager,
 	}
 
@@ -81,8 +95,8 @@ func (g *Game) SetScene(scene scenes.Scene) error {
 
 func (g *Game) loadMenu() error {
 	menu, err := scenes.NewMenuScene(scenes.MenuSceneOptions{
-		OnLogin: func(username, password string) {
-			if err := g.login(username, password); err != nil {
+		OnLogin: func(email, password string) {
+			if err := g.login(email, password); err != nil {
 				log.Error("Failed to start game: %v", err)
 			}
 		},
@@ -97,13 +111,37 @@ func (g *Game) loadMenu() error {
 	return nil
 }
 
-func (g *Game) login(username, password string) error {
+func (g *Game) login(email, password string) error {
+	// TODO: refactor this into a separate function
+	values := url.Values{}
+	values.Set("email", email)
+	values.Set("password", password)
+	requestBody := strings.NewReader(values.Encode())
 
-	// TODO: get token from auth server
-	log.Debug("Logging in with username %s and password %s", username, password)
-	token := "TODO"
+	req, err := http.NewRequest("POST", g.authURL+"/login", requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to create login request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	if err := g.networkManager.Start(token); err != nil {
+	client := http.DefaultClient
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send login request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to login: status: %s, body: %s", resp.Status, string(b))
+	}
+
+	loginResponse := &auth.LoginResponseBody{}
+	if err := json.NewDecoder(resp.Body).Decode(loginResponse); err != nil {
+		return fmt.Errorf("failed to decode login response: %v", err)
+	}
+
+	if err := g.networkManager.Start(loginResponse.IDToken); err != nil {
 		log.Error("Failed to start network manager: %v", err)
 		if err := g.loadNetworkError(); err != nil {
 			return fmt.Errorf("failed to load network error scene: %v", err)

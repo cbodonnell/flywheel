@@ -15,11 +15,11 @@ import (
 type TCPServer struct {
 	ClientManager *ClientManager
 	MessageQueue  queue.Queue
-	Port          string
+	Port          int
 }
 
 // NewTCPServer creates a new TCP server.
-func NewTCPServer(clientManager *ClientManager, messageQueue queue.Queue, port string) *TCPServer {
+func NewTCPServer(clientManager *ClientManager, messageQueue queue.Queue, port int) *TCPServer {
 	return &TCPServer{
 		ClientManager: clientManager,
 		MessageQueue:  messageQueue,
@@ -29,7 +29,7 @@ func NewTCPServer(clientManager *ClientManager, messageQueue queue.Queue, port s
 
 // Start starts the TCP server.
 func (s *TCPServer) Start() {
-	tcpAddr, err := net.ResolveTCPAddr("tcp", ":"+s.Port)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", s.Port))
 	if err != nil {
 		log.Error("Failed to resolve TCP address: %v", err)
 		return
@@ -83,6 +83,7 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 			}
 
 			// TODO: verify client login token and extract relevant claims
+			log.Debug("Received login request with token %s", clientLogin.Token)
 
 			clientID, err := s.ClientManager.ConnectClient(conn)
 			if err != nil {
@@ -178,7 +179,7 @@ func (e *ErrConnectionClosed) Error() string {
 
 // ReadMessageFromTCP reads a Message from a TCP connection
 func ReadMessageFromTCP(conn net.Conn) (*messages.Message, error) {
-	buf := make([]byte, messages.MessageBufferSize)
+	buf := make([]byte, messages.TCPMessageBufferSize)
 	n, err := conn.Read(buf)
 	if err != nil {
 		if err.Error() == "EOF" {

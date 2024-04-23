@@ -19,7 +19,7 @@ type MenuScene struct {
 
 type MenuSceneOptions struct {
 	// OnLogin is called when the start game button is pressed.
-	OnLogin func(username, password string)
+	OnLogin func(email, password string)
 }
 
 func NewMenuScene(opts MenuSceneOptions) (Scene, error) {
@@ -33,7 +33,7 @@ func NewMenuScene(opts MenuSceneOptions) (Scene, error) {
 
 type InitUIOptions struct {
 	// OnLogin is called when the start game button is pressed.
-	OnLogin func(username, password string)
+	OnLogin func(email, password string)
 }
 
 func initUI(opts InitUIOptions) *ebitenui.UI {
@@ -57,7 +57,7 @@ func initUI(opts InitUIOptions) *ebitenui.UI {
 			}))),
 	)
 
-	usernameTextInput := widget.NewTextInput(
+	emailTextInput := widget.NewTextInput(
 		widget.TextInputOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 				Position: widget.RowLayoutPositionCenter,
@@ -80,9 +80,9 @@ func initUI(opts InitUIOptions) *ebitenui.UI {
 		widget.TextInputOpts.CaretOpts(
 			widget.CaretOpts.Size(fontFace, 2),
 		),
-		widget.TextInputOpts.Placeholder("Username"),
+		widget.TextInputOpts.Placeholder("Email"),
 	)
-	rootContainer.AddChild(usernameTextInput)
+	rootContainer.AddChild(emailTextInput)
 
 	passwordTextInput := widget.NewTextInput(
 		widget.TextInputOpts.WidgetOpts(
@@ -133,18 +133,18 @@ func initUI(opts InitUIOptions) *ebitenui.UI {
 	)
 	rootContainer.AddChild(button)
 
-	// auto focus the username text input
-	usernameTextInput.Focus(true)
+	// auto focus the email text input
+	emailTextInput.Focus(true)
 
 	// register login handler with relevant widget events
 	loginHandler := func(args interface{}) {
-		username, password := usernameTextInput.GetText(), passwordTextInput.GetText()
-		if username == "" || password == "" {
+		email, password := emailTextInput.GetText(), passwordTextInput.GetText()
+		if email == "" || password == "" {
 			return
 		}
-		opts.OnLogin(username, password)
+		opts.OnLogin(email, password)
 	}
-	usernameTextInput.SubmitEvent.AddHandler(loginHandler)
+	emailTextInput.SubmitEvent.AddHandler(loginHandler)
 	passwordTextInput.SubmitEvent.AddHandler(loginHandler)
 	button.ClickedEvent.AddHandler(loginHandler)
 

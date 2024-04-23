@@ -2,60 +2,59 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 
-	firebase "firebase.google.com/go"
-	"firebase.google.com/go/auth"
-	"google.golang.org/api/option"
+	"github.com/cbodonnell/flywheel/pkg/log"
 )
 
-func NewFirebaseApp(credentialsPath string) (*firebase.App, error) {
-	opt := option.WithCredentialsFile(credentialsPath)
-	app, err := firebase.NewApp(context.Background(), nil, opt)
-	if err != nil {
-		return nil, fmt.Errorf("error initializing app: %v", err)
-	}
-	return app, nil
+type AuthServer struct {
+	server *http.Server
 }
 
-func NewFirebaseAuthClient(app *firebase.App) (*auth.Client, error) {
-	auth, err := app.Auth(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("error getting Auth client: %v", err)
-	}
-	return auth, nil
+type NewAuthServerOptions struct {
+	Port    int
+	Handler AuthHandler
 }
 
-func VerifyToken(client *auth.Client, idToken string) (*auth.Token, error) {
-	token, err := client.VerifyIDToken(context.Background(), idToken)
-	if err != nil {
-		return nil, fmt.Errorf("error verifying token: %v", err)
+// NewAuthServer creates a new http.Server for handling authentication requests
+func NewAuthServer(opts NewAuthServerOptions) *AuthServer {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/register", opts.Handler.HandleRegister())
+	mux.HandleFunc("/login", opts.Handler.HandleLogin())
+	mux.HandleFunc("/refresh", opts.Handler.HandleRefresh())
+	mux.HandleFunc("/delete", opts.Handler.HandleDelete())
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", opts.Port),
+		Handler: mux,
 	}
-	return token, nil
+	return &AuthServer{
+		server: server,
+	}
 }
 
-func RevokedToken(client *auth.Client, uid string) error {
-	if err := client.RevokeRefreshTokens(context.Background(), uid); err != nil {
-		return fmt.Errorf("error revoking refresh tokens: %v", err)
+// Start starts the AuthServer
+func (s *AuthServer) Start() {
+	log.Info("Auth server listening on %s", s.server.Addr)
+	if err := s.server.ListenAndServe(); err != nil {
+		if errors.Is(err, http.ErrServerClosed) {
+			log.Info("Auth server closed")
+			return
+		}
+		log.Error("Auth server error: %v", err)
 	}
-	return nil
 }
 
-func GetUser(client *auth.Client, uid string) (*auth.UserRecord, error) {
-	user, err := client.GetUser(context.Background(), uid)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching user data: %v", err)
-	}
-	return user, nil
+// Stop stops the AuthServer
+func (s *AuthServer) Stop(ctx context.Context) error {
+	return s.server.Shutdown(ctx)
 }
 
-func CreateUser(client *auth.Client, email, password string) (*auth.UserRecord, error) {
-	params := (&auth.UserToCreate{}).
-		Email(email).
-		Password(password)
-	user, err := client.CreateUser(context.Background(), params)
-	if err != nil {
-		return nil, fmt.Errorf("error creating user: %v", err)
-	}
-	return user, nil
+// AuthHandler is an interface for handling authentication requests
+type AuthHandler interface {
+	HandleRegister() func(w http.ResponseWriter, r *http.Request)
+	HandleLogin() func(w http.ResponseWriter, r *http.Request)
+	HandleRefresh() func(w http.ResponseWriter, r *http.Request)
+	HandleDelete() func(w http.ResponseWriter, r *http.Request)
 }

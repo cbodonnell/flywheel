@@ -102,7 +102,7 @@ func (c *UDPClient) SendMessage(msg *messages.Message) error {
 
 // receiveMessages continuously receives messages from the UDP server.
 func ReceiveUDPMessage(conn *net.UDPConn) (*messages.Message, error) {
-	buf := make([]byte, messages.MessageBufferSize)
+	buf := make([]byte, messages.UDPMessageBufferSize)
 	n, _, err := conn.ReadFromUDP(buf)
 	if err != nil {
 		if err, ok := err.(*net.OpError); ok && err.Err.Error() == "use of closed network connection" {

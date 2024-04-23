@@ -119,7 +119,7 @@ func (c *TCPClient) SendMessage(msg *messages.Message) error {
 
 // ReceiveTCPMessage receives a message from the TCP server.
 func ReceiveTCPMessage(conn net.Conn) (*messages.Message, error) {
-	buf := make([]byte, messages.MessageBufferSize)
+	buf := make([]byte, messages.UDPMessageBufferSize)
 	n, err := conn.Read(buf)
 	if err != nil {
 		if err.Error() == "EOF" {
