@@ -19,12 +19,14 @@ type Client struct {
 	ID         uint32
 	TCPConn    net.Conn
 	UDPAddress *net.UDPAddr
+	UserID     string
 }
 
 // ClientEvent represents an event that happened to a client
 type ClientEvent struct {
 	ClientID uint32
 	Type     ClientEventType
+	UserID   string
 }
 
 // ClientEventType represents the type of a client event
@@ -93,7 +95,7 @@ func (cm *ClientManager) GetClients() []*Client {
 }
 
 // ConnectClient adds a new client to the manager and returns its ID
-func (cm *ClientManager) ConnectClient(tcpConn net.Conn) (uint32, error) {
+func (cm *ClientManager) ConnectClient(tcpConn net.Conn, userID string) (uint32, error) {
 	cm.clientsLock.Lock()
 	defer cm.clientsLock.Unlock()
 
@@ -104,12 +106,14 @@ func (cm *ClientManager) ConnectClient(tcpConn net.Conn) (uint32, error) {
 	client := &Client{
 		ID:      clientID,
 		TCPConn: tcpConn,
+		UserID:  userID,
 	}
 	cm.clients[clientID] = client
 
 	event := ClientEvent{
 		ClientID: clientID,
 		Type:     ClientEventTypeConnect,
+		UserID:   userID,
 	}
 	cm.clientEventChan <- event
 
@@ -134,8 +138,14 @@ func (cm *ClientManager) DisconnectClient(clientID uint32) {
 	cm.clientsLock.Lock()
 	defer cm.clientsLock.Unlock()
 
+	client, ok := cm.clients[clientID]
+	if !ok {
+		return
+	}
+
 	event := ClientEvent{
-		ClientID: clientID,
+		ClientID: client.ID,
+		UserID:   client.UserID,
 		Type:     ClientEventTypeDisconnect,
 	}
 	cm.clientEventChan <- event

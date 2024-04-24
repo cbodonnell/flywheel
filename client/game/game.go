@@ -112,36 +112,12 @@ func (g *Game) loadMenu() error {
 }
 
 func (g *Game) login(email, password string) error {
-	// TODO: refactor this into a separate function
-	values := url.Values{}
-	values.Set("email", email)
-	values.Set("password", password)
-	requestBody := strings.NewReader(values.Encode())
-
-	req, err := http.NewRequest("POST", g.authURL+"/login", requestBody)
+	idToken, err := g.getIDToken(email, password)
 	if err != nil {
-		return fmt.Errorf("failed to create login request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	client := http.DefaultClient
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send login request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to login: status: %s, body: %s", resp.Status, string(b))
+		return fmt.Errorf("failed to get ID token: %v", err)
 	}
 
-	loginResponse := &auth.LoginResponseBody{}
-	if err := json.NewDecoder(resp.Body).Decode(loginResponse); err != nil {
-		return fmt.Errorf("failed to decode login response: %v", err)
-	}
-
-	if err := g.networkManager.Start(loginResponse.IDToken); err != nil {
+	if err := g.networkManager.Start(idToken); err != nil {
 		log.Error("Failed to start network manager: %v", err)
 		if err := g.loadNetworkError(); err != nil {
 			return fmt.Errorf("failed to load network error scene: %v", err)
@@ -154,6 +130,38 @@ func (g *Game) login(email, password string) error {
 	}
 
 	return nil
+}
+
+func (g *Game) getIDToken(email, password string) (string, error) {
+	values := url.Values{}
+	values.Set("email", email)
+	values.Set("password", password)
+	requestBody := strings.NewReader(values.Encode())
+
+	req, err := http.NewRequest("POST", g.authURL+"/login", requestBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to create login request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := http.DefaultClient
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send login request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("failed to login: status: %s, body: %s", resp.Status, string(b))
+	}
+
+	loginResponse := &auth.LoginResponseBody{}
+	if err := json.NewDecoder(resp.Body).Decode(loginResponse); err != nil {
+		return "", fmt.Errorf("failed to decode login response: %v", err)
+	}
+
+	return loginResponse.IDToken, nil
 }
 
 func (g *Game) loadGame() error {

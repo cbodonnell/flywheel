@@ -51,7 +51,16 @@ func main() {
 	clientManager := network.NewClientManager()
 	clientMessageQueue := queue.NewInMemoryQueue(10000)
 
-	tcpServer := network.NewTCPServer(clientManager, clientMessageQueue, *tcpPort)
+	app, err := auth.NewFirebaseApp(ctx, "serviceAccountKey.json")
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create Firebase app: %v", err))
+	}
+	authClient, err := auth.NewFirebaseAuthClient(ctx, app)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create Firebase auth client: %v", err))
+	}
+
+	tcpServer := network.NewTCPServer(authClient, clientManager, clientMessageQueue, *tcpPort)
 	udpServer := network.NewUDPServer(clientManager, clientMessageQueue, *udpPort)
 	go tcpServer.Start()
 	go udpServer.Start()

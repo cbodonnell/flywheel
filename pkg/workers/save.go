@@ -25,7 +25,7 @@ type NewSaveGameStateWorkerOptions struct {
 
 type SavePlayerStateRequest struct {
 	Timestamp   int64
-	ClientID    uint32
+	UserID      string
 	PlayerState *types.PlayerState
 }
 
@@ -58,8 +58,9 @@ func (w *SaveGameStateWorker) Start(ctx context.Context) {
 	}
 }
 
+// TODO: switch from clientID to user ID
 func (w *SaveGameStateWorker) savePlayerState(ctx context.Context, saveRequest SavePlayerStateRequest) {
-	err := w.repository.SavePlayerState(ctx, saveRequest.Timestamp, saveRequest.ClientID, saveRequest.PlayerState.Position)
+	err := w.repository.SavePlayerState(ctx, saveRequest.Timestamp, saveRequest.UserID, saveRequest.PlayerState.Position)
 	if err != nil {
 		log.Error("Failed to save player state: %v", err)
 	}

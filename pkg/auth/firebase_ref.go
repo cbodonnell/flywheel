@@ -9,51 +9,52 @@ import (
 	"google.golang.org/api/option"
 )
 
-func NewFirebaseApp(apiKey string) (*firebase.App, error) {
-	opt := option.WithAPIKey(apiKey)
-	app, err := firebase.NewApp(context.Background(), nil, opt)
+func NewFirebaseApp(ctx context.Context, credentialsPath string) (*firebase.App, error) {
+	// opt := option.WithAPIKey(apiKey)
+	opt := option.WithCredentialsFile(credentialsPath)
+	app, err := firebase.NewApp(ctx, nil, opt)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing app: %v", err)
 	}
 	return app, nil
 }
 
-func NewFirebaseAuthClient(app *firebase.App) (*auth.Client, error) {
-	auth, err := app.Auth(context.Background())
+func NewFirebaseAuthClient(ctx context.Context, app *firebase.App) (*auth.Client, error) {
+	auth, err := app.Auth(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting Auth client: %v", err)
 	}
 	return auth, nil
 }
 
-func VerifyToken(client *auth.Client, idToken string) (*auth.Token, error) {
-	token, err := client.VerifyIDToken(context.Background(), idToken)
+func VerifyToken(ctx context.Context, client *auth.Client, idToken string) (*auth.Token, error) {
+	token, err := client.VerifyIDToken(ctx, idToken)
 	if err != nil {
 		return nil, fmt.Errorf("error verifying token: %v", err)
 	}
 	return token, nil
 }
 
-func RevokedToken(client *auth.Client, uid string) error {
-	if err := client.RevokeRefreshTokens(context.Background(), uid); err != nil {
+func RevokedToken(ctx context.Context, client *auth.Client, uid string) error {
+	if err := client.RevokeRefreshTokens(ctx, uid); err != nil {
 		return fmt.Errorf("error revoking refresh tokens: %v", err)
 	}
 	return nil
 }
 
-func GetUser(client *auth.Client, uid string) (*auth.UserRecord, error) {
-	user, err := client.GetUser(context.Background(), uid)
+func GetUser(ctx context.Context, client *auth.Client, uid string) (*auth.UserRecord, error) {
+	user, err := client.GetUser(ctx, uid)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching user data: %v", err)
 	}
 	return user, nil
 }
 
-func CreateUser(client *auth.Client, email, password string) (*auth.UserRecord, error) {
+func CreateUser(ctx context.Context, client *auth.Client, email, password string) (*auth.UserRecord, error) {
 	params := (&auth.UserToCreate{}).
 		Email(email).
 		Password(password)
-	user, err := client.CreateUser(context.Background(), params)
+	user, err := client.CreateUser(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("error creating user: %v", err)
 	}

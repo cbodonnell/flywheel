@@ -1,6 +1,9 @@
 package types
 
 import (
+	"crypto/sha256"
+	"fmt"
+
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	"github.com/cbodonnell/flywheel/pkg/kinematic"
 	"github.com/cbodonnell/flywheel/pkg/messages"
@@ -9,6 +12,8 @@ import (
 
 type PlayerState struct {
 	LastProcessedTimestamp int64
+	PlayerID               string
+	PlayerName             string
 	Position               kinematic.Vector
 	Velocity               kinematic.Vector
 	Object                 *resolv.Object
@@ -31,8 +36,12 @@ const (
 	PlayerAnimationAttack
 )
 
-func NewPlayerState(positionX, positionY float64) *PlayerState {
+func NewPlayerState(playerID string, positionX, positionY float64) *PlayerState {
+	name := fmt.Sprintf("%x", sha256.Sum256([]byte(playerID)))[:8]
+
 	return &PlayerState{
+		PlayerID:   playerID,
+		PlayerName: name,
 		Position: kinematic.Vector{
 			X: positionX,
 			Y: positionY,
@@ -61,6 +70,8 @@ func (p *PlayerState) Equal(other *PlayerState) bool {
 func (p *PlayerState) Copy() *PlayerState {
 	return &PlayerState{
 		LastProcessedTimestamp: p.LastProcessedTimestamp,
+		PlayerID:               p.PlayerID,
+		PlayerName:             p.PlayerName,
 		Position:               p.Position,
 		Velocity:               p.Velocity,
 		IsOnGround:             p.IsOnGround,

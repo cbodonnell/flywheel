@@ -35,6 +35,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 				gameState: &types.GameState{
 					Players: map[uint32]*types.PlayerState{
 						1: {
+							PlayerID: "player-1",
 							Position: kinematic.Vector{
 								X: 0,
 								Y: 0,
@@ -82,6 +83,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 			want: &types.GameState{
 				Players: map[uint32]*types.PlayerState{
 					1: {
+						PlayerID: "player-1",
 						Position: kinematic.Vector{
 							X: 35,
 							Y: -58.80000000000001,
@@ -101,6 +103,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 				gameState: &types.GameState{
 					Players: map[uint32]*types.PlayerState{
 						1: {
+							PlayerID: "player-1",
 							Position: kinematic.Vector{
 								X: 0,
 								Y: 0,
@@ -120,6 +123,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 			want: &types.GameState{
 				Players: map[uint32]*types.PlayerState{
 					1: {
+						PlayerID: "player-1",
 						Position: kinematic.Vector{
 							X: 0,
 							Y: 0,
@@ -139,6 +143,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 				gameState: &types.GameState{
 					Players: map[uint32]*types.PlayerState{
 						1: {
+							PlayerID: "player-1",
 							Position: kinematic.Vector{
 								X: 0,
 								Y: 0,
@@ -186,6 +191,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 			want: &types.GameState{
 				Players: map[uint32]*types.PlayerState{
 					1: {
+						PlayerID: "player-1",
 						Position: kinematic.Vector{
 							X: 0.0,
 							Y: -14.700000000000003,

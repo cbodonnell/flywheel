@@ -78,12 +78,12 @@ func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gamet
 		return fmt.Errorf("failed to begin transaction: %v", err)
 	}
 
-	for clientID, playerState := range gameState.Players {
+	for _, playerState := range gameState.Players {
 		q := `
 		INSERT INTO players (player_id, timestamp, x, y) VALUES ($1, $2, $3, $4)
 		ON CONFLICT (player_id) DO UPDATE SET timestamp = $2, x = $3, y = $4;
 		`
-		_, err = tx.Exec(ctx, q, clientID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y)
+		_, err = tx.Exec(ctx, q, playerState.PlayerID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y)
 		if err != nil {
 			return fmt.Errorf("failed to insert player: %v", err)
 		}
@@ -96,12 +96,12 @@ func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gamet
 	return nil
 }
 
-func (r *PostgresRepository) SavePlayerState(ctx context.Context, timestamp int64, clientID uint32, position kinematic.Vector) error {
+func (r *PostgresRepository) SavePlayerState(ctx context.Context, timestamp int64, playerID string, position kinematic.Vector) error {
 	q := `
 	INSERT INTO players (player_id, timestamp, x, y) VALUES ($1, $2, $3, $4)
 	ON CONFLICT (player_id) DO UPDATE SET timestamp = $2, x = $3, y = $4;
 	`
-	_, err := r.conn.Exec(ctx, q, clientID, timestamp, position.X, position.Y)
+	_, err := r.conn.Exec(ctx, q, playerID, timestamp, position.X, position.Y)
 	if err != nil {
 		return fmt.Errorf("failed to insert player: %v", err)
 	}
@@ -109,13 +109,13 @@ func (r *PostgresRepository) SavePlayerState(ctx context.Context, timestamp int6
 	return nil
 }
 
-func (r *PostgresRepository) LoadPlayerState(ctx context.Context, clientID uint32) (*kinematic.Vector, error) {
+func (r *PostgresRepository) LoadPlayerState(ctx context.Context, playerID string) (*kinematic.Vector, error) {
 	q := `
 	SELECT x, y FROM players WHERE player_id = $1;
 	`
 	var x float64
 	var y float64
-	if err := r.conn.QueryRow(ctx, q, clientID).Scan(&x, &y); err != nil {
+	if err := r.conn.QueryRow(ctx, q, playerID).Scan(&x, &y); err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, &ErrNotFound{}
 		}

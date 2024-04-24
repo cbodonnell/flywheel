@@ -1,11 +1,13 @@
 package network
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"time"
 
+	"firebase.google.com/go/auth"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -13,14 +15,16 @@ import (
 
 // TCPServer represents a TCP server.
 type TCPServer struct {
+	AuthClient    *auth.Client
 	ClientManager *ClientManager
 	MessageQueue  queue.Queue
 	Port          int
 }
 
 // NewTCPServer creates a new TCP server.
-func NewTCPServer(clientManager *ClientManager, messageQueue queue.Queue, port int) *TCPServer {
+func NewTCPServer(authClient *auth.Client, clientManager *ClientManager, messageQueue queue.Queue, port int) *TCPServer {
 	return &TCPServer{
+		AuthClient:    authClient,
 		ClientManager: clientManager,
 		MessageQueue:  messageQueue,
 		Port:          port,
@@ -57,7 +61,19 @@ func (s *TCPServer) Start() {
 
 // handleTCPConnection handles a TCP connection.
 func (s *TCPServer) handleTCPConnection(conn net.Conn) {
+	ctx, cancel := context.WithCancel(context.Background())
+
 	var connectedClientID uint32 // set after login
+
+	defer func() {
+		cancel()
+		if connectedClientID != 0 {
+			s.ClientManager.DisconnectClient(connectedClientID)
+		}
+		conn.Close()
+		log.Debug("TCP Connection closed for client %d", connectedClientID)
+	}()
+
 	for {
 		message, err := ReadMessageFromTCP(conn)
 		if err != nil {
@@ -74,6 +90,7 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 			continue
 		}
 
+		// TODO: create "handler" functions for each message type
 		switch message.Type {
 		case messages.MessageTypeClientLogin:
 			clientLogin := &messages.ClientLogin{}
@@ -82,10 +99,19 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 				continue
 			}
 
-			// TODO: verify client login token and extract relevant claims
-			log.Debug("Received login request with token %s", clientLogin.Token)
+			token, err := s.AuthClient.VerifyIDToken(ctx, clientLogin.Token)
+			if err != nil {
+				log.Error("Failed to verify ID token: %v", err)
+				continue
+			}
 
-			clientID, err := s.ClientManager.ConnectClient(conn)
+			user, err := s.AuthClient.GetUser(ctx, token.UID)
+			if err != nil {
+				log.Error("Failed to get user: %v", err)
+				continue
+			}
+
+			clientID, err := s.ClientManager.ConnectClient(conn, user.UID)
 			if err != nil {
 				log.Error("Failed to add client: %v", err)
 				conn.Close()
@@ -93,13 +119,7 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 			}
 			connectedClientID = clientID
 
-			log.Debug("Client %d logged in", clientID)
-
-			defer func() {
-				log.Debug("TCP Connection closed for client %d", clientID)
-				s.ClientManager.DisconnectClient(clientID)
-				conn.Close()
-			}()
+			log.Info("Client %d connected as %s", clientID, user.UID)
 
 			assignID := messages.ServerLoginSuccess{
 				ClientID: clientID,
