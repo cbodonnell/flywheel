@@ -28,6 +28,7 @@ services:
       FLYWHEEL_DATABASE_URL: ${FLYWHEEL_DATABASE_URL:-postgresql://flywheel_user:password@flywheel-db:5432/flywheel_db}
       FLYWHEEL_FIREBASE_API_KEY: ${FLYWHEEL_FIREBASE_API_KEY}
     ports:
+      - 8080:8080/tcp
       - 8888:8888/tcp
       - 8889:8889/udp
     networks:
