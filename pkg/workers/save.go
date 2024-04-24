@@ -58,7 +58,6 @@ func (w *SaveGameStateWorker) Start(ctx context.Context) {
 	}
 }
 
-// TODO: switch from clientID to user ID
 func (w *SaveGameStateWorker) savePlayerState(ctx context.Context, saveRequest SavePlayerStateRequest) {
 	err := w.repository.SavePlayerState(ctx, saveRequest.Timestamp, saveRequest.UserID, saveRequest.PlayerState.Position)
 	if err != nil {
