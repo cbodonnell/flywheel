@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/cbodonnell/flywheel/pkg/auth/handlers"
 	"github.com/cbodonnell/flywheel/pkg/log"
 )
 
@@ -15,7 +16,7 @@ type AuthServer struct {
 
 type NewAuthServerOptions struct {
 	Port    int
-	Handler AuthHandler
+	Handler handlers.AuthHandler
 }
 
 // NewAuthServer creates a new http.Server for handling authentication requests
@@ -49,12 +50,4 @@ func (s *AuthServer) Start() {
 // Stop stops the AuthServer
 func (s *AuthServer) Stop(ctx context.Context) error {
 	return s.server.Shutdown(ctx)
-}
-
-// AuthHandler is an interface for handling authentication requests
-type AuthHandler interface {
-	HandleRegister() func(w http.ResponseWriter, r *http.Request)
-	HandleLogin() func(w http.ResponseWriter, r *http.Request)
-	HandleRefresh() func(w http.ResponseWriter, r *http.Request)
-	HandleDelete() func(w http.ResponseWriter, r *http.Request)
 }

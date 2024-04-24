@@ -105,13 +105,7 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 				continue
 			}
 
-			user, err := s.AuthClient.GetUser(ctx, token.UID)
-			if err != nil {
-				log.Error("Failed to get user: %v", err)
-				continue
-			}
-
-			clientID, err := s.ClientManager.ConnectClient(conn, user.UID)
+			clientID, err := s.ClientManager.ConnectClient(conn, token.UID)
 			if err != nil {
 				log.Error("Failed to add client: %v", err)
 				conn.Close()
@@ -119,7 +113,7 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 			}
 			connectedClientID = clientID
 
-			log.Info("Client %d connected as %s", clientID, user.UID)
+			log.Info("Client %d connected as %s", clientID, token.UID)
 
 			assignID := messages.ServerLoginSuccess{
 				ClientID: clientID,

@@ -8,7 +8,6 @@ import (
 
 const (
 	// UDPMessageBufferSize represents the maximum size of a message
-	// TODO: determine a more appropriate size
 	UDPMessageBufferSize = 508
 
 	// TCPMessageBufferSize represents the maximum size of a message

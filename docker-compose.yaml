@@ -26,6 +26,7 @@ services:
     command: ["./flywheel", "-log-level", "debug"]
     environment:
       FLYWHEEL_DATABASE_URL: ${FLYWHEEL_DATABASE_URL:-postgresql://flywheel_user:password@flywheel-db:5432/flywheel_db}
+      FLYWHEEL_FIREBASE_PROJECT_ID: ${FLYWHEEL_FIREBASE_PROJECT_ID}
       FLYWHEEL_FIREBASE_API_KEY: ${FLYWHEEL_FIREBASE_API_KEY}
     ports:
       - 8080:8080/tcp

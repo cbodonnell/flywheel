@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cbodonnell/flywheel/pkg/auth"
+	authhandlers "github.com/cbodonnell/flywheel/pkg/auth/handlers"
 	"github.com/cbodonnell/flywheel/pkg/game"
 	"github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
@@ -38,20 +39,24 @@ func main() {
 	log.Info("Starting server version %s", version.Get())
 	ctx := context.Background()
 
+	firebaseProjectID := os.Getenv("FLYWHEEL_FIREBASE_PROJECT_ID")
+	if firebaseProjectID == "" {
+		panic("FLYWHEEL_FIREBASE_PROJECT_ID environment variable must be set")
+	}
 	firebaseApiKey := os.Getenv("FLYWHEEL_FIREBASE_API_KEY")
 	if firebaseApiKey == "" {
 		panic("FLYWHEEL_FIREBASE_API_KEY environment variable must be set")
 	}
 	authServer := auth.NewAuthServer(auth.NewAuthServerOptions{
 		Port:    *authPort,
-		Handler: auth.NewFirebaseAuthHandler(firebaseApiKey),
+		Handler: authhandlers.NewFirebaseAuthHandler(firebaseApiKey),
 	})
 	go authServer.Start()
 
 	clientManager := network.NewClientManager()
 	clientMessageQueue := queue.NewInMemoryQueue(10000)
 
-	app, err := auth.NewFirebaseApp(ctx, "serviceAccountKey.json")
+	app, err := auth.NewFirebaseApp(ctx, firebaseProjectID, firebaseApiKey)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create Firebase app: %v", err))
 	}

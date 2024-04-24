@@ -42,6 +42,7 @@ build-client:
 
 .PHONY: run
 run:
+	FLYWHEEL_FIREBASE_PROJECT_ID=${FLYWHEEL_FIREBASE_PROJECT_ID} \
 	FLYWHEEL_FIREBASE_API_KEY=${FLYWHEEL_FIREBASE_API_KEY} \
 	go run \
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \

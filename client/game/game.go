@@ -11,7 +11,7 @@ import (
 	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/client/scenes"
-	"github.com/cbodonnell/flywheel/pkg/auth"
+	authhandlers "github.com/cbodonnell/flywheel/pkg/auth/handlers"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -156,7 +156,7 @@ func (g *Game) getIDToken(email, password string) (string, error) {
 		return "", fmt.Errorf("failed to login: status: %s, body: %s", resp.Status, string(b))
 	}
 
-	loginResponse := &auth.LoginResponseBody{}
+	loginResponse := &authhandlers.LoginResponseBody{}
 	if err := json.NewDecoder(resp.Body).Decode(loginResponse); err != nil {
 		return "", fmt.Errorf("failed to decode login response: %v", err)
 	}
