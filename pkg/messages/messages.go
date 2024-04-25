@@ -104,6 +104,10 @@ type ServerGameUpdate struct {
 type PlayerStateUpdate struct {
 	// LastProcessedTimestamp is the timestamp of the last processed update
 	LastProcessedTimestamp int64 `json:"lastProcessedTimestamp"`
+	// PlayerID is the ID of the player
+	PlayerID string `json:"playerID"`
+	// PlayerName is the name of the player
+	PlayerName string `json:"playerName"`
 	// Position is the position of the player
 	Position kinematic.Vector `json:"position"`
 	// Velocity is the velocity of the player

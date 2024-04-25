@@ -18,6 +18,8 @@ func init() {
 
 var MPlusNormalFont font.Face
 var TTFNormalFont font.Face
+var TTFSmallFont font.Face
+var TTFTinyFont font.Face
 
 func loadFonts() error {
 	tt, err := opentype.Parse(fonts.MPlus1pRegular_ttf)
@@ -41,6 +43,18 @@ func loadFonts() error {
 
 	TTFNormalFont = truetype.NewFace(ttfFont, &truetype.Options{
 		Size:    24,
+		DPI:     dpi,
+		Hinting: font.HintingFull,
+	})
+
+	TTFSmallFont = truetype.NewFace(ttfFont, &truetype.Options{
+		Size:    16,
+		DPI:     dpi,
+		Hinting: font.HintingFull,
+	})
+
+	TTFTinyFont = truetype.NewFace(ttfFont, &truetype.Options{
+		Size:    8,
 		DPI:     dpi,
 		Hinting: font.HintingFull,
 	})

@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"image/color"
+	"strings"
 	"time"
 
 	"github.com/cbodonnell/flywheel/client/animations"
+	"github.com/cbodonnell/flywheel/client/fonts"
 	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
@@ -14,8 +16,10 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/solarlune/resolv"
+	"golang.org/x/image/font"
 )
 
 const (
@@ -150,6 +154,14 @@ func (p *Player) Draw(screen *ebiten.Image) {
 	if !p.State.IsAttacking {
 		p.animations[gametypes.PlayerAnimationAttack].Reset()
 	}
+
+	t := strings.ToUpper(p.State.PlayerName)
+	bounds, _ := font.BoundString(fonts.TTFTinyFont, t)
+	op := &ebiten.DrawImageOptions{}
+	offsetY := float64(10)
+	op.GeoM.Translate(float64(p.State.Position.X)+constants.PlayerWidth/2-float64(bounds.Max.X>>6)/2, float64(screen.Bounds().Dy())-float64(p.State.Position.Y)-constants.PlayerHeight-offsetY)
+	op.ColorScale.ScaleWithColor(color.White)
+	text.DrawWithOptions(screen, t, fonts.TTFTinyFont, op)
 
 	if p.debug {
 		strokeWidth := float32(1)
