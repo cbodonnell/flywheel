@@ -60,7 +60,7 @@ func (r *SQLiteRepository) SaveGameState(ctx context.Context, gameState *gametyp
 
 	for _, playerState := range gameState.Players {
 		q := `
-		INSERT OR REPLACE INTO players (player_id, timestamp, x, y)
+		INSERT OR REPLACE INTO players (user_id, timestamp, x, y)
 		VALUES (?, ?, ?, ?);
 		`
 		_, err = tx.ExecContext(ctx, q, playerState.UserID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y)

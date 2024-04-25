@@ -80,8 +80,8 @@ func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gamet
 
 	for _, playerState := range gameState.Players {
 		q := `
-		INSERT INTO players (player_id, timestamp, x, y) VALUES ($1, $2, $3, $4)
-		ON CONFLICT (player_id) DO UPDATE SET timestamp = $2, x = $3, y = $4;
+		INSERT INTO players (user_id, timestamp, x, y) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (user_id) DO UPDATE SET timestamp = $2, x = $3, y = $4;
 		`
 		_, err = tx.Exec(ctx, q, playerState.UserID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y)
 		if err != nil {
