@@ -40,10 +40,6 @@ func main() {
 	log.Info("Starting server version %s", version.Get())
 	ctx := context.Background()
 
-	firebaseProjectID := os.Getenv("FLYWHEEL_FIREBASE_PROJECT_ID")
-	if firebaseProjectID == "" {
-		panic("FLYWHEEL_FIREBASE_PROJECT_ID environment variable must be set")
-	}
 	firebaseApiKey := os.Getenv("FLYWHEEL_FIREBASE_API_KEY")
 	if firebaseApiKey == "" {
 		panic("FLYWHEEL_FIREBASE_API_KEY environment variable must be set")
@@ -57,7 +53,11 @@ func main() {
 	clientManager := network.NewClientManager()
 	clientMessageQueue := queue.NewInMemoryQueue(10000)
 
-	authProvider, err := authproviders.NewFirebaseAuthProvider(ctx, firebaseProjectID, firebaseApiKey)
+	firebaseProjectID := os.Getenv("FLYWHEEL_FIREBASE_PROJECT_ID")
+	if firebaseProjectID == "" {
+		panic("FLYWHEEL_FIREBASE_PROJECT_ID environment variable must be set")
+	}
+	authProvider, err := authproviders.NewFirebaseAuthProvider(ctx, firebaseProjectID)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create Firebase auth provider: %v", err))
 	}

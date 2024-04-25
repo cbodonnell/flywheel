@@ -19,8 +19,8 @@ type FirebaseAuthProvider struct {
 }
 
 // NewFirebaseAuthProvider creates a new FirebaseAuthProvider
-func NewFirebaseAuthProvider(ctx context.Context, projectID string, apiKey string) (*FirebaseAuthProvider, error) {
-	opt := option.WithAPIKey(apiKey)
+func NewFirebaseAuthProvider(ctx context.Context, projectID string) (*FirebaseAuthProvider, error) {
+	opt := option.WithoutAuthentication()
 	cfg := &firebase.Config{
 		ProjectID: projectID,
 	}
