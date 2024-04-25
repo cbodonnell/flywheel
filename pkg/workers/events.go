@@ -66,7 +66,7 @@ func (w *ClientEventWorker) handleClientConnect(event network.ClientEvent) {
 
 	if err := w.connectionEventQueue.Enqueue(&gametypes.ConnectPlayerEvent{
 		ClientID: event.ClientID,
-		PlayerID: event.UserID,
+		UserID:   event.UserID,
 		Position: position,
 	}); err != nil {
 		log.Error("Failed to enqueue connect player event: %v", err)

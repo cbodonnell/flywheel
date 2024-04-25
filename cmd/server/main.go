@@ -10,6 +10,7 @@ import (
 
 	"github.com/cbodonnell/flywheel/pkg/auth"
 	authhandlers "github.com/cbodonnell/flywheel/pkg/auth/handlers"
+	authproviders "github.com/cbodonnell/flywheel/pkg/auth/providers"
 	"github.com/cbodonnell/flywheel/pkg/game"
 	"github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
@@ -56,16 +57,12 @@ func main() {
 	clientManager := network.NewClientManager()
 	clientMessageQueue := queue.NewInMemoryQueue(10000)
 
-	app, err := auth.NewFirebaseApp(ctx, firebaseProjectID, firebaseApiKey)
+	authProvider, err := authproviders.NewFirebaseAuthProvider(ctx, firebaseProjectID, firebaseApiKey)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create Firebase app: %v", err))
-	}
-	authClient, err := auth.NewFirebaseAuthClient(ctx, app)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to create Firebase auth client: %v", err))
+		panic(fmt.Sprintf("Failed to create Firebase auth provider: %v", err))
 	}
 
-	tcpServer := network.NewTCPServer(authClient, clientManager, clientMessageQueue, *tcpPort)
+	tcpServer := network.NewTCPServer(authProvider, clientManager, clientMessageQueue, *tcpPort)
 	udpServer := network.NewUDPServer(clientManager, clientMessageQueue, *udpPort)
 	go tcpServer.Start()
 	go udpServer.Start()

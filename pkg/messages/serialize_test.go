@@ -24,8 +24,8 @@ func TestSerializeDeserializeGameState(t *testing.T) {
 					Players: map[uint32]*PlayerStateUpdate{
 						1: {
 							LastProcessedTimestamp: 1,
-							PlayerID:               "player-1",
-							PlayerName:             "player-1",
+							UserID:                 "player-1",
+							Name:                   "player-1",
 							Position: kinematic.Vector{
 								X: 0.0,
 								Y: 0.0,

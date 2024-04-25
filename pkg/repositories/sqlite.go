@@ -63,7 +63,7 @@ func (r *SQLiteRepository) SaveGameState(ctx context.Context, gameState *gametyp
 		INSERT OR REPLACE INTO players (player_id, timestamp, x, y)
 		VALUES (?, ?, ?, ?);
 		`
-		_, err = tx.ExecContext(ctx, q, playerState.PlayerID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y)
+		_, err = tx.ExecContext(ctx, q, playerState.UserID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y)
 		if err != nil {
 			return fmt.Errorf("failed to insert player: %v", err)
 		}
@@ -76,12 +76,12 @@ func (r *SQLiteRepository) SaveGameState(ctx context.Context, gameState *gametyp
 	return nil
 }
 
-func (r *SQLiteRepository) SavePlayerState(ctx context.Context, timestamp int64, playerID string, position kinematic.Vector) error {
+func (r *SQLiteRepository) SavePlayerState(ctx context.Context, timestamp int64, userID string, position kinematic.Vector) error {
 	q := `
-	INSERT OR REPLACE INTO players (player_id, timestamp, x, y)
+	INSERT OR REPLACE INTO players (user_id, timestamp, x, y)
 	VALUES (?, ?, ?, ?);
 	`
-	_, err := r.db.ExecContext(ctx, q, playerID, timestamp, position.X, position.Y)
+	_, err := r.db.ExecContext(ctx, q, userID, timestamp, position.X, position.Y)
 	if err != nil {
 		return fmt.Errorf("failed to insert player: %v", err)
 	}
@@ -89,13 +89,13 @@ func (r *SQLiteRepository) SavePlayerState(ctx context.Context, timestamp int64,
 	return nil
 }
 
-func (r *SQLiteRepository) LoadPlayerState(ctx context.Context, playerID string) (*kinematic.Vector, error) {
+func (r *SQLiteRepository) LoadPlayerState(ctx context.Context, userID string) (*kinematic.Vector, error) {
 	q := `
-	SELECT x, y FROM players WHERE player_id = $1;
+	SELECT x, y FROM players WHERE user_id = $1;
 	`
 	var x float64
 	var y float64
-	if err := r.db.QueryRowContext(ctx, q, playerID).Scan(&x, &y); err != nil {
+	if err := r.db.QueryRowContext(ctx, q, userID).Scan(&x, &y); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, &ErrNotFound{}
 		}

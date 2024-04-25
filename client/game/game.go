@@ -96,6 +96,7 @@ func (g *Game) SetScene(scene scenes.Scene) error {
 func (g *Game) loadMenu() error {
 	menu, err := scenes.NewMenuScene(scenes.MenuSceneOptions{
 		OnLogin: func(email, password string) {
+			// TODO: this blocks the main thread
 			if err := g.login(email, password); err != nil {
 				log.Error("Failed to start game: %v", err)
 			}
@@ -174,7 +175,6 @@ func (g *Game) loadGame() error {
 	}
 	g.mode = GameModePlay
 	return nil
-
 }
 
 func (g *Game) loadGameOver() error {
@@ -254,11 +254,7 @@ func (g *Game) checkNetworkManagerErrors() error {
 func (g *Game) handleInput() error {
 	switch g.mode {
 	case GameModeMenu:
-		// if input.IsPositiveJustPressed() {
-		// 	if err := g.loadGame(); err != nil {
-		// 		return fmt.Errorf("failed to load game scene: %v", err)
-		// 	}
-		// }
+		// no input handling here
 	case GameModePlay:
 		if input.IsNegativeJustPressed() {
 			if err := g.loadGameOver(); err != nil {

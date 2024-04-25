@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	"firebase.google.com/go/auth"
+	authproviders "github.com/cbodonnell/flywheel/pkg/auth/providers"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -15,16 +15,16 @@ import (
 
 // TCPServer represents a TCP server.
 type TCPServer struct {
-	AuthClient    *auth.Client
+	AuthProvider  authproviders.AuthProvider
 	ClientManager *ClientManager
 	MessageQueue  queue.Queue
 	Port          int
 }
 
 // NewTCPServer creates a new TCP server.
-func NewTCPServer(authClient *auth.Client, clientManager *ClientManager, messageQueue queue.Queue, port int) *TCPServer {
+func NewTCPServer(authProvider authproviders.AuthProvider, clientManager *ClientManager, messageQueue queue.Queue, port int) *TCPServer {
 	return &TCPServer{
-		AuthClient:    authClient,
+		AuthProvider:  authProvider,
 		ClientManager: clientManager,
 		MessageQueue:  messageQueue,
 		Port:          port,
@@ -99,7 +99,7 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 				continue
 			}
 
-			token, err := s.AuthClient.VerifyIDToken(ctx, clientLogin.Token)
+			token, err := s.AuthProvider.VerifyToken(ctx, clientLogin.Token)
 			if err != nil {
 				log.Error("Failed to verify ID token: %v", err)
 				continue

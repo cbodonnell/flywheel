@@ -83,7 +83,7 @@ func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gamet
 		INSERT INTO players (player_id, timestamp, x, y) VALUES ($1, $2, $3, $4)
 		ON CONFLICT (player_id) DO UPDATE SET timestamp = $2, x = $3, y = $4;
 		`
-		_, err = tx.Exec(ctx, q, playerState.PlayerID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y)
+		_, err = tx.Exec(ctx, q, playerState.UserID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y)
 		if err != nil {
 			return fmt.Errorf("failed to insert player: %v", err)
 		}
@@ -96,12 +96,12 @@ func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gamet
 	return nil
 }
 
-func (r *PostgresRepository) SavePlayerState(ctx context.Context, timestamp int64, playerID string, position kinematic.Vector) error {
+func (r *PostgresRepository) SavePlayerState(ctx context.Context, timestamp int64, userID string, position kinematic.Vector) error {
 	q := `
-	INSERT INTO players (player_id, timestamp, x, y) VALUES ($1, $2, $3, $4)
-	ON CONFLICT (player_id) DO UPDATE SET timestamp = $2, x = $3, y = $4;
+	INSERT INTO players (user_id, timestamp, x, y) VALUES ($1, $2, $3, $4)
+	ON CONFLICT (user_id) DO UPDATE SET timestamp = $2, x = $3, y = $4;
 	`
-	_, err := r.conn.Exec(ctx, q, playerID, timestamp, position.X, position.Y)
+	_, err := r.conn.Exec(ctx, q, userID, timestamp, position.X, position.Y)
 	if err != nil {
 		return fmt.Errorf("failed to insert player: %v", err)
 	}
@@ -109,13 +109,13 @@ func (r *PostgresRepository) SavePlayerState(ctx context.Context, timestamp int6
 	return nil
 }
 
-func (r *PostgresRepository) LoadPlayerState(ctx context.Context, playerID string) (*kinematic.Vector, error) {
+func (r *PostgresRepository) LoadPlayerState(ctx context.Context, userID string) (*kinematic.Vector, error) {
 	q := `
-	SELECT x, y FROM players WHERE player_id = $1;
+	SELECT x, y FROM players WHERE user_id = $1;
 	`
 	var x float64
 	var y float64
-	if err := r.conn.QueryRow(ctx, q, playerID).Scan(&x, &y); err != nil {
+	if err := r.conn.QueryRow(ctx, q, userID).Scan(&x, &y); err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, &ErrNotFound{}
 		}

@@ -4,7 +4,7 @@ import "github.com/cbodonnell/flywheel/pkg/kinematic"
 
 type ConnectPlayerEvent struct {
 	ClientID uint32
-	PlayerID string
+	UserID   string
 	Position *kinematic.Vector
 }
 

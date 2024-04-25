@@ -105,14 +105,13 @@ func (gm *GameManager) processConnectionEvents() {
 	for _, item := range pendingEvents {
 		switch event := item.(type) {
 		case *types.ConnectPlayerEvent:
-			playerState := types.NewPlayerState(event.PlayerID, event.Position.X, event.Position.Y)
-			log.Debug("Player %s created as %s", playerState.PlayerID, playerState.PlayerName)
+			playerState := types.NewPlayerState(event.UserID, event.Position.X, event.Position.Y)
+			log.Debug("Player %s created as %s", playerState.UserID, playerState.Name)
 			// add the player to the game state
 			gm.gameState.Players[event.ClientID] = playerState
 			// add the player object to the collision space
 			gm.gameState.CollisionSpace.Add(playerState.Object)
 
-			// TODO: transmit the player ID and name to the client as part of player state
 			// send a message to connected clients to add the player to the game
 			playerConnect := &messages.ServerPlayerConnect{
 				ClientID:    event.ClientID,
@@ -141,7 +140,7 @@ func (gm *GameManager) processConnectionEvents() {
 			// send a request to save the player state before deleting it
 			saveRequest := workers.SavePlayerStateRequest{
 				Timestamp:   gm.gameState.Timestamp,
-				UserID:      gm.gameState.Players[event.ClientID].PlayerID,
+				UserID:      gm.gameState.Players[event.ClientID].UserID,
 				PlayerState: gm.gameState.Players[event.ClientID],
 			}
 			gm.savePlayerStateChan <- saveRequest

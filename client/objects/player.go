@@ -155,7 +155,7 @@ func (p *Player) Draw(screen *ebiten.Image) {
 		p.animations[gametypes.PlayerAnimationAttack].Reset()
 	}
 
-	t := strings.ToUpper(p.State.PlayerName)
+	t := strings.ToUpper(p.State.Name)
 	bounds, _ := font.BoundString(fonts.TTFTinyFont, t)
 	op := &ebiten.DrawImageOptions{}
 	offsetY := float64(10)

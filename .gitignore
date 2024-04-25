@@ -7,6 +7,3 @@ bin/
 
 # environment variables
 .env
-
-# service account key
-serviceAccountKey.json
