@@ -7,9 +7,9 @@ const (
 	// PlayerJumpSpeed is the speed at which players jump
 	PlayerJumpSpeed float64 = 750.0
 	// Player Height
-	PlayerHeight float64 = 32.0
+	PlayerHeight float64 = 64.0
 	// Player Width
-	PlayerWidth float64 = 32.0
+	PlayerWidth float64 = 64.0
 	// Player Starting X
 	PlayerStartingX float64 = 320.0
 	// Player Starting Y
@@ -31,9 +31,9 @@ const (
 	// NPCSpeed is the speed at which NPCs move
 	NPCSpeed float64 = 100.0
 	// NPC Height
-	NPCHeight float64 = 32.0
+	NPCHeight float64 = 64.0
 	// NPC Width
-	NPCWidth float64 = 32.0
+	NPCWidth float64 = 64.0
 	// NPC Starting X
 	NPCStartingX float64 = 100.0
 	// NPC Starting Y

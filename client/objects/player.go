@@ -156,12 +156,13 @@ func (p *Player) Draw(screen *ebiten.Image) {
 	}
 
 	t := strings.ToUpper(p.State.Name)
-	bounds, _ := font.BoundString(fonts.TTFTinyFont, t)
+	f := fonts.TTFSmallFont
+	bounds, _ := font.BoundString(f, t)
 	op := &ebiten.DrawImageOptions{}
-	offsetY := float64(10)
+	offsetY := float64(12)
 	op.GeoM.Translate(float64(p.State.Position.X)+constants.PlayerWidth/2-float64(bounds.Max.X>>6)/2, float64(screen.Bounds().Dy())-float64(p.State.Position.Y)-constants.PlayerHeight-offsetY)
 	op.ColorScale.ScaleWithColor(color.White)
-	text.DrawWithOptions(screen, t, fonts.TTFTinyFont, op)
+	text.DrawWithOptions(screen, t, f, op)
 
 	if p.debug {
 		strokeWidth := float32(1)
