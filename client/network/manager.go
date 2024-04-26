@@ -85,6 +85,7 @@ func (m *NetworkManager) Start(token string) error {
 	go func(ctx context.Context) {
 		defer m.clientWaitGroup.Done()
 		if err := m.tcpClient.HandleMessages(ctx); err != nil {
+			// TODO: find a way to do this without channels (maybe a flag w/ mutex?)
 			m.tcpClientErrChan <- err
 		}
 	}(ctx)
@@ -112,6 +113,7 @@ func (m *NetworkManager) Start(token string) error {
 	go func(ctx context.Context) {
 		defer m.clientWaitGroup.Done()
 		if err := m.udpClient.HandleMessages(ctx); err != nil {
+			// TODO: find a way to do this without channels (maybe a flag w/ mutex?)
 			m.udpClientErrChan <- err
 		}
 	}(ctx)
