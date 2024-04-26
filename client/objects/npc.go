@@ -48,8 +48,8 @@ func (p *NPC) Draw(screen *ebiten.Image) {
 	if !p.State.IsDead() {
 		// Draw hitpoints bar
 		hitpointsBarWidth := float32(constants.NPCWidth)
-		hitpointsBarHeight := float32(5)
-		hitpointsBarYOffset := float32(10)
+		hitpointsBarHeight := float32(8)
+		hitpointsBarYOffset := float32(12)
 		hitpointsBarX := float32(p.State.Position.X)
 		hitpointsBarY := float32(float64(screen.Bounds().Dy())-constants.NPCHeight) - float32(p.State.Position.Y) - hitpointsBarHeight - hitpointsBarYOffset
 		hitpointsBarColor := color.RGBA{255, 0, 0, 255} // Red
