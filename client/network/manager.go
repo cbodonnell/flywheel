@@ -29,7 +29,7 @@ type NetworkManager struct {
 	udpClientErrChan chan error
 	cancelClientCtx  context.CancelFunc
 
-	clientWaitGroup *sync.WaitGroup
+	clientWaitGroup sync.WaitGroup
 	clientID        uint32
 	clientIDMutex   sync.Mutex
 	clientIDChan    <-chan uint32
@@ -67,40 +67,36 @@ func NewNetworkManager(serverSettings ServerSettings, messageQueue queue.Queue) 
 		tcpClientErrChan:   make(chan error),
 		udpClient:          udpClient,
 		udpClientErrChan:   make(chan error),
-		clientWaitGroup:    &sync.WaitGroup{},
 		clientIDChan:       clientIDChan,
 		serverTimeChan:     serverTimeChan,
 	}, nil
 }
 
 // Start starts the network manager.
-func (m *NetworkManager) Start() error {
+func (m *NetworkManager) Start(token string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancelClientCtx = cancel
 
-	// Connect to the server via TCP.
+	if err := m.tcpClient.Connect(); err != nil {
+		return fmt.Errorf("failed to start TCP client: %v", err)
+	}
+
 	m.clientWaitGroup.Add(1)
 	go func(ctx context.Context) {
 		defer m.clientWaitGroup.Done()
-		err := m.tcpClient.Connect(ctx)
-		if err != nil {
+		if err := m.tcpClient.HandleMessages(ctx); err != nil {
+			// TODO: find a way to do this without channels (maybe a flag w/ mutex?)
 			m.tcpClientErrChan <- err
 		}
 	}(ctx)
 
-	// Connect to the server via UDP.
-	m.clientWaitGroup.Add(1)
-	go func(ctx context.Context) {
-		defer m.clientWaitGroup.Done()
-		err := m.udpClient.Connect(ctx)
-		if err != nil {
-			m.udpClientErrChan <- err
-		}
-	}(ctx)
+	if err := m.login(token); err != nil {
+		return fmt.Errorf("failed to login: %v", err)
+	}
 
 	select {
-	case err := <-m.tcpClientErrChan:
-		return fmt.Errorf("failed to start TCP client: %v", err)
+	case <-time.After(10 * time.Second):
+		return fmt.Errorf("timed out waiting for client ID")
 	case m.clientID = <-m.clientIDChan:
 		log.Info("Connected to server with client ID %d", m.clientID)
 	}
@@ -109,11 +105,43 @@ func (m *NetworkManager) Start() error {
 		return fmt.Errorf("failed to start time sync: %v", err)
 	}
 
+	if err := m.udpClient.Connect(); err != nil {
+		return fmt.Errorf("failed to start UDP client: %v", err)
+	}
+
+	m.clientWaitGroup.Add(1)
+	go func(ctx context.Context) {
+		defer m.clientWaitGroup.Done()
+		if err := m.udpClient.HandleMessages(ctx); err != nil {
+			// TODO: find a way to do this without channels (maybe a flag w/ mutex?)
+			m.udpClientErrChan <- err
+		}
+	}(ctx)
+
 	if err := m.pingUDP(); err != nil {
 		return fmt.Errorf("failed to ping UDP: %v", err)
 	}
 
 	m.isConnected = true
+	return nil
+}
+
+func (m *NetworkManager) login(token string) error {
+	login := &messages.ClientLogin{
+		Token: token,
+	}
+	b, err := json.Marshal(login)
+	if err != nil {
+		return fmt.Errorf("failed to serialize login message: %v", err)
+	}
+	msg := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeClientLogin,
+		Payload:  b,
+	}
+	if err := m.SendReliableMessage(msg); err != nil {
+		return fmt.Errorf("failed to send login message: %v", err)
+	}
 	return nil
 }
 

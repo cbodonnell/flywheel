@@ -53,8 +53,24 @@ func (rcv *PlayerState) MutateLastProcessedTimestamp(n int64) bool {
 	return rcv._tab.MutateInt64Slot(4, n)
 }
 
-func (rcv *PlayerState) Position(obj *Position) *Position {
+func (rcv *PlayerState) UserId() []byte {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
+	if o != 0 {
+		return rcv._tab.ByteVector(o + rcv._tab.Pos)
+	}
+	return nil
+}
+
+func (rcv *PlayerState) Name() []byte {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	if o != 0 {
+		return rcv._tab.ByteVector(o + rcv._tab.Pos)
+	}
+	return nil
+}
+
+func (rcv *PlayerState) Position(obj *Position) *Position {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
@@ -67,7 +83,7 @@ func (rcv *PlayerState) Position(obj *Position) *Position {
 }
 
 func (rcv *PlayerState) Velocity(obj *Velocity) *Velocity {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
 	if o != 0 {
 		x := rcv._tab.Indirect(o + rcv._tab.Pos)
 		if obj == nil {
@@ -80,7 +96,7 @@ func (rcv *PlayerState) Velocity(obj *Velocity) *Velocity {
 }
 
 func (rcv *PlayerState) IsOnGround() bool {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
 	if o != 0 {
 		return rcv._tab.GetBool(o + rcv._tab.Pos)
 	}
@@ -88,34 +104,10 @@ func (rcv *PlayerState) IsOnGround() bool {
 }
 
 func (rcv *PlayerState) MutateIsOnGround(n bool) bool {
-	return rcv._tab.MutateBoolSlot(10, n)
+	return rcv._tab.MutateBoolSlot(14, n)
 }
 
 func (rcv *PlayerState) IsAttacking() bool {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
-	if o != 0 {
-		return rcv._tab.GetBool(o + rcv._tab.Pos)
-	}
-	return false
-}
-
-func (rcv *PlayerState) MutateIsAttacking(n bool) bool {
-	return rcv._tab.MutateBoolSlot(12, n)
-}
-
-func (rcv *PlayerState) Animation() byte {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
-	if o != 0 {
-		return rcv._tab.GetByte(o + rcv._tab.Pos)
-	}
-	return 0
-}
-
-func (rcv *PlayerState) MutateAnimation(n byte) bool {
-	return rcv._tab.MutateByteSlot(14, n)
-}
-
-func (rcv *PlayerState) AnimationFlip() bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(16))
 	if o != 0 {
 		return rcv._tab.GetBool(o + rcv._tab.Pos)
@@ -123,33 +115,63 @@ func (rcv *PlayerState) AnimationFlip() bool {
 	return false
 }
 
-func (rcv *PlayerState) MutateAnimationFlip(n bool) bool {
+func (rcv *PlayerState) MutateIsAttacking(n bool) bool {
 	return rcv._tab.MutateBoolSlot(16, n)
 }
 
+func (rcv *PlayerState) Animation() byte {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(18))
+	if o != 0 {
+		return rcv._tab.GetByte(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *PlayerState) MutateAnimation(n byte) bool {
+	return rcv._tab.MutateByteSlot(18, n)
+}
+
+func (rcv *PlayerState) AnimationFlip() bool {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(20))
+	if o != 0 {
+		return rcv._tab.GetBool(o + rcv._tab.Pos)
+	}
+	return false
+}
+
+func (rcv *PlayerState) MutateAnimationFlip(n bool) bool {
+	return rcv._tab.MutateBoolSlot(20, n)
+}
+
 func PlayerStateStart(builder *flatbuffers.Builder) {
-	builder.StartObject(7)
+	builder.StartObject(9)
 }
 func PlayerStateAddLastProcessedTimestamp(builder *flatbuffers.Builder, lastProcessedTimestamp int64) {
 	builder.PrependInt64Slot(0, lastProcessedTimestamp, 0)
 }
+func PlayerStateAddUserId(builder *flatbuffers.Builder, userId flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(userId), 0)
+}
+func PlayerStateAddName(builder *flatbuffers.Builder, name flatbuffers.UOffsetT) {
+	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(name), 0)
+}
 func PlayerStateAddPosition(builder *flatbuffers.Builder, position flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(position), 0)
+	builder.PrependUOffsetTSlot(3, flatbuffers.UOffsetT(position), 0)
 }
 func PlayerStateAddVelocity(builder *flatbuffers.Builder, velocity flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(velocity), 0)
+	builder.PrependUOffsetTSlot(4, flatbuffers.UOffsetT(velocity), 0)
 }
 func PlayerStateAddIsOnGround(builder *flatbuffers.Builder, isOnGround bool) {
-	builder.PrependBoolSlot(3, isOnGround, false)
+	builder.PrependBoolSlot(5, isOnGround, false)
 }
 func PlayerStateAddIsAttacking(builder *flatbuffers.Builder, isAttacking bool) {
-	builder.PrependBoolSlot(4, isAttacking, false)
+	builder.PrependBoolSlot(6, isAttacking, false)
 }
 func PlayerStateAddAnimation(builder *flatbuffers.Builder, animation byte) {
-	builder.PrependByteSlot(5, animation, 0)
+	builder.PrependByteSlot(7, animation, 0)
 }
 func PlayerStateAddAnimationFlip(builder *flatbuffers.Builder, animationFlip bool) {
-	builder.PrependBoolSlot(6, animationFlip, false)
+	builder.PrependBoolSlot(8, animationFlip, false)
 }
 func PlayerStateEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

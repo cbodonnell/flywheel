@@ -2,6 +2,7 @@ package network
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 )
@@ -18,12 +19,14 @@ type Client struct {
 	ID         uint32
 	TCPConn    net.Conn
 	UDPAddress *net.UDPAddr
+	UserID     string
 }
 
 // ClientEvent represents an event that happened to a client
 type ClientEvent struct {
 	ClientID uint32
 	Type     ClientEventType
+	UserID   string
 }
 
 // ClientEventType represents the type of a client event
@@ -38,7 +41,6 @@ const (
 type ClientManager struct {
 	clients     map[uint32]*Client
 	clientsLock sync.RWMutex
-	nextID      uint32
 	// UDP connection for broadcasting to clients
 	udpConn         *net.UDPConn
 	clientEventChan chan ClientEvent
@@ -48,7 +50,6 @@ type ClientManager struct {
 func NewClientManager() *ClientManager {
 	return &ClientManager{
 		clients:         make(map[uint32]*Client),
-		nextID:          1,
 		clientEventChan: make(chan ClientEvent, ClientEventChannelSize),
 	}
 }
@@ -94,7 +95,7 @@ func (cm *ClientManager) GetClients() []*Client {
 }
 
 // ConnectClient adds a new client to the manager and returns its ID
-func (cm *ClientManager) ConnectClient(tcpConn net.Conn) (uint32, error) {
+func (cm *ClientManager) ConnectClient(tcpConn net.Conn, userID string) (uint32, error) {
 	cm.clientsLock.Lock()
 	defer cm.clientsLock.Unlock()
 
@@ -105,16 +106,31 @@ func (cm *ClientManager) ConnectClient(tcpConn net.Conn) (uint32, error) {
 	client := &Client{
 		ID:      clientID,
 		TCPConn: tcpConn,
+		UserID:  userID,
 	}
 	cm.clients[clientID] = client
 
 	event := ClientEvent{
 		ClientID: clientID,
 		Type:     ClientEventTypeConnect,
+		UserID:   userID,
 	}
 	cm.clientEventChan <- event
 
 	return clientID, nil
+}
+
+// GetClientIDByTCPConn returns the ID of a client by its TCP connection.
+// Returns 0 if the client is not found
+func (cm *ClientManager) GetClientIDByTCPConn(conn net.Conn) uint32 {
+	cm.clientsLock.RLock()
+	defer cm.clientsLock.RUnlock()
+	for _, client := range cm.clients {
+		if client.TCPConn == conn {
+			return client.ID
+		}
+	}
+	return 0
 }
 
 // DisconnectClient removes a client from the manager
@@ -122,8 +138,14 @@ func (cm *ClientManager) DisconnectClient(clientID uint32) {
 	cm.clientsLock.Lock()
 	defer cm.clientsLock.Unlock()
 
+	client, ok := cm.clients[clientID]
+	if !ok {
+		return
+	}
+
 	event := ClientEvent{
-		ClientID: clientID,
+		ClientID: client.ID,
+		UserID:   client.UserID,
 		Type:     ClientEventTypeDisconnect,
 	}
 	cm.clientEventChan <- event
@@ -155,12 +177,13 @@ func (cm *ClientManager) Exists(clientID uint32) bool {
 // it reads from the clients, so it needs to be locked before calling
 func (cm *ClientManager) generateUniqueID(maxRetries int) (uint32, error) {
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		id := cm.nextID
+		id := rand.Uint32()
+		if id == 0 {
+			continue
+		}
 		if _, ok := cm.clients[id]; !ok {
-			cm.nextID++
 			return id, nil
 		}
-		cm.nextID++
 	}
 
 	return 0, fmt.Errorf("failed to generate a unique ID after %d attempts", maxRetries)

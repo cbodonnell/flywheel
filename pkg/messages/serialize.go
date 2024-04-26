@@ -99,6 +99,9 @@ func SerializeGameStateFlatbuffer(state *ServerGameUpdate) ([]byte, error) {
 
 	playerStateKVs := make([]flatbuffers.UOffsetT, 0, len(state.Players))
 	for k, v := range state.Players {
+		userID := builder.CreateString(v.UserID)
+		name := builder.CreateString(v.Name)
+
 		gamestatefb.PositionStart(builder)
 		gamestatefb.PositionAddX(builder, v.Position.X)
 		gamestatefb.PositionAddY(builder, v.Position.Y)
@@ -111,6 +114,8 @@ func SerializeGameStateFlatbuffer(state *ServerGameUpdate) ([]byte, error) {
 
 		gamestatefb.PlayerStateStart(builder)
 		gamestatefb.PlayerStateAddLastProcessedTimestamp(builder, v.LastProcessedTimestamp)
+		gamestatefb.PlayerStateAddUserId(builder, userID)
+		gamestatefb.PlayerStateAddName(builder, name)
 		gamestatefb.PlayerStateAddPosition(builder, position)
 		gamestatefb.PlayerStateAddVelocity(builder, velocity)
 		gamestatefb.PlayerStateAddIsOnGround(builder, v.IsOnGround)
@@ -190,6 +195,8 @@ func DeserializeGameStateFlatbuffer(b []byte) (*ServerGameUpdate, error) {
 
 		playerState := &PlayerStateUpdate{}
 		playerState.LastProcessedTimestamp = playerStateKV.Value(nil).LastProcessedTimestamp()
+		playerState.UserID = string(playerStateKV.Value(nil).UserId())
+		playerState.Name = string(playerStateKV.Value(nil).Name())
 		playerState.Position.X = playerStateKV.Value(nil).Position(nil).X()
 		playerState.Position.Y = playerStateKV.Value(nil).Position(nil).Y()
 		playerState.Velocity.X = playerStateKV.Value(nil).Velocity(nil).X()

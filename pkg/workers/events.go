@@ -51,13 +51,13 @@ func (w *ClientEventWorker) Start() {
 
 func (w *ClientEventWorker) handleClientConnect(event network.ClientEvent) {
 	var position *kinematic.Vector
-	if lastKnownState, err := w.repository.LoadPlayerState(context.Background(), event.ClientID); err == nil {
+	if lastKnownState, err := w.repository.LoadPlayerState(context.Background(), event.UserID); err == nil {
 		position = lastKnownState
 	} else {
 		if !repositories.IsNotFound(err) {
 			log.Error("Failed to get player state for client %d: %v", event.ClientID, err)
 		}
-		log.Debug("Adding client %d with default values", event.ClientID)
+		log.Debug("Adding player %s with default values", event.UserID)
 		position = &kinematic.Vector{
 			X: gameconstants.PlayerStartingX,
 			Y: gameconstants.PlayerStartingY,
@@ -66,6 +66,7 @@ func (w *ClientEventWorker) handleClientConnect(event network.ClientEvent) {
 
 	if err := w.connectionEventQueue.Enqueue(&gametypes.ConnectPlayerEvent{
 		ClientID: event.ClientID,
+		UserID:   event.UserID,
 		Position: position,
 	}); err != nil {
 		log.Error("Failed to enqueue connect player event: %v", err)

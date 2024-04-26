@@ -44,6 +44,8 @@ func GameStateFromServerUpdate(update *messages.ServerGameUpdate) *types.GameSta
 func PlayerStateUpdateFromState(state *types.PlayerState) *messages.PlayerStateUpdate {
 	return &messages.PlayerStateUpdate{
 		LastProcessedTimestamp: state.LastProcessedTimestamp,
+		UserID:                 state.UserID,
+		Name:                   state.Name,
 		Position:               state.Position,
 		Velocity:               state.Velocity,
 		IsOnGround:             state.IsOnGround,
@@ -56,6 +58,8 @@ func PlayerStateUpdateFromState(state *types.PlayerState) *messages.PlayerStateU
 func PlayerStateFromServerUpdate(update *messages.PlayerStateUpdate) *types.PlayerState {
 	return &types.PlayerState{
 		LastProcessedTimestamp: update.LastProcessedTimestamp,
+		UserID:                 update.UserID,
+		Name:                   update.Name,
 		Position:               update.Position,
 		Velocity:               update.Velocity,
 		IsOnGround:             update.IsOnGround,

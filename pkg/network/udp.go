@@ -13,11 +13,11 @@ import (
 type UDPServer struct {
 	ClientManager *ClientManager
 	MessageQueue  queue.Queue
-	Port          string
+	Port          int
 }
 
 // NewUDPServer creates a new UDP server.
-func NewUDPServer(clientManager *ClientManager, messageQueue queue.Queue, port string) *UDPServer {
+func NewUDPServer(clientManager *ClientManager, messageQueue queue.Queue, port int) *UDPServer {
 	return &UDPServer{
 		ClientManager: clientManager,
 		MessageQueue:  messageQueue,
@@ -27,7 +27,7 @@ func NewUDPServer(clientManager *ClientManager, messageQueue queue.Queue, port s
 
 // Start starts the UDP server.
 func (s *UDPServer) Start() {
-	udpAddr, err := net.ResolveUDPAddr("udp", ":"+s.Port)
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", s.Port))
 	if err != nil {
 		log.Error("Failed to resolve UDP address: %v", err)
 		return
@@ -51,6 +51,11 @@ func (s *UDPServer) Start() {
 			continue
 		}
 
+		if message.ClientID == 0 {
+			log.Warn("Received UDP message from unknown client, ignoring")
+			continue
+		}
+
 		if !s.ClientManager.Exists(message.ClientID) {
 			log.Warn("Received UDP message from %d, but client is not connected", message.ClientID)
 			continue
@@ -58,11 +63,9 @@ func (s *UDPServer) Start() {
 
 		log.Trace("Received UDP message of type %s from %d", message.Type, message.ClientID)
 
-		// TODO: real identity verification
-		s.ClientManager.SetUDPAddress(message.ClientID, addr)
-
 		switch message.Type {
 		case messages.MessageTypeClientPing:
+			s.ClientManager.SetUDPAddress(message.ClientID, addr)
 			m := &messages.Message{
 				ClientID: 0,
 				Type:     messages.MessageTypeServerPong,
@@ -96,7 +99,7 @@ func WriteMessageToUDP(conn *net.UDPConn, addr *net.UDPAddr, msg *messages.Messa
 
 // ReadMessageFromUDP reads a Message from a UDP connection
 func ReadMessageFromUDP(conn *net.UDPConn) (*messages.Message, *net.UDPAddr, error) {
-	buf := make([]byte, messages.MessageBufferSize)
+	buf := make([]byte, messages.UDPMessageBufferSize)
 	n, addr, err := conn.ReadFromUDP(buf)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read message from UDP connection: %v", err)

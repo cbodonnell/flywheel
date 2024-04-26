@@ -8,6 +8,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/cbodonnell/flywheel/pkg/auth"
+	authhandlers "github.com/cbodonnell/flywheel/pkg/auth/handlers"
+	authproviders "github.com/cbodonnell/flywheel/pkg/auth/providers"
 	"github.com/cbodonnell/flywheel/pkg/game"
 	"github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
@@ -19,8 +22,9 @@ import (
 )
 
 func main() {
-	tcpPort := flag.String("tcp-port", "8888", "TCP port to listen on")
-	udpPort := flag.String("udp-port", "8889", "UDP port to listen on")
+	tcpPort := flag.Int("tcp-port", 8888, "TCP port to listen on")
+	udpPort := flag.Int("udp-port", 8889, "UDP port to listen on")
+	authPort := flag.Int("auth-port", 8080, "Auth server port")
 	logLevel := flag.String("log-level", "info", "Log level")
 	flag.Parse()
 
@@ -36,10 +40,29 @@ func main() {
 	log.Info("Starting server version %s", version.Get())
 	ctx := context.Background()
 
+	firebaseApiKey := os.Getenv("FLYWHEEL_FIREBASE_API_KEY")
+	if firebaseApiKey == "" {
+		panic("FLYWHEEL_FIREBASE_API_KEY environment variable must be set")
+	}
+	authServer := auth.NewAuthServer(auth.NewAuthServerOptions{
+		Port:    *authPort,
+		Handler: authhandlers.NewFirebaseAuthHandler(firebaseApiKey),
+	})
+	go authServer.Start()
+
 	clientManager := network.NewClientManager()
 	clientMessageQueue := queue.NewInMemoryQueue(10000)
 
-	tcpServer := network.NewTCPServer(clientManager, clientMessageQueue, *tcpPort)
+	firebaseProjectID := os.Getenv("FLYWHEEL_FIREBASE_PROJECT_ID")
+	if firebaseProjectID == "" {
+		panic("FLYWHEEL_FIREBASE_PROJECT_ID environment variable must be set")
+	}
+	authProvider, err := authproviders.NewFirebaseAuthProvider(ctx, firebaseProjectID)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create Firebase auth provider: %v", err))
+	}
+
+	tcpServer := network.NewTCPServer(authProvider, clientManager, clientMessageQueue, *tcpPort)
 	udpServer := network.NewUDPServer(clientManager, clientMessageQueue, *udpPort)
 	go tcpServer.Start()
 	go udpServer.Start()

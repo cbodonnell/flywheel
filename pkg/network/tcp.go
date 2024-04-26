@@ -1,11 +1,13 @@
 package network
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"time"
 
+	authproviders "github.com/cbodonnell/flywheel/pkg/auth/providers"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -13,14 +15,16 @@ import (
 
 // TCPServer represents a TCP server.
 type TCPServer struct {
+	AuthProvider  authproviders.AuthProvider
 	ClientManager *ClientManager
 	MessageQueue  queue.Queue
-	Port          string
+	Port          int
 }
 
 // NewTCPServer creates a new TCP server.
-func NewTCPServer(clientManager *ClientManager, messageQueue queue.Queue, port string) *TCPServer {
+func NewTCPServer(authProvider authproviders.AuthProvider, clientManager *ClientManager, messageQueue queue.Queue, port int) *TCPServer {
 	return &TCPServer{
+		AuthProvider:  authProvider,
 		ClientManager: clientManager,
 		MessageQueue:  messageQueue,
 		Port:          port,
@@ -29,7 +33,7 @@ func NewTCPServer(clientManager *ClientManager, messageQueue queue.Queue, port s
 
 // Start starts the TCP server.
 func (s *TCPServer) Start() {
-	tcpAddr, err := net.ResolveTCPAddr("tcp", ":"+s.Port)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", s.Port))
 	if err != nil {
 		log.Error("Failed to resolve TCP address: %v", err)
 		return
@@ -57,55 +61,80 @@ func (s *TCPServer) Start() {
 
 // handleTCPConnection handles a TCP connection.
 func (s *TCPServer) handleTCPConnection(conn net.Conn) {
-	clientID, err := s.ClientManager.ConnectClient(conn)
-	if err != nil {
-		log.Error("Failed to add client: %v", err)
-		conn.Close()
-		return
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var connectedClientID uint32 // set after login
 
 	defer func() {
-		log.Debug("TCP Connection closed for client %d", clientID)
-		s.ClientManager.DisconnectClient(clientID)
+		cancel()
+		if connectedClientID != 0 {
+			s.ClientManager.DisconnectClient(connectedClientID)
+		}
 		conn.Close()
+		log.Debug("TCP Connection closed for client %d", connectedClientID)
 	}()
-
-	log.Debug("TCP Connection established for client %d", clientID)
-
-	assignID := messages.AssignID{
-		ClientID: clientID,
-	}
-
-	payload, err := json.Marshal(assignID)
-	if err != nil {
-		log.Error("Failed to marshal assignID: %v", err)
-		return
-	}
-
-	// Send the client its ID
-	message := &messages.Message{
-		ClientID: 0,
-		Type:     messages.MessageTypeServerAssignID,
-		Payload:  payload,
-	}
-	if err := WriteMessageToTCP(conn, message); err != nil {
-		log.Error("Error writing TCP message of type %s to client %d: %v", message.Type, clientID, err)
-		return
-	}
 
 	for {
 		message, err := ReadMessageFromTCP(conn)
 		if err != nil {
 			if _, ok := err.(*ErrConnectionClosed); ok {
-				log.Debug("Client %d disconnected", clientID)
+				log.Debug("Client %d disconnected", connectedClientID)
 				return
 			}
-			log.Error("Error reading TCP message from client %d: %v", clientID, err)
+			log.Error("Error reading TCP message from client %d: %v", connectedClientID, err)
 			continue
 		}
-		log.Trace("Received TCP message of type %s from client %d", message.Type, message.ClientID)
 
+		if message.ClientID == 0 && message.Type != messages.MessageTypeClientLogin {
+			log.Warn("Received message from unknown client that is not a login message")
+			continue
+		}
+
+		// TODO: create "handler" functions for each message type
 		switch message.Type {
+		case messages.MessageTypeClientLogin:
+			clientLogin := &messages.ClientLogin{}
+			if err := json.Unmarshal(message.Payload, clientLogin); err != nil {
+				log.Error("Failed to unmarshal client login: %v", err)
+				continue
+			}
+
+			token, err := s.AuthProvider.VerifyToken(ctx, clientLogin.Token)
+			if err != nil {
+				log.Error("Failed to verify ID token: %v", err)
+				continue
+			}
+
+			clientID, err := s.ClientManager.ConnectClient(conn, token.UID)
+			if err != nil {
+				log.Error("Failed to add client: %v", err)
+				conn.Close()
+				return
+			}
+			connectedClientID = clientID
+
+			log.Info("Client %d connected as %s", clientID, token.UID)
+
+			assignID := messages.ServerLoginSuccess{
+				ClientID: clientID,
+			}
+
+			payload, err := json.Marshal(assignID)
+			if err != nil {
+				log.Error("Failed to marshal assignID: %v", err)
+				return
+			}
+
+			// Send the client its ID
+			message := &messages.Message{
+				ClientID: 0,
+				Type:     messages.MessageTypeServerLoginSuccess,
+				Payload:  payload,
+			}
+			if err := WriteMessageToTCP(conn, message); err != nil {
+				log.Error("Error writing TCP message of type %s to client %d: %v", message.Type, clientID, err)
+				return
+			}
 		case messages.MessageTypeClientSyncTime:
 			clientSyncTime := &messages.ClientSyncTime{}
 			if err := json.Unmarshal(message.Payload, clientSyncTime); err != nil {
@@ -164,7 +193,7 @@ func (e *ErrConnectionClosed) Error() string {
 
 // ReadMessageFromTCP reads a Message from a TCP connection
 func ReadMessageFromTCP(conn net.Conn) (*messages.Message, error) {
-	buf := make([]byte, messages.MessageBufferSize)
+	buf := make([]byte, messages.TCPMessageBufferSize)
 	n, err := conn.Read(buf)
 	if err != nil {
 		if err.Error() == "EOF" {

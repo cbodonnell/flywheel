@@ -7,16 +7,19 @@ import (
 )
 
 const (
-	// MessageBufferSize represents the maximum size of a message
-	// TODO: determine a more appropriate size
-	MessageBufferSize = 512
+	// UDPMessageBufferSize represents the maximum size of a message
+	UDPMessageBufferSize = 508
+
+	// TCPMessageBufferSize represents the maximum size of a message
+	TCPMessageBufferSize = 1460
 )
 
 // Message types
 type MessageType uint8
 
 const (
-	MessageTypeServerAssignID MessageType = iota
+	MessageTypeClientLogin MessageType = iota
+	MessageTypeServerLoginSuccess
 	MessageTypeClientPing
 	MessageTypeServerPong
 	MessageTypeClientPlayerUpdate
@@ -31,7 +34,8 @@ const (
 
 func (m MessageType) String() string {
 	return [...]string{
-		"ServerAssignID",
+		"ClientLogin",
+		"ServerLoginSuccess",
 		"ClientPing",
 		"ServerPong",
 		"ClientPlayerUpdate",
@@ -52,7 +56,11 @@ type Message struct {
 	Payload  json.RawMessage `json:"payload"`
 }
 
-type AssignID struct {
+type ClientLogin struct {
+	Token string `json:"token"`
+}
+
+type ServerLoginSuccess struct {
 	ClientID uint32 `json:"clientID"`
 }
 
@@ -96,6 +104,10 @@ type ServerGameUpdate struct {
 type PlayerStateUpdate struct {
 	// LastProcessedTimestamp is the timestamp of the last processed update
 	LastProcessedTimestamp int64 `json:"lastProcessedTimestamp"`
+	// UserID is the ID of the player
+	UserID string `json:"playerID"`
+	// Name is the name of the player
+	Name string `json:"playerName"`
 	// Position is the position of the player
 	Position kinematic.Vector `json:"position"`
 	// Velocity is the velocity of the player

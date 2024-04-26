@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cbodonnell/flywheel/client/game"
 	clientgame "github.com/cbodonnell/flywheel/client/game"
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/pkg/log"
@@ -21,6 +22,7 @@ func main() {
 	serverHostname := flag.String("server-hostname", network.DefaultServerHostname, "Server hostname")
 	serverTCPPort := flag.Int("server-tcp-port", network.DefaultServerTCPPort, "Server TCP port")
 	serverUDPPort := flag.Int("server-udp-port", network.DefaultServerUDPPort, "Server UDP port")
+	authServerURL := flag.String("auth-server-url", game.DefaultAuthServerURL, "Auth server URL")
 	flag.Parse()
 
 	parsedLogLevel, err := log.ParseLogLevel(*logLevel)
@@ -46,6 +48,7 @@ func main() {
 
 	game, err := clientgame.NewGame(clientgame.NewGameOptions{
 		Debug:          *debug,
+		AuthURL:        *authServerURL,
 		NetworkManager: networkManager,
 	})
 	if err != nil {
