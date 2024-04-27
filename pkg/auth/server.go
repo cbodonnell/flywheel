@@ -45,13 +45,15 @@ func NewAuthServer(opts NewAuthServerOptions) *AuthServer {
 
 // Start starts the AuthServer
 func (s *AuthServer) Start() {
-	log.Info("Auth server listening on %s", s.server.Addr)
-	listenAndServe := s.server.ListenAndServe
+	var listenAndServe func() error
 	if s.tls != nil {
-		log.Debug("Auth server using TLS")
+		log.Info("Auth server listening on %s with TLS", s.server.Addr)
 		listenAndServe = func() error {
 			return s.server.ListenAndServeTLS(s.tls.CertFile, s.tls.KeyFile)
 		}
+	} else {
+		log.Info("Auth server listening on %s", s.server.Addr)
+		listenAndServe = s.server.ListenAndServe
 	}
 	if err := listenAndServe(); err != nil {
 		if errors.Is(err, http.ErrServerClosed) {
