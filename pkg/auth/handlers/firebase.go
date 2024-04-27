@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/cbodonnell/flywheel/pkg/log"
@@ -27,8 +26,8 @@ func NewFirebaseAuthHandler(apiKey string) *FirebaseAuthHandler {
 // https://firebase.google.com/docs/reference/rest/auth#section-error-format
 type ErrorResponseBody struct {
 	Error struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
+		Code    int                  `json:"code"`
+		Message ErrorResponseMessage `json:"message"`
 		Errors  []struct {
 			Message string `json:"message"`
 			Domain  string `json:"domain"`
@@ -36,6 +35,19 @@ type ErrorResponseBody struct {
 		} `json:"errors"`
 	} `json:"error"`
 }
+
+type ErrorResponseMessage string
+
+const (
+	ErrorEmailExists             ErrorResponseMessage = "EMAIL_EXISTS"
+	ErrorOperationNotAllowed     ErrorResponseMessage = "OPERATION_NOT_ALLOWED"
+	ErrorTooManyAttempts         ErrorResponseMessage = "TOO_MANY_ATTEMPTS_TRY_LATER"
+	ErrorInvalidEmail            ErrorResponseMessage = "INVALID_EMAIL"
+	ErrorInvalidLoginCredentials ErrorResponseMessage = "INVALID_LOGIN_CREDENTIALS"
+	ErrorTokenExpired            ErrorResponseMessage = "TOKEN_EXPIRED"
+	ErrorInvalidIDToken          ErrorResponseMessage = "INVALID_ID_TOKEN"
+	ErrorUserNotFound            ErrorResponseMessage = "USER_NOT_FOUND"
+)
 
 // RegisterRequestBody is the request body for the register endpoint
 type RegisterRequestBody struct {
@@ -101,10 +113,20 @@ func (s *FirebaseAuthHandler) HandleRegister() func(w http.ResponseWriter, r *ht
 
 		if resp.StatusCode != http.StatusOK {
 			log.Error("error response status: %s", resp.Status)
-			if b, err := io.ReadAll(resp.Body); err == nil {
-				log.Error("error response body: %s", string(b))
+			errorResponse := &ErrorResponseBody{}
+			if err := json.NewDecoder(resp.Body).Decode(errorResponse); err != nil {
+				log.Error("failed to decode error response: %v", err)
+				http.Error(w, "failed to decode error response", http.StatusInternalServerError)
+				return
 			}
-			// TODO: handle some errors differently
+
+			switch errorResponse.Error.Message {
+			case ErrorEmailExists, ErrorOperationNotAllowed, ErrorTooManyAttempts:
+				http.Error(w, "too many attempts, try again later", http.StatusBadRequest)
+				return
+			}
+
+			log.Error("unhandled error response message: %s", errorResponse.Error.Message)
 			http.Error(w, "failed to register", http.StatusInternalServerError)
 			return
 		}
@@ -190,10 +212,20 @@ func (s *FirebaseAuthHandler) HandleLogin() func(w http.ResponseWriter, r *http.
 
 		if resp.StatusCode != http.StatusOK {
 			log.Error("error response status: %s", resp.Status)
-			if b, err := io.ReadAll(resp.Body); err == nil {
-				log.Error("error response body: %s", string(b))
+			errorResponse := &ErrorResponseBody{}
+			if err := json.NewDecoder(resp.Body).Decode(errorResponse); err != nil {
+				log.Error("failed to decode error response: %v", err)
+				http.Error(w, "failed to decode error response", http.StatusInternalServerError)
+				return
 			}
-			// TODO: handle some errors differently
+
+			switch errorResponse.Error.Message {
+			case ErrorInvalidEmail, ErrorInvalidLoginCredentials:
+				http.Error(w, string(errorResponse.Error.Message), http.StatusBadRequest)
+				return
+			}
+
+			log.Error("unhandled error response message: %s", errorResponse.Error.Message)
 			http.Error(w, "failed to login", http.StatusInternalServerError)
 			return
 		}
@@ -272,9 +304,20 @@ func (s *FirebaseAuthHandler) HandleRefresh() func(w http.ResponseWriter, r *htt
 
 		if resp.StatusCode != http.StatusOK {
 			log.Error("error response status: %s", resp.Status)
-			if b, err := io.ReadAll(resp.Body); err == nil {
-				log.Error("error response body: %s", string(b))
+			errorResponse := &ErrorResponseBody{}
+			if err := json.NewDecoder(resp.Body).Decode(errorResponse); err != nil {
+				log.Error("failed to decode error response: %v", err)
+				http.Error(w, "failed to decode error response", http.StatusInternalServerError)
+				return
 			}
+
+			switch errorResponse.Error.Message {
+			case ErrorTokenExpired:
+				http.Error(w, string(errorResponse.Error.Message), http.StatusBadRequest)
+				return
+			}
+
+			log.Error("unhandled error response message: %s", errorResponse.Error.Message)
 			http.Error(w, "failed to refresh", http.StatusInternalServerError)
 			return
 		}
@@ -341,10 +384,20 @@ func (s *FirebaseAuthHandler) HandleDelete() func(w http.ResponseWriter, r *http
 
 		if resp.StatusCode != http.StatusOK {
 			log.Error("error response status: %s", resp.Status)
-			if b, err := io.ReadAll(resp.Body); err == nil {
-				log.Error("error response body: %s", string(b))
+			errorResponse := &ErrorResponseBody{}
+			if err := json.NewDecoder(resp.Body).Decode(errorResponse); err != nil {
+				log.Error("failed to decode error response: %v", err)
+				http.Error(w, "failed to decode error response", http.StatusInternalServerError)
+				return
 			}
-			// TODO: handle some errors differently
+
+			switch errorResponse.Error.Message {
+			case ErrorInvalidIDToken, ErrorUserNotFound:
+				http.Error(w, string(errorResponse.Error.Message), http.StatusBadRequest)
+				return
+			}
+
+			log.Error("unhandled error response message: %s", errorResponse.Error.Message)
 			http.Error(w, "failed to delete", http.StatusInternalServerError)
 			return
 		}
