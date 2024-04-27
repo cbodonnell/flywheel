@@ -334,6 +334,8 @@ func (gm *GameManager) broadcastGameState() {
 		log.Error("Failed to serialize game state: %v", err)
 		return
 	}
+	// TODO: this is not scalable for large numbers of clients.
+	// sending individual player and npc updates may be more efficient.
 
 	for _, client := range gm.clientManager.GetClients() {
 		message := &messages.Message{
