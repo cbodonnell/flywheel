@@ -44,10 +44,19 @@ func main() {
 	if firebaseApiKey == "" {
 		panic("FLYWHEEL_FIREBASE_API_KEY environment variable must be set")
 	}
-	authServer := auth.NewAuthServer(auth.NewAuthServerOptions{
+	authServerOpts := auth.NewAuthServerOptions{
 		Port:    *authPort,
 		Handler: authhandlers.NewFirebaseAuthHandler(firebaseApiKey),
-	})
+	}
+	tlsCertFile := os.Getenv("FLYWHEEL_TLS_CERT_FILE")
+	tlsKeyFile := os.Getenv("FLYWHEEL_TLS_KEY_FILE")
+	if tlsCertFile != "" && tlsKeyFile != "" {
+		authServerOpts.TLS = &auth.TLSConfig{
+			CertFile: tlsCertFile,
+			KeyFile:  tlsKeyFile,
+		}
+	}
+	authServer := auth.NewAuthServer(authServerOpts)
 	go authServer.Start()
 
 	clientManager := network.NewClientManager()
