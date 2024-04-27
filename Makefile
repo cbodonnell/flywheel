@@ -66,7 +66,8 @@ run-client-remote:
 	-log-level=debug \
 	-server-hostname=${FLYWHEEL_SERVER_HOSTNAME} \
 	-server-tcp-port=${FLYWHEEL_SERVER_TCP_PORT} \
-	-server-udp-port=${FLYWHEEL_SERVER_UDP_PORT}
+	-server-udp-port=${FLYWHEEL_SERVER_UDP_PORT} \
+	-auth-server-url=${FLYWHEEL_AUTH_SERVER_URL}
 
 .PHONY: container
 container:
