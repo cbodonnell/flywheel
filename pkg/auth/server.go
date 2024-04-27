@@ -12,11 +12,18 @@ import (
 
 type AuthServer struct {
 	server *http.Server
+	tls    *TLSConfig
+}
+
+type TLSConfig struct {
+	CertFile string
+	KeyFile  string
 }
 
 type NewAuthServerOptions struct {
 	Port    int
 	Handler handlers.AuthHandler
+	TLS     *TLSConfig
 }
 
 // NewAuthServer creates a new http.Server for handling authentication requests
@@ -32,13 +39,23 @@ func NewAuthServer(opts NewAuthServerOptions) *AuthServer {
 	}
 	return &AuthServer{
 		server: server,
+		tls:    opts.TLS,
 	}
 }
 
 // Start starts the AuthServer
 func (s *AuthServer) Start() {
-	log.Info("Auth server listening on %s", s.server.Addr)
-	if err := s.server.ListenAndServe(); err != nil {
+	var listenAndServe func() error
+	if s.tls != nil {
+		log.Info("Auth server listening on %s with TLS", s.server.Addr)
+		listenAndServe = func() error {
+			return s.server.ListenAndServeTLS(s.tls.CertFile, s.tls.KeyFile)
+		}
+	} else {
+		log.Info("Auth server listening on %s", s.server.Addr)
+		listenAndServe = s.server.ListenAndServe
+	}
+	if err := listenAndServe(); err != nil {
 		if errors.Is(err, http.ErrServerClosed) {
 			log.Info("Auth server closed")
 			return

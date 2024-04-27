@@ -44,7 +44,8 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create network manager: %v", err))
 	}
-	log.Info("Configured for server %s ports %d (TCP) and %d (UDP)", serverSettings.Hostname, serverSettings.TCPPort, serverSettings.UDPPort)
+	log.Info("Configured for game server %s ports %d (TCP) and %d (UDP)", serverSettings.Hostname, serverSettings.TCPPort, serverSettings.UDPPort)
+	log.Info("Configured for auth server %s", *authServerURL)
 
 	game, err := clientgame.NewGame(clientgame.NewGameOptions{
 		Debug:          *debug,

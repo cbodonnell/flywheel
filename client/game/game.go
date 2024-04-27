@@ -290,15 +290,17 @@ func (g *Game) drawDebugOverlay(screen *ebiten.Image) {
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n   FPS: %0.1f", ebiten.ActualFPS()))
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n   TPS: %0.1f", ebiten.ActualTPS()))
 
+	serverSettings := g.networkManager.ServerSettings()
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n   Game Server: %s", serverSettings.Hostname))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n\n   Auth Server: %s", g.authURL))
+
 	if !g.networkManager.IsConnected() {
 		return
 	}
 
-	serverSettings := g.networkManager.ServerSettings()
 	serverTime, ping := g.networkManager.ServerTime()
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n   Server: %s", serverSettings.Hostname))
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n\n   Ping: %0.1f", ping))
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n\n\n   Time: %0.0f", serverTime))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n\n\n   Ping: %0.1f", ping))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n\n\n\n   Time: %0.0f", serverTime))
 }
 
 const (
