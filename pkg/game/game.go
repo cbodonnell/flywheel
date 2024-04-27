@@ -105,75 +105,83 @@ func (gm *GameManager) processConnectionEvents() {
 	for _, item := range pendingEvents {
 		switch event := item.(type) {
 		case *types.ConnectPlayerEvent:
-			playerState := types.NewPlayerState(event.UserID, event.Position.X, event.Position.Y)
-			log.Debug("Player %s created as %s", playerState.UserID, playerState.Name)
-			// add the player to the game state
-			gm.gameState.Players[event.ClientID] = playerState
-			// add the player object to the collision space
-			gm.gameState.CollisionSpace.Add(playerState.Object)
-
-			// send a message to connected clients to add the player to the game
-			playerConnect := &messages.ServerPlayerConnect{
-				ClientID:    event.ClientID,
-				PlayerState: PlayerStateUpdateFromState(playerState),
-			}
-			payload, err := json.Marshal(playerConnect)
-			if err != nil {
-				log.Error("Failed to marshal player state: %v", err)
-				continue
-			}
-
-			for _, client := range gm.clientManager.GetClients() {
-				msg := &messages.Message{
-					ClientID: 0, // ClientID 0 means the message is from the server
-					Type:     messages.MessageTypeServerPlayerConnect,
-					Payload:  payload,
-				}
-
-				err := network.WriteMessageToTCP(client.TCPConn, msg)
-				if err != nil {
-					log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-					continue
-				}
-			}
+			gm.handleConnectPlayerEvent(event)
 		case *types.DisconnectPlayerEvent:
-			// send a request to save the player state before deleting it
-			saveRequest := workers.SavePlayerStateRequest{
-				Timestamp:   gm.gameState.Timestamp,
-				UserID:      gm.gameState.Players[event.ClientID].UserID,
-				PlayerState: gm.gameState.Players[event.ClientID],
-			}
-			gm.savePlayerStateChan <- saveRequest
-			// remove the player object from the collision space
-			gm.gameState.CollisionSpace.Remove(gm.gameState.Players[event.ClientID].Object)
-			// delete the player from the game state
-			delete(gm.gameState.Players, event.ClientID)
-
-			// send a message to connected clients to remove the player from the game
-			playerDisconnect := &messages.ServerPlayerDisconnect{
-				ClientID: event.ClientID,
-			}
-			payload, err := json.Marshal(playerDisconnect)
-			if err != nil {
-				log.Error("Failed to marshal player disconnect message: %v", err)
-				continue
-			}
-
-			for _, client := range gm.clientManager.GetClients() {
-				msg := &messages.Message{
-					ClientID: 0, // ClientID 0 means the message is from the server
-					Type:     messages.MessageTypeServerPlayerDisconnect,
-					Payload:  payload,
-				}
-
-				err := network.WriteMessageToTCP(client.TCPConn, msg)
-				if err != nil {
-					log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-					continue
-				}
-			}
+			gm.handleDisconnectPlayerEvent(event)
 		default:
 			log.Error("unhandled connection event type: %T", event)
+		}
+	}
+}
+
+func (gm *GameManager) handleConnectPlayerEvent(event *types.ConnectPlayerEvent) {
+	playerState := types.NewPlayerState(event.UserID, event.Position.X, event.Position.Y)
+	log.Debug("Player %s created as %s", playerState.UserID, playerState.Name)
+	// add the player to the game state
+	gm.gameState.Players[event.ClientID] = playerState
+	// add the player object to the collision space
+	gm.gameState.CollisionSpace.Add(playerState.Object)
+
+	// send a message to connected clients to add the player to the game
+	playerConnect := &messages.ServerPlayerConnect{
+		ClientID:    event.ClientID,
+		PlayerState: PlayerStateUpdateFromState(playerState),
+	}
+	payload, err := json.Marshal(playerConnect)
+	if err != nil {
+		log.Error("Failed to marshal player state: %v", err)
+		return
+	}
+
+	for _, client := range gm.clientManager.GetClients() {
+		msg := &messages.Message{
+			ClientID: 0, // ClientID 0 means the message is from the server
+			Type:     messages.MessageTypeServerPlayerConnect,
+			Payload:  payload,
+		}
+
+		err := network.WriteMessageToTCP(client.TCPConn, msg)
+		if err != nil {
+			log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
+			continue
+		}
+	}
+}
+
+func (gm *GameManager) handleDisconnectPlayerEvent(event *types.DisconnectPlayerEvent) {
+	// send a request to save the player state before deleting it
+	saveRequest := workers.SavePlayerStateRequest{
+		Timestamp:   gm.gameState.Timestamp,
+		UserID:      gm.gameState.Players[event.ClientID].UserID,
+		PlayerState: gm.gameState.Players[event.ClientID],
+	}
+	gm.savePlayerStateChan <- saveRequest
+	// remove the player object from the collision space
+	gm.gameState.CollisionSpace.Remove(gm.gameState.Players[event.ClientID].Object)
+	// delete the player from the game state
+	delete(gm.gameState.Players, event.ClientID)
+
+	// send a message to connected clients to remove the player from the game
+	playerDisconnect := &messages.ServerPlayerDisconnect{
+		ClientID: event.ClientID,
+	}
+	payload, err := json.Marshal(playerDisconnect)
+	if err != nil {
+		log.Error("Failed to marshal player disconnect message: %v", err)
+		return
+	}
+
+	for _, client := range gm.clientManager.GetClients() {
+		msg := &messages.Message{
+			ClientID: 0, // ClientID 0 means the message is from the server
+			Type:     messages.MessageTypeServerPlayerDisconnect,
+			Payload:  payload,
+		}
+
+		err := network.WriteMessageToTCP(client.TCPConn, msg)
+		if err != nil {
+			log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
+			continue
 		}
 	}
 }
@@ -195,32 +203,44 @@ func (gm *GameManager) processClientMessages() {
 
 		switch message.Type {
 		case messages.MessageTypeClientPlayerUpdate:
-			clientPlayerUpdate := &messages.ClientPlayerUpdate{}
-			err := json.Unmarshal(message.Payload, clientPlayerUpdate)
-			if err != nil {
-				log.Error("Failed to unmarshal player state: %v", err)
-				continue
-			}
-			if _, ok := gm.gameState.Players[message.ClientID]; !ok {
-				log.Warn("Client %d is not in the game state", message.ClientID)
-				continue
-			}
-			playerState := gm.gameState.Players[message.ClientID]
-
-			if playerState.LastProcessedTimestamp > clientPlayerUpdate.Timestamp {
-				log.Warn("Client %d sent an outdated player update", message.ClientID)
-				continue
-			}
-
-			// TODO: check for previousUpdates that have not been processed
-			// TODO: validate the update before applying it
-			playerState.ApplyInput(clientPlayerUpdate)
-
-			gm.checkPlayerCollisions(message.ClientID, playerState)
+			gm.handleClientPlayerUpdate(message)
 		default:
 			log.Error("Unhandled message type: %s", message.Type)
 		}
 	}
+}
+
+func (gm *GameManager) handleClientPlayerUpdate(message *messages.Message) {
+	clientPlayerUpdate := &messages.ClientPlayerUpdate{}
+	err := json.Unmarshal(message.Payload, clientPlayerUpdate)
+	if err != nil {
+		log.Error("Failed to unmarshal player state: %v", err)
+		return
+	}
+	if _, ok := gm.gameState.Players[message.ClientID]; !ok {
+		log.Warn("Client %d is not in the game state", message.ClientID)
+		return
+	}
+	playerState := gm.gameState.Players[message.ClientID]
+
+	if playerState.LastProcessedTimestamp > clientPlayerUpdate.Timestamp {
+		log.Warn("Client %d sent an outdated player update", message.ClientID)
+		return
+	}
+
+	// check for past updates that have not been processed and apply first
+	for _, pastUpdate := range clientPlayerUpdate.PastUpdates {
+		if playerState.LastProcessedTimestamp >= pastUpdate.Timestamp {
+			continue
+		}
+		log.Warn("Applying past update for client %d - Last processed: %d, past update: %d", message.ClientID, playerState.LastProcessedTimestamp, pastUpdate.Timestamp)
+		playerState.ApplyInput(pastUpdate)
+	}
+
+	// TODO: validate the update before applying it
+	playerState.ApplyInput(clientPlayerUpdate)
+
+	gm.checkPlayerCollisions(message.ClientID, playerState)
 }
 
 // checkPlayerCollisions checks for collisions between a player and other objects in the game.
