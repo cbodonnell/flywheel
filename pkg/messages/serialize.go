@@ -99,30 +99,7 @@ func SerializeGameStateFlatbuffer(state *ServerGameUpdate) ([]byte, error) {
 
 	playerStateKVs := make([]flatbuffers.UOffsetT, 0, len(state.Players))
 	for k, v := range state.Players {
-		userID := builder.CreateString(v.UserID)
-		name := builder.CreateString(v.Name)
-
-		gamestatefb.PositionStart(builder)
-		gamestatefb.PositionAddX(builder, v.Position.X)
-		gamestatefb.PositionAddY(builder, v.Position.Y)
-		position := gamestatefb.PositionEnd(builder)
-
-		gamestatefb.VelocityStart(builder)
-		gamestatefb.VelocityAddX(builder, v.Velocity.X)
-		gamestatefb.VelocityAddY(builder, v.Velocity.Y)
-		velocity := gamestatefb.VelocityEnd(builder)
-
-		gamestatefb.PlayerStateStart(builder)
-		gamestatefb.PlayerStateAddLastProcessedTimestamp(builder, v.LastProcessedTimestamp)
-		gamestatefb.PlayerStateAddUserId(builder, userID)
-		gamestatefb.PlayerStateAddName(builder, name)
-		gamestatefb.PlayerStateAddPosition(builder, position)
-		gamestatefb.PlayerStateAddVelocity(builder, velocity)
-		gamestatefb.PlayerStateAddIsOnGround(builder, v.IsOnGround)
-		gamestatefb.PlayerStateAddIsAttacking(builder, v.IsAttacking)
-		gamestatefb.PlayerStateAddAnimation(builder, byte(v.Animation))
-		gamestatefb.PlayerStateAddAnimationFlip(builder, v.AnimationFlip)
-		playerState := gamestatefb.PlayerStateEnd(builder)
+		playerState := SerializePlayerStateFlatbuffer(builder, v)
 
 		gamestatefb.PlayerStateKeyValueStart(builder)
 		gamestatefb.PlayerStateKeyValueAddKey(builder, k)
@@ -139,24 +116,7 @@ func SerializeGameStateFlatbuffer(state *ServerGameUpdate) ([]byte, error) {
 
 	npcStateKVs := make([]flatbuffers.UOffsetT, 0, len(state.NPCs))
 	for k, v := range state.NPCs {
-		gamestatefb.PositionStart(builder)
-		gamestatefb.PositionAddX(builder, v.Position.X)
-		gamestatefb.PositionAddY(builder, v.Position.Y)
-		position := gamestatefb.PositionEnd(builder)
-
-		gamestatefb.VelocityStart(builder)
-		gamestatefb.VelocityAddX(builder, v.Velocity.X)
-		gamestatefb.VelocityAddY(builder, v.Velocity.Y)
-		velocity := gamestatefb.VelocityEnd(builder)
-
-		gamestatefb.NPCStateStart(builder)
-		gamestatefb.NPCStateAddPosition(builder, position)
-		gamestatefb.NPCStateAddVelocity(builder, velocity)
-		gamestatefb.NPCStateAddIsOnGround(builder, v.IsOnGround)
-		gamestatefb.NPCStateAddAnimation(builder, byte(v.Animation))
-		gamestatefb.NPCStateAddAnimationFlip(builder, v.AnimationFlip)
-		gamestatefb.NPCStateAddHitpoints(builder, v.Hitpoints)
-		npcState := gamestatefb.NPCStateEnd(builder)
+		npcState := SerializeNPCStateFlatbuffer(builder, v)
 
 		gamestatefb.NPCStateKeyValueStart(builder)
 		gamestatefb.NPCStateKeyValueAddKey(builder, k)
@@ -182,6 +142,58 @@ func SerializeGameStateFlatbuffer(state *ServerGameUpdate) ([]byte, error) {
 	return b, nil
 }
 
+func SerializePlayerStateFlatbuffer(builder *flatbuffers.Builder, state *PlayerStateUpdate) flatbuffers.UOffsetT {
+	userID := builder.CreateString(state.UserID)
+	name := builder.CreateString(state.Name)
+
+	gamestatefb.PositionStart(builder)
+	gamestatefb.PositionAddX(builder, state.Position.X)
+	gamestatefb.PositionAddY(builder, state.Position.Y)
+	position := gamestatefb.PositionEnd(builder)
+
+	gamestatefb.VelocityStart(builder)
+	gamestatefb.VelocityAddX(builder, state.Velocity.X)
+	gamestatefb.VelocityAddY(builder, state.Velocity.Y)
+	velocity := gamestatefb.VelocityEnd(builder)
+
+	gamestatefb.PlayerStateStart(builder)
+	gamestatefb.PlayerStateAddLastProcessedTimestamp(builder, state.LastProcessedTimestamp)
+	gamestatefb.PlayerStateAddUserId(builder, userID)
+	gamestatefb.PlayerStateAddName(builder, name)
+	gamestatefb.PlayerStateAddPosition(builder, position)
+	gamestatefb.PlayerStateAddVelocity(builder, velocity)
+	gamestatefb.PlayerStateAddIsOnGround(builder, state.IsOnGround)
+	gamestatefb.PlayerStateAddIsAttacking(builder, state.IsAttacking)
+	gamestatefb.PlayerStateAddAnimation(builder, byte(state.Animation))
+	gamestatefb.PlayerStateAddAnimationFlip(builder, state.AnimationFlip)
+	playerState := gamestatefb.PlayerStateEnd(builder)
+
+	return playerState
+}
+
+func SerializeNPCStateFlatbuffer(builder *flatbuffers.Builder, state *NPCStateUpdate) flatbuffers.UOffsetT {
+	gamestatefb.PositionStart(builder)
+	gamestatefb.PositionAddX(builder, state.Position.X)
+	gamestatefb.PositionAddY(builder, state.Position.Y)
+	position := gamestatefb.PositionEnd(builder)
+
+	gamestatefb.VelocityStart(builder)
+	gamestatefb.VelocityAddX(builder, state.Velocity.X)
+	gamestatefb.VelocityAddY(builder, state.Velocity.Y)
+	velocity := gamestatefb.VelocityEnd(builder)
+
+	gamestatefb.NPCStateStart(builder)
+	gamestatefb.NPCStateAddPosition(builder, position)
+	gamestatefb.NPCStateAddVelocity(builder, velocity)
+	gamestatefb.NPCStateAddIsOnGround(builder, state.IsOnGround)
+	gamestatefb.NPCStateAddAnimation(builder, byte(state.Animation))
+	gamestatefb.NPCStateAddAnimationFlip(builder, state.AnimationFlip)
+	gamestatefb.NPCStateAddHitpoints(builder, state.Hitpoints)
+	npcState := gamestatefb.NPCStateEnd(builder)
+
+	return npcState
+}
+
 func DeserializeGameStateFlatbuffer(b []byte) (*ServerGameUpdate, error) {
 	gameState := &ServerGameUpdate{}
 	gameStateFlatbuffer := gamestatefb.GetRootAsGameState(b, 0)
@@ -192,21 +204,7 @@ func DeserializeGameStateFlatbuffer(b []byte) (*ServerGameUpdate, error) {
 		if !gameStateFlatbuffer.Players(playerStateKV, i) {
 			return nil, fmt.Errorf("failed to get player state key value at index %d", i)
 		}
-
-		playerState := &PlayerStateUpdate{}
-		playerState.LastProcessedTimestamp = playerStateKV.Value(nil).LastProcessedTimestamp()
-		playerState.UserID = string(playerStateKV.Value(nil).UserId())
-		playerState.Name = string(playerStateKV.Value(nil).Name())
-		playerState.Position.X = playerStateKV.Value(nil).Position(nil).X()
-		playerState.Position.Y = playerStateKV.Value(nil).Position(nil).Y()
-		playerState.Velocity.X = playerStateKV.Value(nil).Velocity(nil).X()
-		playerState.Velocity.Y = playerStateKV.Value(nil).Velocity(nil).Y()
-		playerState.IsOnGround = playerStateKV.Value(nil).IsOnGround()
-		playerState.IsAttacking = playerStateKV.Value(nil).IsAttacking()
-		playerState.Animation = playerStateKV.Value(nil).Animation()
-		playerState.AnimationFlip = playerStateKV.Value(nil).AnimationFlip()
-
-		players[playerStateKV.Key()] = playerState
+		players[playerStateKV.Key()] = DeserializePlayerStateFlatbuffer(playerStateKV)
 	}
 	gameState.Players = players
 
@@ -216,20 +214,40 @@ func DeserializeGameStateFlatbuffer(b []byte) (*ServerGameUpdate, error) {
 		if !gameStateFlatbuffer.Npcs(npcStateKV, i) {
 			return nil, fmt.Errorf("failed to get npc state key value at index %d", i)
 		}
-
-		npcState := &NPCStateUpdate{}
-		npcState.Position.X = npcStateKV.Value(nil).Position(nil).X()
-		npcState.Position.Y = npcStateKV.Value(nil).Position(nil).Y()
-		npcState.Velocity.X = npcStateKV.Value(nil).Velocity(nil).X()
-		npcState.Velocity.Y = npcStateKV.Value(nil).Velocity(nil).Y()
-		npcState.IsOnGround = npcStateKV.Value(nil).IsOnGround()
-		npcState.Animation = npcStateKV.Value(nil).Animation()
-		npcState.AnimationFlip = npcStateKV.Value(nil).AnimationFlip()
-		npcState.Hitpoints = npcStateKV.Value(nil).Hitpoints()
-
-		npcs[npcStateKV.Key()] = npcState
+		npcs[npcStateKV.Key()] = DeserializeNPCStateFlatbuffer(npcStateKV)
 	}
 	gameState.NPCs = npcs
 
 	return gameState, nil
+}
+
+func DeserializePlayerStateFlatbuffer(playerStateKV *gamestatefb.PlayerStateKeyValue) *PlayerStateUpdate {
+	playerState := &PlayerStateUpdate{}
+	playerState.LastProcessedTimestamp = playerStateKV.Value(nil).LastProcessedTimestamp()
+	playerState.UserID = string(playerStateKV.Value(nil).UserId())
+	playerState.Name = string(playerStateKV.Value(nil).Name())
+	playerState.Position.X = playerStateKV.Value(nil).Position(nil).X()
+	playerState.Position.Y = playerStateKV.Value(nil).Position(nil).Y()
+	playerState.Velocity.X = playerStateKV.Value(nil).Velocity(nil).X()
+	playerState.Velocity.Y = playerStateKV.Value(nil).Velocity(nil).Y()
+	playerState.IsOnGround = playerStateKV.Value(nil).IsOnGround()
+	playerState.IsAttacking = playerStateKV.Value(nil).IsAttacking()
+	playerState.Animation = playerStateKV.Value(nil).Animation()
+	playerState.AnimationFlip = playerStateKV.Value(nil).AnimationFlip()
+
+	return playerState
+}
+
+func DeserializeNPCStateFlatbuffer(npcStateKV *gamestatefb.NPCStateKeyValue) *NPCStateUpdate {
+	npcState := &NPCStateUpdate{}
+	npcState.Position.X = npcStateKV.Value(nil).Position(nil).X()
+	npcState.Position.Y = npcStateKV.Value(nil).Position(nil).Y()
+	npcState.Velocity.X = npcStateKV.Value(nil).Velocity(nil).X()
+	npcState.Velocity.Y = npcStateKV.Value(nil).Velocity(nil).Y()
+	npcState.IsOnGround = npcStateKV.Value(nil).IsOnGround()
+	npcState.Animation = npcStateKV.Value(nil).Animation()
+	npcState.AnimationFlip = npcStateKV.Value(nil).AnimationFlip()
+	npcState.Hitpoints = npcStateKV.Value(nil).Hitpoints()
+
+	return npcState
 }
