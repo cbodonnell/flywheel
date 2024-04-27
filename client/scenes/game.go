@@ -187,7 +187,6 @@ func (g *GameScene) reconcilePlayerState(gameState *gametypes.GameState) error {
 
 const (
 	// InterpolationOffset is how far back in time we want to interpolate.
-	// TODO: find a good rule of thumb for this value vs server tick rate
 	InterpolationOffset = 150 // ms - currently 3x the server tick rate (50ms)
 )
 
