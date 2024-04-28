@@ -61,18 +61,10 @@ func (s *UDPServer) Start() {
 			continue
 		}
 
-		log.Trace("Received UDP message of type %s from %d", message.Type, message.ClientID)
-
 		switch message.Type {
 		case messages.MessageTypeClientPing:
-			s.ClientManager.SetUDPAddress(message.ClientID, addr)
-			m := &messages.Message{
-				ClientID: 0,
-				Type:     messages.MessageTypeServerPong,
-				Payload:  nil,
-			}
-			if err := WriteMessageToUDP(udpConn, addr, m); err != nil {
-				log.Error("Failed to send server pong: %v", err)
+			if err := s.handleClientPing(message, udpConn, addr); err != nil {
+				log.Error("Failed to handle client ping: %v", err)
 			}
 		default:
 			if err := s.MessageQueue.Enqueue(message); err != nil {
@@ -80,6 +72,20 @@ func (s *UDPServer) Start() {
 			}
 		}
 	}
+}
+
+func (s *UDPServer) handleClientPing(msg *messages.Message, udpConn *net.UDPConn, addr *net.UDPAddr) error {
+	s.ClientManager.SetUDPAddress(msg.ClientID, addr)
+	m := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerPong,
+		Payload:  nil,
+	}
+	if err := WriteMessageToUDP(udpConn, addr, m); err != nil {
+		return fmt.Errorf("failed to write pong message to client: %v", err)
+	}
+
+	return nil
 }
 
 // WriteMessageToUDP writes a Message to a UDP connection

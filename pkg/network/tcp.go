@@ -90,76 +90,17 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 			continue
 		}
 
-		// TODO: create "handler" functions for each message type
 		switch message.Type {
 		case messages.MessageTypeClientLogin:
-			clientLogin := &messages.ClientLogin{}
-			if err := json.Unmarshal(message.Payload, clientLogin); err != nil {
-				log.Error("Failed to unmarshal client login: %v", err)
-				continue
-			}
-
-			token, err := s.AuthProvider.VerifyToken(ctx, clientLogin.Token)
+			clientID, err := s.handleClientLogin(ctx, conn, message)
 			if err != nil {
-				log.Error("Failed to verify ID token: %v", err)
+				log.Error("Failed to handle client login: %v", err)
 				continue
-			}
-
-			clientID, err := s.ClientManager.ConnectClient(conn, token.UID)
-			if err != nil {
-				log.Error("Failed to add client: %v", err)
-				conn.Close()
-				return
 			}
 			connectedClientID = clientID
-
-			log.Info("Client %d connected as %s", clientID, token.UID)
-
-			assignID := messages.ServerLoginSuccess{
-				ClientID: clientID,
-			}
-
-			payload, err := json.Marshal(assignID)
-			if err != nil {
-				log.Error("Failed to marshal assignID: %v", err)
-				return
-			}
-
-			// Send the client its ID
-			message := &messages.Message{
-				ClientID: 0,
-				Type:     messages.MessageTypeServerLoginSuccess,
-				Payload:  payload,
-			}
-			if err := WriteMessageToTCP(conn, message); err != nil {
-				log.Error("Error writing TCP message of type %s to client %d: %v", message.Type, clientID, err)
-				return
-			}
 		case messages.MessageTypeClientSyncTime:
-			clientSyncTime := &messages.ClientSyncTime{}
-			if err := json.Unmarshal(message.Payload, clientSyncTime); err != nil {
-				log.Error("Failed to unmarshal client sync time: %v", err)
-				continue
-			}
-
-			serverSyncTime := &messages.ServerSyncTime{
-				Timestamp:       time.Now().UnixMilli(),
-				ClientTimestamp: clientSyncTime.Timestamp,
-			}
-
-			payload, err := json.Marshal(serverSyncTime)
-			if err != nil {
-				log.Error("Failed to marshal server sync time: %v", err)
-				continue
-			}
-
-			msg := &messages.Message{
-				ClientID: 0,
-				Type:     messages.MessageTypeServerSyncTime,
-				Payload:  payload,
-			}
-			if err := WriteMessageToTCP(conn, msg); err != nil {
-				log.Error("Failed to send server pong: %v", err)
+			if err := s.handleClientSyncTime(conn, message); err != nil {
+				log.Error("Failed to handle client sync time: %v", err)
 			}
 		default:
 			if err := s.MessageQueue.Enqueue(message); err != nil {
@@ -167,6 +108,75 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 			}
 		}
 	}
+}
+
+// handleClientLogin handles a client login message.
+func (s *TCPServer) handleClientLogin(ctx context.Context, conn net.Conn, message *messages.Message) (uint32, error) {
+	clientLogin := &messages.ClientLogin{}
+	if err := json.Unmarshal(message.Payload, clientLogin); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal client login: %v", err)
+	}
+
+	token, err := s.AuthProvider.VerifyToken(ctx, clientLogin.Token)
+	if err != nil {
+		return 0, fmt.Errorf("failed to verify token: %v", err)
+	}
+
+	clientID, err := s.ClientManager.ConnectClient(conn, token.UID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to connect client: %v", err)
+	}
+
+	log.Info("Client %d connected as %s", clientID, token.UID)
+
+	assignID := messages.ServerLoginSuccess{
+		ClientID: clientID,
+	}
+
+	payload, err := json.Marshal(assignID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to marshal server login success: %v", err)
+	}
+
+	// Send the client its ID
+	msg := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerLoginSuccess,
+		Payload:  payload,
+	}
+	if err := WriteMessageToTCP(conn, msg); err != nil {
+		return 0, fmt.Errorf("failed to send server login success: %v", err)
+	}
+
+	return clientID, nil
+}
+
+func (s *TCPServer) handleClientSyncTime(conn net.Conn, message *messages.Message) error {
+	clientSyncTime := &messages.ClientSyncTime{}
+	if err := json.Unmarshal(message.Payload, clientSyncTime); err != nil {
+		return fmt.Errorf("failed to unmarshal client sync time: %v", err)
+	}
+
+	serverSyncTime := &messages.ServerSyncTime{
+		Timestamp:       time.Now().UnixMilli(),
+		ClientTimestamp: clientSyncTime.Timestamp,
+	}
+
+	payload, err := json.Marshal(serverSyncTime)
+	if err != nil {
+		return fmt.Errorf("failed to marshal server sync time: %v", err)
+	}
+
+	msg := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerSyncTime,
+		Payload:  payload,
+	}
+	if err := WriteMessageToTCP(conn, msg); err != nil {
+		return fmt.Errorf("failed to send server sync time: %v", err)
+	}
+
+	return nil
 }
 
 // WriteMessageToTCP writes a Message to a TCP connection
