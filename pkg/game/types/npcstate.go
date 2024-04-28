@@ -61,7 +61,8 @@ func (n *NPCState) RespawnTime() float64 {
 }
 
 // Update updates the NPC state based on the current state and the time passed
-func (n *NPCState) Update(deltaTime float64) {
+// and returns whether the state has changed
+func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	// TODO: some base movement logic
 
 	// X-axis
@@ -115,6 +116,9 @@ func (n *NPCState) Update(deltaTime float64) {
 	} else {
 		n.Animation = NPCAnimationIdle
 	}
+
+	// TODO: return false if the update did not change the state
+	return true
 }
 
 func (n *NPCState) TakeDamage(damage int16) {

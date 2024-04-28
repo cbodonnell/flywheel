@@ -81,9 +81,9 @@ func (p *PlayerState) Copy() *PlayerState {
 	}
 }
 
-// ApplyInput updates the player's state based on the client's input.
-// The player state is updated in place.
-func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate) {
+// ApplyInput updates the player's state based on the client's input
+// and returns whether the state has changed
+func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate) (changed bool) {
 	// Attack
 
 	if p.AttackTimeLeft > 0 {
@@ -187,4 +187,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 			}
 		}
 	}
+
+	// TODO: return false if the update did not change the state
+	return true
 }
