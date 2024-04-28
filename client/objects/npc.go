@@ -44,6 +44,12 @@ func (p *NPC) Update() error {
 
 func (p *NPC) Draw(screen *ebiten.Image) {
 	p.animations[p.State.Animation].Draw(screen, p.State.Position.X, p.State.Position.Y, p.State.AnimationFlip)
+	for a, anim := range p.animations {
+		if a == p.State.Animation {
+			continue
+		}
+		anim.Reset()
+	}
 
 	if !p.State.IsDead() {
 		// Draw hitpoints bar

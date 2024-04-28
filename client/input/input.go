@@ -63,6 +63,14 @@ func IsJumpJustPressed() bool {
 	return inpututil.IsKeyJustPressed(ebiten.KeySpace)
 }
 
-func IsAttackJustPressed() bool {
+func IsAttack1JustPressed() bool {
 	return inpututil.IsKeyJustPressed(ebiten.KeyQ)
+}
+
+func IsAttack2JustPressed() bool {
+	return inpututil.IsKeyJustPressed(ebiten.KeyW)
+}
+
+func IsAttack3JustPressed() bool {
+	return inpututil.IsKeyJustPressed(ebiten.KeyE)
 }

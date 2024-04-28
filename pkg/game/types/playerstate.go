@@ -19,12 +19,21 @@ type PlayerState struct {
 	Object                 *resolv.Object
 	IsOnGround             bool
 	IsAttacking            bool
+	CurrentAttack          PlayerAttack
 	AttackTimeLeft         float64
 	IsAttackHitting        bool
 	DidAttackHit           bool
 	Animation              PlayerAnimation
 	AnimationFlip          bool
 }
+
+type PlayerAttack uint8
+
+const (
+	PlayerAttack1 PlayerAttack = iota
+	PlayerAttack2
+	PlayerAttack3
+)
 
 type PlayerAnimation uint8
 
@@ -33,7 +42,9 @@ const (
 	PlayerAnimationRun
 	PlayerAnimationJump
 	PlayerAnimationFall
-	PlayerAnimationAttack
+	PlayerAnimationAttack1
+	PlayerAnimationAttack2
+	PlayerAnimationAttack3
 )
 
 func NewPlayerState(playerID string, positionX, positionY float64) *PlayerState {
@@ -89,7 +100,18 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	if p.AttackTimeLeft > 0 {
 		p.AttackTimeLeft -= clientPlayerUpdate.DeltaTime
 		if !p.DidAttackHit {
-			if p.AttackTimeLeft <= constants.PlayerAttackDuration-constants.PlayerAttackChannelTime {
+
+			attackHitTime := 0.0
+			switch p.CurrentAttack {
+			case PlayerAttack1:
+				attackHitTime = constants.PlayerAttack1Duration - constants.PlayerAttack1ChannelTime
+			case PlayerAttack2:
+				attackHitTime = constants.PlayerAttack2Duration - constants.PlayerAttack2ChannelTime
+			case PlayerAttack3:
+				attackHitTime = constants.PlayerAttack3Duration - constants.PlayerAttack3ChannelTime
+			}
+
+			if p.AttackTimeLeft <= attackHitTime {
 				// register the hit only once
 				p.IsAttackHitting = true
 				p.DidAttackHit = true
@@ -103,9 +125,21 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		p.DidAttackHit = false
 	}
 
-	if !p.IsAttacking && clientPlayerUpdate.InputAttack {
-		p.IsAttacking = true
-		p.AttackTimeLeft = constants.PlayerAttackDuration
+	if !p.IsAttacking {
+		switch {
+		case clientPlayerUpdate.InputAttack1:
+			p.IsAttacking = true
+			p.CurrentAttack = PlayerAttack1
+			p.AttackTimeLeft = constants.PlayerAttack1Duration
+		case clientPlayerUpdate.InputAttack2:
+			p.IsAttacking = true
+			p.CurrentAttack = PlayerAttack2
+			p.AttackTimeLeft = constants.PlayerAttack2Duration
+		case clientPlayerUpdate.InputAttack3:
+			p.IsAttacking = true
+			p.CurrentAttack = PlayerAttack3
+			p.AttackTimeLeft = constants.PlayerAttack3Duration
+		}
 	}
 
 	// Movement
@@ -171,7 +205,14 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	// Animation
 
 	if p.IsAttacking {
-		p.Animation = PlayerAnimationAttack
+		switch p.CurrentAttack {
+		case PlayerAttack1:
+			p.Animation = PlayerAnimationAttack1
+		case PlayerAttack2:
+			p.Animation = PlayerAnimationAttack2
+		case PlayerAttack3:
+			p.Animation = PlayerAnimationAttack3
+		}
 	} else {
 		if isOnGround {
 			if clientPlayerUpdate.InputX != 0 {

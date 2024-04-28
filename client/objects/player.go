@@ -68,11 +68,13 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 		// debug:          true,
 		State: state,
 		animations: map[gametypes.PlayerAnimation]*animations.Animation{
-			gametypes.PlayerAnimationIdle:   animations.NewPlayerIdleAnimation(),
-			gametypes.PlayerAnimationRun:    animations.NewPlayerRunAnimation(),
-			gametypes.PlayerAnimationJump:   animations.NewPlayerJumpAnimation(),
-			gametypes.PlayerAnimationFall:   animations.NewPlayerFallAnimation(),
-			gametypes.PlayerAnimationAttack: animations.NewPlayerAttackAnimation(),
+			gametypes.PlayerAnimationIdle:    animations.NewPlayerIdleAnimation(),
+			gametypes.PlayerAnimationRun:     animations.NewPlayerRunAnimation(),
+			gametypes.PlayerAnimationJump:    animations.NewPlayerJumpAnimation(),
+			gametypes.PlayerAnimationFall:    animations.NewPlayerFallAnimation(),
+			gametypes.PlayerAnimationAttack1: animations.NewPlayerAttack1Animation(),
+			gametypes.PlayerAnimationAttack2: animations.NewPlayerAttack2Animation(),
+			gametypes.PlayerAnimationAttack3: animations.NewPlayerAttack3Animation(),
 		},
 	}, nil
 }
@@ -104,16 +106,20 @@ func (p *Player) Update() error {
 
 	inputJump := input.IsJumpJustPressed()
 
-	inputAttack := input.IsAttackJustPressed()
+	inputAttack1 := input.IsAttack1JustPressed()
+	inputAttack2 := input.IsAttack2JustPressed()
+	inputAttack3 := input.IsAttack3JustPressed()
 
 	cpu := &messages.ClientPlayerUpdate{
-		Timestamp:   time.Now().UnixMilli(),
-		InputX:      inputX,
-		InputY:      inputY,
-		InputJump:   inputJump,
-		InputAttack: inputAttack,
-		DeltaTime:   1.0 / float64(ebiten.TPS()),
-		PastUpdates: p.pastUpdates,
+		Timestamp:    time.Now().UnixMilli(),
+		InputX:       inputX,
+		InputY:       inputY,
+		InputJump:    inputJump,
+		InputAttack1: inputAttack1,
+		InputAttack2: inputAttack2,
+		InputAttack3: inputAttack3,
+		DeltaTime:    1.0 / float64(ebiten.TPS()),
+		PastUpdates:  p.pastUpdates,
 	}
 	payload, err := json.Marshal(cpu)
 	if err != nil {
@@ -151,8 +157,11 @@ func (p *Player) Update() error {
 
 func (p *Player) Draw(screen *ebiten.Image) {
 	p.animations[p.State.Animation].Draw(screen, p.State.Position.X, p.State.Position.Y, p.State.AnimationFlip)
-	if !p.State.IsAttacking {
-		p.animations[gametypes.PlayerAnimationAttack].Reset()
+	for a, anim := range p.animations {
+		if a == p.State.Animation {
+			continue
+		}
+		anim.Reset()
 	}
 
 	t := strings.ToUpper(p.State.Name)
