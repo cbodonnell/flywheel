@@ -105,16 +105,20 @@ func (gm *GameManager) processConnectionEvents() {
 	for _, item := range pendingEvents {
 		switch event := item.(type) {
 		case *types.ConnectPlayerEvent:
-			gm.handleConnectPlayerEvent(event)
+			if err := gm.handleConnectPlayerEvent(event); err != nil {
+				log.Error("Failed to handle connect player event: %v", err)
+			}
 		case *types.DisconnectPlayerEvent:
-			gm.handleDisconnectPlayerEvent(event)
+			if err := gm.handleDisconnectPlayerEvent(event); err != nil {
+				log.Error("Failed to handle disconnect player event: %v", err)
+			}
 		default:
 			log.Error("unhandled connection event type: %T", event)
 		}
 	}
 }
 
-func (gm *GameManager) handleConnectPlayerEvent(event *types.ConnectPlayerEvent) {
+func (gm *GameManager) handleConnectPlayerEvent(event *types.ConnectPlayerEvent) error {
 	playerState := types.NewPlayerState(event.UserID, event.Position.X, event.Position.Y)
 	log.Debug("Player %s created as %s", playerState.UserID, playerState.Name)
 	// add the player to the game state
@@ -129,8 +133,7 @@ func (gm *GameManager) handleConnectPlayerEvent(event *types.ConnectPlayerEvent)
 	}
 	payload, err := json.Marshal(playerConnect)
 	if err != nil {
-		log.Error("Failed to marshal player state: %v", err)
-		return
+		return fmt.Errorf("failed to marshal player state: %v", err)
 	}
 
 	for _, client := range gm.clientManager.GetClients() {
@@ -146,9 +149,11 @@ func (gm *GameManager) handleConnectPlayerEvent(event *types.ConnectPlayerEvent)
 			continue
 		}
 	}
+
+	return nil
 }
 
-func (gm *GameManager) handleDisconnectPlayerEvent(event *types.DisconnectPlayerEvent) {
+func (gm *GameManager) handleDisconnectPlayerEvent(event *types.DisconnectPlayerEvent) error {
 	// send a request to save the player state before deleting it
 	saveRequest := workers.SavePlayerStateRequest{
 		Timestamp:   gm.gameState.Timestamp,
@@ -167,8 +172,7 @@ func (gm *GameManager) handleDisconnectPlayerEvent(event *types.DisconnectPlayer
 	}
 	payload, err := json.Marshal(playerDisconnect)
 	if err != nil {
-		log.Error("Failed to marshal player disconnect message: %v", err)
-		return
+		return fmt.Errorf("failed to marshal player disconnect message: %v", err)
 	}
 
 	for _, client := range gm.clientManager.GetClients() {
@@ -184,6 +188,8 @@ func (gm *GameManager) handleDisconnectPlayerEvent(event *types.DisconnectPlayer
 			continue
 		}
 	}
+
+	return nil
 }
 
 // processClientMessages processes all pending client messages in the queue
@@ -203,29 +209,30 @@ func (gm *GameManager) processClientMessages() {
 
 		switch message.Type {
 		case messages.MessageTypeClientPlayerUpdate:
-			gm.handleClientPlayerUpdate(message)
+			if err := gm.handleClientPlayerUpdate(message); err != nil {
+				log.Error("Failed to handle client player update: %v", err)
+			}
 		default:
 			log.Error("Unhandled message type: %s", message.Type)
 		}
 	}
 }
 
-func (gm *GameManager) handleClientPlayerUpdate(message *messages.Message) {
+func (gm *GameManager) handleClientPlayerUpdate(message *messages.Message) error {
 	clientPlayerUpdate := &messages.ClientPlayerUpdate{}
 	err := json.Unmarshal(message.Payload, clientPlayerUpdate)
 	if err != nil {
-		log.Error("Failed to unmarshal player state: %v", err)
-		return
+		return fmt.Errorf("failed to unmarshal client player update: %v", err)
 	}
 	if _, ok := gm.gameState.Players[message.ClientID]; !ok {
 		log.Warn("Client %d is not in the game state", message.ClientID)
-		return
+		return nil
 	}
 	playerState := gm.gameState.Players[message.ClientID]
 
 	if playerState.LastProcessedTimestamp > clientPlayerUpdate.Timestamp {
 		log.Warn("Client %d sent an outdated player update", message.ClientID)
-		return
+		return nil
 	}
 
 	// check for past updates that have not been processed and apply first
@@ -241,6 +248,8 @@ func (gm *GameManager) handleClientPlayerUpdate(message *messages.Message) {
 	playerState.ApplyInput(clientPlayerUpdate)
 
 	gm.checkPlayerCollisions(message.ClientID, playerState)
+
+	return nil
 }
 
 // checkPlayerCollisions checks for collisions between a player and other objects in the game.
