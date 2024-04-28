@@ -15,7 +15,6 @@ type NPCState struct {
 	AnimationFlip bool
 	Hitpoints     int16
 
-	// TODO: combine exists and dead into a single state
 	exists      bool
 	respawnTime float64
 }
@@ -63,8 +62,9 @@ func (n *NPCState) RespawnTime() float64 {
 
 // Update updates the NPC state based on the current state and the time passed
 func (n *NPCState) Update(deltaTime float64) {
-	// X-axis
 	// TODO: some base movement logic
+
+	// X-axis
 	dx := 0.0
 	vx := 0.0
 
@@ -75,7 +75,6 @@ func (n *NPCState) Update(deltaTime float64) {
 	}
 
 	// Y-axis
-	// TODO: some base movement logic
 	vy := n.Velocity.Y
 
 	// Apply gravity
