@@ -67,6 +67,9 @@ func (gm *GameManager) Start(ctx context.Context) error {
 			if err != nil {
 				log.Error("Failed to run game tick: %v", err)
 			}
+			// TODO: server metrics
+			// duration := time.Since(t)
+			// log.Trace("Game tick took %s (%.2f%% of tick rate)", duration, float64(duration)/float64(gm.gameLoopInterval)*100)
 		}
 	}
 }
