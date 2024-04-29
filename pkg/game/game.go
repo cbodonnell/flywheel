@@ -79,9 +79,14 @@ func (gm *GameManager) Stop() {
 }
 
 func (gm *GameManager) initializeGameState(_ context.Context) error {
-	npcState := types.NewNPCState(constants.NPCStartingX, constants.NPCStartingY)
-	gm.gameState.NPCs[1] = npcState
-	gm.gameState.CollisionSpace.Add(npcState.Object)
+	leftNPCState := types.NewNPCState(128.0-constants.NPCWidth/2, 16.0)
+	gm.gameState.NPCs[1] = leftNPCState
+	gm.gameState.CollisionSpace.Add(leftNPCState.Object)
+
+	rightNPCState := types.NewNPCState(512.0-constants.NPCWidth/2, 16.0)
+	rightNPCState.AnimationFlip = true
+	gm.gameState.NPCs[2] = rightNPCState
+	gm.gameState.CollisionSpace.Add(rightNPCState.Object)
 
 	return nil
 }

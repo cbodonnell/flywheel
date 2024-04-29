@@ -7,6 +7,7 @@ import (
 )
 
 type NPCState struct {
+	SpawnPosition kinematic.Vector
 	Position      kinematic.Vector
 	Velocity      kinematic.Vector
 	Object        *resolv.Object
@@ -27,17 +28,15 @@ const (
 )
 
 func NewNPCState(positionX float64, positionY float64) *NPCState {
+	spawnPosition := kinematic.Vector{
+		X: positionX,
+		Y: positionY,
+	}
+
 	return &NPCState{
-		Position: kinematic.Vector{
-			X: positionX,
-			Y: positionY,
-		},
-		Velocity: kinematic.Vector{
-			X: 0,
-			Y: 0,
-		},
-		Object:    resolv.NewObject(positionX, positionY, constants.NPCWidth, constants.NPCHeight, CollisionSpaceTagNPC),
-		Hitpoints: constants.NPCHitpoints,
+		SpawnPosition: spawnPosition,
+		Object:        resolv.NewObject(positionX, positionY, constants.NPCWidth, constants.NPCHeight, CollisionSpaceTagNPC),
+		Hitpoints:     constants.NPCHitpoints,
 	}
 }
 
@@ -137,8 +136,8 @@ func (n *NPCState) Spawn() {
 	n.exists = true
 	n.respawnTime = 0
 
-	n.Position.X = constants.NPCStartingX
-	n.Position.Y = constants.NPCStartingY
+	n.Position.X = n.SpawnPosition.X
+	n.Position.Y = n.SpawnPosition.Y
 	n.Velocity.X = 0
 	n.Velocity.Y = 0
 	n.IsOnGround = false

@@ -100,7 +100,6 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	if p.AttackTimeLeft > 0 {
 		p.AttackTimeLeft -= clientPlayerUpdate.DeltaTime
 		if !p.DidAttackHit {
-
 			attackHitTime := 0.0
 			switch p.CurrentAttack {
 			case PlayerAttack1:
@@ -157,7 +156,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 
 	// Check for collisions
 	if collision := p.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
-		dx = collision.ContactWithObject(collision.Objects[0]).X
+		dx = collision.ContactWithCell(collision.Cells[0]).X
 		vx = 0
 	}
 
@@ -175,7 +174,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	// Check for collisions
 	isOnGround := false
 	if collision := p.Object.Check(0, dy, CollisionSpaceTagLevel); collision != nil {
-		dy = collision.ContactWithObject(collision.Objects[0]).Y
+		dy = collision.ContactWithCell(collision.Cells[0]).Y
 		vy = 0
 		isOnGround = true
 	}

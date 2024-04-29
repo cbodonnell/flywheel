@@ -5,15 +5,15 @@ const (
 	// PlayerSpeed is the speed at which players move
 	PlayerSpeed float64 = 350.0
 	// PlayerJumpSpeed is the speed at which players jump
-	PlayerJumpSpeed float64 = 750.0
+	PlayerJumpSpeed float64 = 850.0
 	// Player Height
 	PlayerHeight float64 = 64.0
 	// Player Width
 	PlayerWidth float64 = 64.0
 	// Player Starting X
-	PlayerStartingX float64 = 320.0
+	PlayerStartingX float64 = 320.0 - PlayerWidth/2
 	// Player Starting Y
-	PlayerStartingY float64 = 240.0
+	PlayerStartingY float64 = 240.0 - PlayerHeight/2
 	// PlayerGravityMultiplier
 	PlayerGravityMultiplier float64 = 300.0
 
@@ -56,10 +56,6 @@ const (
 	NPCHeight float64 = 64.0
 	// NPC Width
 	NPCWidth float64 = 64.0
-	// NPC Starting X
-	NPCStartingX float64 = 100.0
-	// NPC Starting Y
-	NPCStartingY float64 = 16.0
 	// NPCGravityMultiplier
 	NPCGravityMultiplier float64 = 300.0
 	// NPCRespawnTime is the time it takes for an NPC to respawn
