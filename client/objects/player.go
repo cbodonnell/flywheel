@@ -164,14 +164,32 @@ func (p *Player) Draw(screen *ebiten.Image) {
 		anim.Reset()
 	}
 
+	// Draw Name
 	t := strings.ToUpper(p.State.Name)
 	f := fonts.TTFSmallFont
 	bounds, _ := font.BoundString(f, t)
 	op := &ebiten.DrawImageOptions{}
-	offsetY := float64(12)
+	offsetY := float64(24)
 	op.GeoM.Translate(float64(p.State.Position.X)+constants.PlayerWidth/2-float64(bounds.Max.X>>6)/2, float64(screen.Bounds().Dy())-float64(p.State.Position.Y)-constants.PlayerHeight-offsetY)
 	op.ColorScale.ScaleWithColor(color.White)
 	text.DrawWithOptions(screen, t, f, op)
+
+	// Draw hitpoints bar
+	hitpointsBarWidth := float32(constants.NPCWidth)
+	hitpointsBarHeight := float32(8)
+	hitpointsBarYOffset := float32(12)
+	hitpointsBarX := float32(p.State.Position.X)
+	hitpointsBarY := float32(float64(screen.Bounds().Dy())-constants.NPCHeight) - float32(p.State.Position.Y) - hitpointsBarHeight - hitpointsBarYOffset
+	hitpointsBarColor := color.RGBA{255, 0, 0, 255} // Red
+	vector.DrawFilledRect(screen, hitpointsBarX, hitpointsBarY, hitpointsBarWidth, hitpointsBarHeight, hitpointsBarColor, false)
+
+	// Draw hitpoints
+	hitpointsWidth := float32(float64(hitpointsBarWidth) * 1.0) // TODO: player hitpoints
+	hitpointsHeight := float32(hitpointsBarHeight)
+	hitpointsX := hitpointsBarX
+	hitpointsY := hitpointsBarY
+	hitpointsColor := color.RGBA{0, 255, 0, 255} // Green
+	vector.DrawFilledRect(screen, hitpointsX, hitpointsY, hitpointsWidth, hitpointsHeight, hitpointsColor, false)
 
 	if p.debug {
 		strokeWidth := float32(1)
