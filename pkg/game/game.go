@@ -79,9 +79,14 @@ func (gm *GameManager) Stop() {
 }
 
 func (gm *GameManager) initializeGameState(_ context.Context) error {
-	npcState := types.NewNPCState(constants.NPCStartingX, constants.NPCStartingY)
-	gm.gameState.NPCs[1] = npcState
-	gm.gameState.CollisionSpace.Add(npcState.Object)
+	leftNPCState := types.NewNPCState(128.0-constants.NPCWidth/2, 16.0)
+	gm.gameState.NPCs[1] = leftNPCState
+	gm.gameState.CollisionSpace.Add(leftNPCState.Object)
+
+	rightNPCState := types.NewNPCState(512.0-constants.NPCWidth/2, 16.0)
+	rightNPCState.AnimationFlip = true
+	gm.gameState.NPCs[2] = rightNPCState
+	gm.gameState.CollisionSpace.Add(rightNPCState.Object)
 
 	return nil
 }
@@ -264,11 +269,27 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 
 	// create an attack hitbox for the player
 	attackHitbox := playerState.Object.Clone()
-	attackHitbox.Size.X = constants.PlayerAttackHitboxWidth
+
+	attackHitboxWidth, attackHitboxOffset := 0.0, 0.0
+	switch playerState.CurrentAttack {
+	case types.PlayerAttack1:
+		attackHitboxWidth = constants.PlayerAttack1HitboxWidth
+		attackHitboxOffset = constants.PlayerAttack1HitboxOffset
+	case types.PlayerAttack2:
+		attackHitboxWidth = constants.PlayerAttack2HitboxWidth
+		attackHitboxOffset = constants.PlayerAttack2HitboxOffset
+	case types.PlayerAttack3:
+		attackHitboxWidth = constants.PlayerAttack3HitboxWidth
+		attackHitboxOffset = constants.PlayerAttack3HitboxOffset
+	default:
+		log.Warn("Unhandled player attack type: %d", playerState.CurrentAttack)
+	}
+
+	attackHitbox.Size.X = attackHitboxWidth
 	if !playerState.AnimationFlip {
-		attackHitbox.Position.X += constants.PlayerAttackHitboxOffset
+		attackHitbox.Position.X += attackHitboxOffset
 	} else {
-		attackHitbox.Position.X -= constants.PlayerAttackHitboxOffset
+		attackHitbox.Position.X -= attackHitboxOffset
 	}
 	gm.gameState.CollisionSpace.Add(attackHitbox)
 
@@ -283,7 +304,19 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 		}
 
 		log.Debug("Player %d hit NPC %d", clientID, npcID)
-		damage := constants.PlayerAttackDamage
+
+		damage := int16(0)
+		switch playerState.CurrentAttack {
+		case types.PlayerAttack1:
+			damage = constants.PlayerAttack1Damage
+		case types.PlayerAttack2:
+			damage = constants.PlayerAttack2Damage
+		case types.PlayerAttack3:
+			damage = constants.PlayerAttack3Damage
+		default:
+			log.Warn("Unhandled player attack type: %d", playerState.CurrentAttack)
+		}
+
 		npcState.TakeDamage(damage)
 
 		npcHit := &messages.ServerNPCHit{

@@ -2,13 +2,17 @@ package objects
 
 import (
 	"image/color"
+	"strings"
 
 	"github.com/cbodonnell/flywheel/client/animations"
+	"github.com/cbodonnell/flywheel/client/fonts"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/solarlune/resolv"
+	"golang.org/x/image/font"
 )
 
 type NPC struct {
@@ -44,8 +48,24 @@ func (p *NPC) Update() error {
 
 func (p *NPC) Draw(screen *ebiten.Image) {
 	p.animations[p.State.Animation].Draw(screen, p.State.Position.X, p.State.Position.Y, p.State.AnimationFlip)
+	for a, anim := range p.animations {
+		if a == p.State.Animation {
+			continue
+		}
+		anim.Reset()
+	}
 
 	if !p.State.IsDead() {
+		// Draw Name
+		t := strings.ToUpper("Skeleton")
+		f := fonts.TTFSmallFont
+		bounds, _ := font.BoundString(f, t)
+		op := &ebiten.DrawImageOptions{}
+		offsetY := float64(24)
+		op.GeoM.Translate(float64(p.State.Position.X)+constants.PlayerWidth/2-float64(bounds.Max.X>>6)/2, float64(screen.Bounds().Dy())-float64(p.State.Position.Y)-constants.PlayerHeight-offsetY)
+		op.ColorScale.ScaleWithColor(color.White)
+		text.DrawWithOptions(screen, t, f, op)
+
 		// Draw hitpoints bar
 		hitpointsBarWidth := float32(constants.NPCWidth)
 		hitpointsBarHeight := float32(8)

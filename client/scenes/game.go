@@ -355,7 +355,7 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 	for _, obj := range g.collisionSpace.Objects() {
 		if obj.HasTags(gametypes.CollisionSpaceTagLevel) {
 			levelColor := color.RGBA{0x80, 0x80, 0x80, 0xff} // white
-			vector.DrawFilledRect(screen, float32(obj.Position.X), float32(obj.Position.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
+			vector.DrawFilledRect(screen, float32(obj.Position.X), float32(screen.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
 		}
 	}
 

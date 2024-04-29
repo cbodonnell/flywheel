@@ -4,10 +4,8 @@ import (
 	"fmt"
 
 	"github.com/golang/freetype/truetype"
-	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/goregular"
-	"golang.org/x/image/font/opentype"
 )
 
 func init() {
@@ -16,26 +14,12 @@ func init() {
 	}
 }
 
-var MPlusNormalFont font.Face
 var TTFNormalFont font.Face
 var TTFSmallFont font.Face
 var TTFTinyFont font.Face
 
 func loadFonts() error {
-	tt, err := opentype.Parse(fonts.MPlus1pRegular_ttf)
-	if err != nil {
-		return fmt.Errorf("failed to parse font: %v", err)
-	}
 	const dpi = 72
-	MPlusNormalFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
-		Size:    24,
-		DPI:     dpi,
-		Hinting: font.HintingVertical,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create font face: %v", err)
-	}
-
 	ttfFont, err := truetype.Parse(goregular.TTF)
 	if err != nil {
 		return fmt.Errorf("failed to parse font: %v", err)
@@ -48,7 +32,7 @@ func loadFonts() error {
 	})
 
 	TTFSmallFont = truetype.NewFace(ttfFont, &truetype.Options{
-		Size:    16,
+		Size:    12,
 		DPI:     dpi,
 		Hinting: font.HintingFull,
 	})

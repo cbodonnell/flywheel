@@ -81,8 +81,12 @@ type ClientPlayerUpdate struct {
 	InputY float64 `json:"inputY"`
 	// InputJump is the jump input from the client
 	InputJump bool `json:"inputJump"`
-	// InputAttack is the attack input from the client
-	InputAttack bool `json:"inputAttack"`
+	// InputAttack1 is the attack 1 input from the client
+	InputAttack1 bool `json:"inputAttack1"`
+	// InputAttack2 is the attack 2 input from the client
+	InputAttack2 bool `json:"inputAttack2"`
+	// InputAttack3 is the attack 3 input from the client
+	InputAttack3 bool `json:"inputAttack3"`
 	// DeltaTime is the time since the last update as recorded by the client
 	DeltaTime float64 `json:"deltaTime"`
 	// PastUpdates is a list of past updates from the client to
