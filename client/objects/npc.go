@@ -1,13 +1,17 @@
 package objects
 
 import (
+	"fmt"
 	"image/color"
 	"strings"
+	"time"
 
 	"github.com/cbodonnell/flywheel/client/animations"
 	"github.com/cbodonnell/flywheel/client/fonts"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/log"
+	"github.com/google/uuid"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -118,4 +122,23 @@ func (p *NPC) ExtrapolateState(from *gametypes.NPCState, to *gametypes.NPCState,
 	p.State.Hitpoints = to.Hitpoints
 	p.State.Object.Position.X = p.State.Position.X
 	p.State.Object.Position.Y = p.State.Position.Y
+}
+
+func (p *NPC) HitEffect(damage int16) error {
+	hitID := fmt.Sprintf("%s-hit-%d", p.ID, uuid.New().ID())
+	hitX := p.State.Position.X + constants.NPCWidth/2
+	hitY := p.State.Position.Y + constants.NPCHeight/2
+	hitObject := NewHit(hitID, fmt.Sprintf("%d", damage), hitX, hitY)
+	if err := p.AddChild(hitObject.GetID(), hitObject); err != nil {
+		return fmt.Errorf("failed to add hit object: %v", err)
+	}
+
+	go func() {
+		<-time.After(2 * time.Second)
+		if err := p.RemoveChild(hitID); err != nil {
+			log.Error("Failed to remove hit object: %v", err)
+		}
+	}()
+
+	return nil
 }

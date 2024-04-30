@@ -150,11 +150,34 @@ func (g *GameScene) processPendingServerMessages() error {
 			}
 			g.deletedObjects[id] = time.Now().UnixMilli()
 		case messages.MessageTypeServerNPCHit:
-			log.Debug("Received NPC hit message: %s", message.Payload)
-			// TODO: display hit effect
+			npcHit := &messages.ServerNPCHit{}
+			if err := json.Unmarshal(message.Payload, npcHit); err != nil {
+				log.Error("Failed to unmarshal NPC hit message: %v", err)
+				continue
+			}
+			log.Debug("Player %d hit NPC %d for %d damage", npcHit.PlayerID, npcHit.NPCID, npcHit.Damage)
+			npcID := fmt.Sprintf("npc-%d", npcHit.NPCID)
+			obj := g.GetRoot().GetChild(npcID)
+			if obj == nil {
+				log.Warn("NPC object with id %d not found", npcHit.NPCID)
+				continue
+			}
+			npcObject, ok := obj.(*objects.NPC)
+			if !ok {
+				log.Error("Failed to cast game object %s to *objects.NPC", npcID)
+				continue
+			}
+			if err := npcObject.HitEffect(npcHit.Damage); err != nil {
+				log.Error("Failed to apply hit effect: %v", err)
+				continue
+			}
 		case messages.MessageTypeServerNPCKill:
-			log.Debug("Received NPC kill message: %s", message.Payload)
-			// TODO: display kill effect
+			npcKill := &messages.ServerNPCKill{}
+			if err := json.Unmarshal(message.Payload, npcKill); err != nil {
+				log.Error("Failed to unmarshal NPC kill message: %v", err)
+				continue
+			}
+			log.Debug("Player %d killed NPC %d", npcKill.PlayerID, npcKill.NPCID)
 		default:
 			log.Warn("Received unexpected message type from server: %s", message.Type)
 			continue
