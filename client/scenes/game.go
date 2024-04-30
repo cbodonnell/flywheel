@@ -81,84 +81,50 @@ func (g *GameScene) processPendingServerMessages() error {
 
 		switch message.Type {
 		case messages.MessageTypeServerGameUpdate:
-			serverGameUpdate, err := messages.DeserializeGameState(message.Payload)
-			if err != nil {
-				log.Error("Failed to deserialize game state: %v", err)
-				continue
-			}
-			gameState := game.GameStateFromServerUpdate(serverGameUpdate)
-
-			if gameState.Timestamp < g.lastGameStateReceived {
-				log.Warn("Received outdated game state: %d < %d", gameState.Timestamp, g.lastGameStateReceived)
-				continue
-			}
-			g.lastGameStateReceived = gameState.Timestamp
-			g.gameStates = append(g.gameStates, gameState)
-
-			if err := g.reconcilePlayerState(gameState); err != nil {
-				log.Warn("Failed to reconcile player state: %v", err)
+			if err := g.handleServerGameUpdate(message); err != nil {
+				log.Error("Failed to handle server game update: %v", err)
 			}
 		case messages.MessageTypeServerPlayerConnect:
-			playerConnect := &messages.ServerPlayerConnect{}
-			if err := json.Unmarshal(message.Payload, playerConnect); err != nil {
-				log.Error("Failed to unmarshal player connect message: %v", err)
-				continue
+			if err := g.handleServerPlayerConnect(message); err != nil {
+				log.Error("Failed to handle server player connect: %v", err)
 			}
-
-			id := fmt.Sprintf("player-%d", playerConnect.ClientID)
-			obj := g.GetRoot().GetChild(id)
-			if obj != nil {
-				log.Warn("Player object for client %d already exists", playerConnect.ClientID)
-				continue
-			}
-			log.Debug("Adding new player object for client %d", playerConnect.ClientID)
-			playerState := game.PlayerStateFromServerUpdate(playerConnect.PlayerState)
-			playerObject, err := objects.NewPlayer(id, g.networkManager, playerState)
-			if err != nil {
-				log.Error("Failed to create new player object: %v", err)
-				continue
-			}
-			g.collisionSpace.Add(playerObject.State.Object)
-			if err := g.GetRoot().AddChild(id, playerObject); err != nil {
-				log.Error("Failed to add player object: %v", err)
-				continue
-			}
-			delete(g.deletedObjects, id)
 		case messages.MessageTypeServerPlayerDisconnect:
-			playerDisconnect := &messages.ServerPlayerDisconnect{}
-			if err := json.Unmarshal(message.Payload, playerDisconnect); err != nil {
-				log.Error("Failed to unmarshal player disconnect message: %v", err)
-				continue
+			if err := g.handleServerPlayerDisconnect(message); err != nil {
+				log.Error("Failed to handle server player disconnect: %v", err)
 			}
-
-			id := fmt.Sprintf("player-%d", playerDisconnect.ClientID)
-			obj := g.GetRoot().GetChild(id)
-			if obj == nil {
-				log.Warn("Player object for client %d not found", playerDisconnect.ClientID)
-				continue
-			}
-			playerObject, ok := obj.(*objects.Player)
-			if !ok {
-				log.Error("Failed to cast game object %s to *objects.Player", id)
-				continue
-			}
-			log.Debug("Removing player object for client %d", playerDisconnect.ClientID)
-			g.collisionSpace.Remove(playerObject.State.Object)
-			if err := g.GetRoot().RemoveChild(id); err != nil {
-				log.Error("Failed to remove player object: %v", err)
-				continue
-			}
-			g.deletedObjects[id] = time.Now().UnixMilli()
 		case messages.MessageTypeServerNPCHit:
-			log.Debug("Received NPC hit message: %s", message.Payload)
-			// TODO: display hit effect
+			if err := g.handleServerNPCHit(message); err != nil {
+				log.Error("Failed to handle server NPC hit: %v", err)
+			}
 		case messages.MessageTypeServerNPCKill:
-			log.Debug("Received NPC kill message: %s", message.Payload)
-			// TODO: display kill effect
+			if err := g.handleServerNPCKill(message); err != nil {
+				log.Error("Failed to handle server NPC kill: %v", err)
+			}
 		default:
 			log.Warn("Received unexpected message type from server: %s", message.Type)
-			continue
 		}
+	}
+
+	return nil
+}
+
+func (g *GameScene) handleServerGameUpdate(message *messages.Message) error {
+	serverGameUpdate, err := messages.DeserializeGameState(message.Payload)
+	if err != nil {
+		return fmt.Errorf("failed to deserialize game state: %v", err)
+	}
+	gameState := game.GameStateFromServerUpdate(serverGameUpdate)
+
+	if gameState.Timestamp < g.lastGameStateReceived {
+		log.Warn("Received outdated game state: %d < %d", gameState.Timestamp, g.lastGameStateReceived)
+		return nil
+	}
+	g.lastGameStateReceived = gameState.Timestamp
+	g.gameStates = append(g.gameStates, gameState)
+
+	if err := g.reconcilePlayerState(gameState); err != nil {
+		log.Warn("Failed to reconcile player state: %v", err)
+		return nil
 	}
 
 	return nil
@@ -183,6 +149,91 @@ func (g *GameScene) reconcilePlayerState(gameState *gametypes.GameState) error {
 	}
 
 	return playerObject.ReconcileState(playerState)
+}
+
+func (g *GameScene) handleServerPlayerConnect(message *messages.Message) error {
+	playerConnect := &messages.ServerPlayerConnect{}
+	if err := json.Unmarshal(message.Payload, playerConnect); err != nil {
+		return fmt.Errorf("failed to unmarshal player connect message: %v", err)
+	}
+
+	id := fmt.Sprintf("player-%d", playerConnect.ClientID)
+	obj := g.GetRoot().GetChild(id)
+	if obj != nil {
+		log.Warn("Player object for client %d already exists", playerConnect.ClientID)
+		return nil
+	}
+	log.Debug("Adding new player object for client %d", playerConnect.ClientID)
+	playerState := game.PlayerStateFromServerUpdate(playerConnect.PlayerState)
+	playerObject, err := objects.NewPlayer(id, g.networkManager, playerState)
+	if err != nil {
+		return fmt.Errorf("failed to create new player object: %v", err)
+	}
+	g.collisionSpace.Add(playerObject.State.Object)
+	if err := g.GetRoot().AddChild(id, playerObject); err != nil {
+		return fmt.Errorf("failed to add player object: %v", err)
+	}
+	delete(g.deletedObjects, id)
+
+	return nil
+}
+
+func (g *GameScene) handleServerPlayerDisconnect(message *messages.Message) error {
+	playerDisconnect := &messages.ServerPlayerDisconnect{}
+	if err := json.Unmarshal(message.Payload, playerDisconnect); err != nil {
+		return fmt.Errorf("failed to unmarshal player disconnect message: %v", err)
+	}
+
+	id := fmt.Sprintf("player-%d", playerDisconnect.ClientID)
+	obj := g.GetRoot().GetChild(id)
+	if obj == nil {
+		log.Warn("Player object for client %d not found", playerDisconnect.ClientID)
+		return nil
+	}
+	playerObject, ok := obj.(*objects.Player)
+	if !ok {
+		return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
+	}
+	log.Debug("Removing player object for client %d", playerDisconnect.ClientID)
+	g.collisionSpace.Remove(playerObject.State.Object)
+	if err := g.GetRoot().RemoveChild(id); err != nil {
+		return fmt.Errorf("failed to remove player object: %v", err)
+	}
+	g.deletedObjects[id] = time.Now().UnixMilli()
+
+	return nil
+}
+
+func (g *GameScene) handleServerNPCHit(message *messages.Message) error {
+	npcHit := &messages.ServerNPCHit{}
+	if err := json.Unmarshal(message.Payload, npcHit); err != nil {
+		return fmt.Errorf("failed to unmarshal NPC hit message: %v", err)
+	}
+	log.Debug("Player %d hit NPC %d for %d damage", npcHit.PlayerID, npcHit.NPCID, npcHit.Damage)
+	npcID := fmt.Sprintf("npc-%d", npcHit.NPCID)
+	obj := g.GetRoot().GetChild(npcID)
+	if obj == nil {
+		log.Warn("NPC object with id %d not found", npcHit.NPCID)
+		return nil
+	}
+	npcObject, ok := obj.(*objects.NPC)
+	if !ok {
+		return fmt.Errorf("failed to cast game object %s to *objects.NPC", npcID)
+	}
+	if err := npcObject.DamageEffect(npcHit.Damage); err != nil {
+		return fmt.Errorf("failed to apply damage effect to NPC: %v", err)
+	}
+
+	return nil
+}
+
+func (g *GameScene) handleServerNPCKill(message *messages.Message) error {
+	npcKill := &messages.ServerNPCKill{}
+	if err := json.Unmarshal(message.Payload, npcKill); err != nil {
+		return fmt.Errorf("failed to unmarshal NPC kill message: %v", err)
+	}
+	log.Debug("Player %d killed NPC %d", npcKill.PlayerID, npcKill.NPCID)
+	return nil
 }
 
 const (

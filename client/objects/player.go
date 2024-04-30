@@ -79,10 +79,10 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 	}, nil
 }
 
-func (p *Player) Update() error {
-	p.animations[p.State.Animation].Update()
+func (o *Player) Update() error {
+	o.animations[o.State.Animation].Update()
 
-	if !p.isLocalPlayer {
+	if !o.isLocalPlayer {
 		return nil
 	}
 
@@ -119,7 +119,7 @@ func (p *Player) Update() error {
 		InputAttack2: inputAttack2,
 		InputAttack3: inputAttack3,
 		DeltaTime:    1.0 / float64(ebiten.TPS()),
-		PastUpdates:  p.pastUpdates,
+		PastUpdates:  o.pastUpdates,
 	}
 	payload, err := json.Marshal(cpu)
 	if err != nil {
@@ -127,50 +127,50 @@ func (p *Player) Update() error {
 	}
 
 	msg := &messages.Message{
-		ClientID: p.networkManager.ClientID(),
+		ClientID: o.networkManager.ClientID(),
 		Type:     messages.MessageTypeClientPlayerUpdate,
 		Payload:  payload,
 	}
 
-	if err := p.networkManager.SendUnreliableMessage(msg); err != nil {
+	if err := o.networkManager.SendUnreliableMessage(msg); err != nil {
 		return fmt.Errorf("failed to send client player update: %v", err)
 	}
 
 	cpu.PastUpdates = nil // clear the past updates after sending the message
-	p.pastUpdates = append(p.pastUpdates, cpu)
-	for len(p.pastUpdates) > messages.MaxPreviousUpdates {
-		p.pastUpdates = p.pastUpdates[1:]
+	o.pastUpdates = append(o.pastUpdates, cpu)
+	for len(o.pastUpdates) > messages.MaxPreviousUpdates {
+		o.pastUpdates = o.pastUpdates[1:]
 	}
 
-	p.State.ApplyInput(cpu)
+	o.State.ApplyInput(cpu)
 
-	p.previousStates = append(p.previousStates, PreviousState{
+	o.previousStates = append(o.previousStates, PreviousState{
 		Timestamp: cpu.Timestamp,
-		State:     p.State.Copy(), // store a copy as the state will be modified by the game loop
+		State:     o.State.Copy(), // store a copy as the state will be modified by the game loop
 	})
-	for len(p.previousStates) > MaxPreviousStates {
-		p.previousStates = p.previousStates[1:]
+	for len(o.previousStates) > MaxPreviousStates {
+		o.previousStates = o.previousStates[1:]
 	}
 
 	return nil
 }
 
-func (p *Player) Draw(screen *ebiten.Image) {
-	p.animations[p.State.Animation].Draw(screen, p.State.Position.X, p.State.Position.Y, p.State.AnimationFlip)
-	for a, anim := range p.animations {
-		if a == p.State.Animation {
+func (o *Player) Draw(screen *ebiten.Image) {
+	o.animations[o.State.Animation].Draw(screen, o.State.Position.X, o.State.Position.Y, o.State.AnimationFlip)
+	for a, anim := range o.animations {
+		if a == o.State.Animation {
 			continue
 		}
 		anim.Reset()
 	}
 
 	// Draw Name
-	t := strings.ToUpper(p.State.Name)
+	t := strings.ToUpper(o.State.Name)
 	f := fonts.TTFSmallFont
 	bounds, _ := font.BoundString(f, t)
 	op := &ebiten.DrawImageOptions{}
 	offsetY := float64(24)
-	op.GeoM.Translate(float64(p.State.Position.X)+constants.PlayerWidth/2-float64(bounds.Max.X>>6)/2, float64(screen.Bounds().Dy())-float64(p.State.Position.Y)-constants.PlayerHeight-offsetY)
+	op.GeoM.Translate(float64(o.State.Position.X)+constants.PlayerWidth/2-float64(bounds.Max.X>>6)/2, float64(screen.Bounds().Dy())-float64(o.State.Position.Y)-constants.PlayerHeight-offsetY)
 	op.ColorScale.ScaleWithColor(color.White)
 	text.DrawWithOptions(screen, t, f, op)
 
@@ -178,8 +178,8 @@ func (p *Player) Draw(screen *ebiten.Image) {
 	hitpointsBarWidth := float32(constants.NPCWidth)
 	hitpointsBarHeight := float32(8)
 	hitpointsBarYOffset := float32(12)
-	hitpointsBarX := float32(p.State.Position.X)
-	hitpointsBarY := float32(float64(screen.Bounds().Dy())-constants.NPCHeight) - float32(p.State.Position.Y) - hitpointsBarHeight - hitpointsBarYOffset
+	hitpointsBarX := float32(o.State.Position.X)
+	hitpointsBarY := float32(float64(screen.Bounds().Dy())-constants.NPCHeight) - float32(o.State.Position.Y) - hitpointsBarHeight - hitpointsBarYOffset
 	hitpointsBarColor := color.RGBA{255, 0, 0, 255} // Red
 	vector.DrawFilledRect(screen, hitpointsBarX, hitpointsBarY, hitpointsBarWidth, hitpointsBarHeight, hitpointsBarColor, false)
 
@@ -191,51 +191,51 @@ func (p *Player) Draw(screen *ebiten.Image) {
 	hitpointsColor := color.RGBA{0, 255, 0, 255} // Green
 	vector.DrawFilledRect(screen, hitpointsX, hitpointsY, hitpointsWidth, hitpointsHeight, hitpointsColor, false)
 
-	if p.debug {
+	if o.debug {
 		strokeWidth := float32(1)
 		var playerColor color.RGBA
-		if p.isLocalPlayer {
+		if o.isLocalPlayer {
 			// red if not on ground, blue if on ground
 			playerColor = color.RGBA{255, 0, 0, 255} // Red
-			if p.State.IsOnGround {
+			if o.State.IsOnGround {
 				playerColor = color.RGBA{0, 0, 255, 255} // Blue
 			}
 		} else {
 			playerColor = color.RGBA{0, 255, 60, 255} // Green
-			if p.State.IsOnGround {
+			if o.State.IsOnGround {
 				playerColor = color.RGBA{200, 0, 200, 255} // Purple
 			}
 		}
-		vector.StrokeRect(screen, float32(p.State.Position.X), float32(float64(screen.Bounds().Dy())-constants.PlayerHeight)-float32(p.State.Position.Y), float32(constants.PlayerWidth), float32(constants.PlayerHeight), strokeWidth, playerColor, false)
+		vector.StrokeRect(screen, float32(o.State.Position.X), float32(float64(screen.Bounds().Dy())-constants.PlayerHeight)-float32(o.State.Position.Y), float32(constants.PlayerWidth), float32(constants.PlayerHeight), strokeWidth, playerColor, false)
 	}
 }
 
-func (p *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {
-	p.State.LastProcessedTimestamp = to.LastProcessedTimestamp
-	p.State.Position.X = from.Position.X + (to.Position.X-from.Position.X)*factor
-	p.State.Position.Y = from.Position.Y + (to.Position.Y-from.Position.Y)*factor
-	p.State.Velocity.X = to.Velocity.X
-	p.State.Velocity.Y = to.Velocity.X
-	p.State.IsOnGround = to.IsOnGround
-	p.State.IsAttacking = to.IsAttacking
-	p.State.Animation = to.Animation
-	p.State.AnimationFlip = to.AnimationFlip
-	p.State.Object.Position.X = p.State.Position.X
-	p.State.Object.Position.Y = p.State.Position.Y
+func (o *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {
+	o.State.LastProcessedTimestamp = to.LastProcessedTimestamp
+	o.State.Position.X = from.Position.X + (to.Position.X-from.Position.X)*factor
+	o.State.Position.Y = from.Position.Y + (to.Position.Y-from.Position.Y)*factor
+	o.State.Velocity.X = to.Velocity.X
+	o.State.Velocity.Y = to.Velocity.X
+	o.State.IsOnGround = to.IsOnGround
+	o.State.IsAttacking = to.IsAttacking
+	o.State.Animation = to.Animation
+	o.State.AnimationFlip = to.AnimationFlip
+	o.State.Object.Position.X = o.State.Position.X
+	o.State.Object.Position.Y = o.State.Position.Y
 }
 
-func (p *Player) ExtrapolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {
-	p.State.LastProcessedTimestamp = to.LastProcessedTimestamp
-	p.State.Position.X = to.Position.X + (to.Position.X-from.Position.X)*factor
-	p.State.Position.Y = to.Position.Y + (to.Position.Y-from.Position.Y)*factor
-	p.State.Velocity.X = to.Velocity.X
-	p.State.Velocity.Y = to.Velocity.Y
-	p.State.IsOnGround = to.IsOnGround
-	p.State.IsAttacking = to.IsAttacking
-	p.State.Animation = to.Animation
-	p.State.AnimationFlip = to.AnimationFlip
-	p.State.Object.Position.X = p.State.Position.X
-	p.State.Object.Position.Y = p.State.Position.Y
+func (o *Player) ExtrapolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {
+	o.State.LastProcessedTimestamp = to.LastProcessedTimestamp
+	o.State.Position.X = to.Position.X + (to.Position.X-from.Position.X)*factor
+	o.State.Position.Y = to.Position.Y + (to.Position.Y-from.Position.Y)*factor
+	o.State.Velocity.X = to.Velocity.X
+	o.State.Velocity.Y = to.Velocity.Y
+	o.State.IsOnGround = to.IsOnGround
+	o.State.IsAttacking = to.IsAttacking
+	o.State.Animation = to.Animation
+	o.State.AnimationFlip = to.AnimationFlip
+	o.State.Object.Position.X = o.State.Position.X
+	o.State.Object.Position.Y = o.State.Position.Y
 }
 
 // ReconcileState reconciles the player state with the server state
@@ -243,37 +243,37 @@ func (p *Player) ExtrapolateState(from *gametypes.PlayerState, to *gametypes.Pla
 // the client state for that timestamp matches the server state.
 // If it doesn't match, the server state is applied and all of the
 // past updates that are after the last processed timestamp are replayed.
-func (p *Player) ReconcileState(state *gametypes.PlayerState) error {
+func (o *Player) ReconcileState(state *gametypes.PlayerState) error {
 	if state.LastProcessedTimestamp == 0 {
 		// initial state received from the server, nothing to reconcile
 		return nil
 	}
 
 	foundPreviousState := false
-	for i := len(p.previousStates) - 1; i >= 0; i-- {
-		ps := p.previousStates[i]
+	for i := len(o.previousStates) - 1; i >= 0; i-- {
+		ps := o.previousStates[i]
 		if ps.Timestamp == state.LastProcessedTimestamp {
 			foundPreviousState = true
 			if !ps.State.Equal(state) {
-				log.Warn("Reconciling player state at timestamp %d for %s", state.LastProcessedTimestamp, p.ID)
+				log.Warn("Reconciling player state at timestamp %d for %s", state.LastProcessedTimestamp, o.ID)
 				log.Warn("Client state: %v", ps.State)
 				log.Warn("Server state: %v", state)
 				// apply the server state
-				p.State.Position.X = state.Position.X
-				p.State.Position.Y = state.Position.Y
-				p.State.Velocity.X = state.Velocity.X
-				p.State.Velocity.Y = state.Velocity.Y
-				p.State.IsOnGround = state.IsOnGround
-				p.State.IsAttacking = state.IsAttacking
-				p.State.Animation = state.Animation
-				p.State.AnimationFlip = state.AnimationFlip
-				p.State.Object.Position.X = state.Position.X
-				p.State.Object.Position.Y = state.Position.Y
+				o.State.Position.X = state.Position.X
+				o.State.Position.Y = state.Position.Y
+				o.State.Velocity.X = state.Velocity.X
+				o.State.Velocity.Y = state.Velocity.Y
+				o.State.IsOnGround = state.IsOnGround
+				o.State.IsAttacking = state.IsAttacking
+				o.State.Animation = state.Animation
+				o.State.AnimationFlip = state.AnimationFlip
+				o.State.Object.Position.X = state.Position.X
+				o.State.Object.Position.Y = state.Position.Y
 
 				// replay all of the past updates that are after the reconciled state
-				for j := 0; j < len(p.pastUpdates); j++ {
-					if p.pastUpdates[j].Timestamp > state.LastProcessedTimestamp {
-						p.State.ApplyInput(p.pastUpdates[j])
+				for j := 0; j < len(o.pastUpdates); j++ {
+					if o.pastUpdates[j].Timestamp > state.LastProcessedTimestamp {
+						o.State.ApplyInput(o.pastUpdates[j])
 					}
 				}
 			}
