@@ -154,6 +154,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		vx = kinematic.FinalVelocity(p.Velocity.X, clientPlayerUpdate.DeltaTime, 0)
 	}
 
+	// TODO: fix edge case when player hits top corner of a platform
 	// Check for collisions
 	if collision := p.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
 		dx = collision.ContactWithCell(collision.Cells[0]).X

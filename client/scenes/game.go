@@ -254,10 +254,12 @@ func (g *GameScene) updateGameState() error {
 	}
 
 	if len(g.gameStates) > 2 {
+		// we have a future state to interpolate to
 		if err := g.interpolateState(g.gameStates[1], g.gameStates[2], renderTime); err != nil {
 			return fmt.Errorf("failed to interpolate game state: %v", err)
 		}
 	} else {
+		// we don't have a future state, so we need to extrapolate from the last state
 		if err := g.extrapolateState(g.gameStates[0], g.gameStates[1], renderTime); err != nil {
 			return fmt.Errorf("failed to extrapolate game state: %v", err)
 		}
@@ -269,17 +271,8 @@ func (g *GameScene) updateGameState() error {
 // interpolateState interpolates the game state between two states given a render time
 // that is between the two states.
 func (g *GameScene) interpolateState(from *gametypes.GameState, to *gametypes.GameState, renderTime int64) error {
-	// we have a future state to interpolate to
 	interpolationFactor := float64(renderTime-from.Timestamp) / float64(to.Timestamp-from.Timestamp)
 	for clientID, playerState := range to.Players {
-		if clientID == g.networkManager.ClientID() {
-			continue
-		}
-		if _, ok := from.Players[clientID]; !ok {
-			continue
-		}
-		previousPlayerState := from.Players[clientID]
-
 		id := fmt.Sprintf("player-%d", clientID)
 		obj := g.GetRoot().GetChild(id)
 		if obj == nil {
@@ -298,10 +291,17 @@ func (g *GameScene) interpolateState(from *gametypes.GameState, to *gametypes.Ga
 				return fmt.Errorf("failed to add player object: %v", err)
 			}
 		} else {
+			if clientID == g.networkManager.ClientID() {
+				continue
+			}
 			playerObject, ok := obj.(*objects.Player)
 			if !ok {
 				return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
 			}
+			if _, ok := from.Players[clientID]; !ok {
+				continue
+			}
+			previousPlayerState := from.Players[clientID]
 			playerObject.InterpolateState(previousPlayerState, playerState, interpolationFactor)
 		}
 	}
@@ -344,26 +344,24 @@ func (g *GameScene) interpolateState(from *gametypes.GameState, to *gametypes.Ga
 // extrapolateState extrapolates the game state based on the last two states.
 // This is used when we don't have a future state to interpolate to.
 func (g *GameScene) extrapolateState(from *gametypes.GameState, to *gametypes.GameState, renderTime int64) error {
-	// we don't have a future state, so we need to extrapolate from the last state
 	extrapolationFactor := float64(renderTime-to.Timestamp) / float64(to.Timestamp-from.Timestamp)
 	for clientID, playerState := range to.Players {
-		if clientID == g.networkManager.ClientID() {
-			continue
-		}
-		if _, ok := from.Players[clientID]; !ok {
-			continue
-		}
-		previousPlayerState := from.Players[clientID]
-
 		id := fmt.Sprintf("player-%d", clientID)
 		obj := g.GetRoot().GetChild(id)
 		if obj == nil {
 			log.Debug("Player object for client %d not found, not instancing since we're extrapolating", clientID)
 		} else {
+			if clientID == g.networkManager.ClientID() {
+				continue
+			}
 			playerObject, ok := obj.(*objects.Player)
 			if !ok {
 				return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
 			}
+			if _, ok := from.Players[clientID]; !ok {
+				continue
+			}
+			previousPlayerState := from.Players[clientID]
 			playerObject.ExtrapolateState(previousPlayerState, playerState, extrapolationFactor)
 		}
 	}
