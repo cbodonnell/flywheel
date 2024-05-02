@@ -12,10 +12,12 @@ import (
 )
 
 type MenuScene struct {
-	BaseScene
+	*BaseScene
 
 	ui *ebitenui.UI
 }
+
+var _ Scene = &MenuScene{}
 
 type MenuSceneOptions struct {
 	// OnLogin is called when the start game button is pressed.
@@ -24,10 +26,8 @@ type MenuSceneOptions struct {
 
 func NewMenuScene(opts MenuSceneOptions) (Scene, error) {
 	return &MenuScene{
-		BaseScene{
-			root: objects.NewBaseObject("menu-root", nil),
-		},
-		initUI(InitUIOptions(opts)),
+		BaseScene: NewBaseScene(objects.NewBaseObject("menu-root", nil)),
+		ui:        initUI(InitUIOptions(opts)),
 	}, nil
 }
 

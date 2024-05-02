@@ -21,7 +21,7 @@ import (
 )
 
 type GameScene struct {
-	BaseScene
+	*BaseScene
 
 	// networkManager is the network manager.
 	networkManager *network.NetworkManager
@@ -36,11 +36,11 @@ type GameScene struct {
 	gameStates []*gametypes.GameState
 }
 
+var _ Scene = &GameScene{}
+
 func NewGameScene(networkManager *network.NetworkManager) (Scene, error) {
 	return &GameScene{
-		BaseScene: BaseScene{
-			root: objects.NewBaseObject("game-root", nil),
-		},
+		BaseScene:      NewBaseScene(objects.NewSortedZIndexObject("game-root")),
 		networkManager: networkManager,
 		collisionSpace: game.NewCollisionSpace(),
 		deletedObjects: make(map[string]int64),
@@ -225,7 +225,6 @@ func (g *GameScene) handleServerNPCHit(message *messages.Message) error {
 	hitID := fmt.Sprintf("%s-hit-%d", npcObject.ID, uuid.New().ID())
 	zIndex := 15
 	if npcHit.PlayerID == g.networkManager.ClientID() {
-		// TODO: determine if this should show above or below the local player
 		zIndex = 25
 	}
 	hitObject := objects.NewTextEffect(hitID, objects.NewTextEffectOptions{

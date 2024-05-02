@@ -70,7 +70,7 @@ func (o *TextEffect) Update() error {
 	if o.ttl > 0 {
 		o.ttl -= 1000 / ebiten.TPS()
 		if o.ttl <= 0 {
-			if err := o.BaseObject.RemoveFromParent(); err != nil {
+			if err := o.RemoveFromParent(); err != nil {
 				return fmt.Errorf("failed to remove text effect from parent: %w", err)
 			}
 		}

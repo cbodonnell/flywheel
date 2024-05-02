@@ -16,6 +16,14 @@ type BaseScene struct {
 	root objects.GameObject
 }
 
+var _ Scene = &BaseScene{}
+
+func NewBaseScene(root objects.GameObject) *BaseScene {
+	return &BaseScene{
+		root: root,
+	}
+}
+
 func (s *BaseScene) GetRoot() objects.GameObject {
 	return s.root
 }

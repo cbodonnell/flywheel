@@ -16,7 +16,6 @@ type GameObject interface {
 
 	GetID() string
 	GetChildren() []GameObject
-	GetChildrenSorted() []GameObject
 	GetChild(id string) GameObject
 	AddChild(id string, child GameObject) error
 	RemoveChild(id string) error
@@ -29,36 +28,20 @@ type GameObject interface {
 
 // TODO: unit tests for IndexedObjectList
 type IndexedObjectList struct {
-	objects               []GameObject
-	idxIDObjects          map[string]int
-	objectsSortedByZIndex []GameObject
-	idxIDObjectsSorted    map[string]int
+	objects      []GameObject
+	idxIDObjects map[string]int
 }
 
 func NewIndexedObjectList() *IndexedObjectList {
 	return &IndexedObjectList{
-		objects:               make([]GameObject, 0),
-		idxIDObjects:          make(map[string]int),
-		objectsSortedByZIndex: make([]GameObject, 0),
-		idxIDObjectsSorted:    make(map[string]int),
+		objects:      make([]GameObject, 0),
+		idxIDObjects: make(map[string]int),
 	}
 }
 
 func (l *IndexedObjectList) Add(id string, object GameObject) {
 	l.objects = append(l.objects, object)
 	l.idxIDObjects[id] = len(l.objects) - 1
-	for i := len(l.objectsSortedByZIndex) - 1; i >= 0; i-- {
-		if l.objectsSortedByZIndex[i].GetZIndex() <= object.GetZIndex() {
-			l.objectsSortedByZIndex = append(l.objectsSortedByZIndex[:i+1], append([]GameObject{object}, l.objectsSortedByZIndex[i+1:]...)...)
-			l.idxIDObjectsSorted[id] = i + 1
-			for j := i + 1; j < len(l.objectsSortedByZIndex); j++ {
-				l.idxIDObjectsSorted[l.objectsSortedByZIndex[j].GetID()] = j
-			}
-			return
-		}
-	}
-	l.objectsSortedByZIndex = append([]GameObject{object}, l.objectsSortedByZIndex...)
-	l.idxIDObjectsSorted[id] = 0
 }
 
 func (l *IndexedObjectList) Remove(id string) {
@@ -70,15 +53,6 @@ func (l *IndexedObjectList) Remove(id string) {
 	l.objects = append(l.objects[:idx], l.objects[idx+1:]...)
 	for i := idx; i < len(l.objects); i++ {
 		l.idxIDObjects[l.objects[i].GetID()] = i
-	}
-	idxSorted, ok := l.idxIDObjectsSorted[id]
-	if !ok {
-		return
-	}
-	delete(l.idxIDObjectsSorted, id)
-	l.objectsSortedByZIndex = append(l.objectsSortedByZIndex[:idxSorted], l.objectsSortedByZIndex[idxSorted+1:]...)
-	for i := idxSorted; i < len(l.objectsSortedByZIndex); i++ {
-		l.idxIDObjectsSorted[l.objectsSortedByZIndex[i].GetID()] = i
 	}
 }
 
@@ -92,10 +66,6 @@ func (l *IndexedObjectList) Get(id string) GameObject {
 
 func (l *IndexedObjectList) GetAll() []GameObject {
 	return l.objects
-}
-
-func (l *IndexedObjectList) GetSorted() []GameObject {
-	return l.objectsSortedByZIndex
 }
 
 // BaseObject is a base implementation of GameObject.
@@ -144,10 +114,6 @@ func (o *BaseObject) GetID() string {
 
 func (o *BaseObject) GetChildren() []GameObject {
 	return o.children.GetAll()
-}
-
-func (o *BaseObject) GetChildrenSorted() []GameObject {
-	return o.children.GetSorted()
 }
 
 func (o *BaseObject) GetChild(id string) GameObject {
@@ -232,7 +198,7 @@ func UpdateTree(object GameObject) error {
 
 func DrawTree(object GameObject, screen *ebiten.Image) {
 	object.Draw(screen)
-	for _, child := range object.GetChildrenSorted() {
+	for _, child := range object.GetChildren() {
 		DrawTree(child, screen)
 	}
 }
