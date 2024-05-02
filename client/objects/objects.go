@@ -27,6 +27,7 @@ type GameObject interface {
 	GetZIndex() int
 }
 
+// TODO: unit tests for IndexedObjectList
 type IndexedObjectList struct {
 	objects               []GameObject
 	idxIDObjects          map[string]int
