@@ -13,25 +13,25 @@ type Scene interface {
 }
 
 type BaseScene struct {
-	Root objects.GameObject
+	root objects.GameObject
 }
 
 func (s *BaseScene) GetRoot() objects.GameObject {
-	return s.Root
+	return s.root
 }
 
 func (s *BaseScene) Init() error {
-	return objects.InitTree(s.Root)
+	return objects.InitTree(s.root)
 }
 
 func (s *BaseScene) Destroy() error {
-	return objects.DestroyTree(s.Root)
+	return objects.DestroyTree(s.root)
 }
 
 func (s *BaseScene) Update() error {
-	return objects.UpdateTree(s.Root)
+	return objects.UpdateTree(s.root)
 }
 
 func (s *BaseScene) Draw(screen *ebiten.Image) {
-	objects.DrawTree(s.Root, screen)
+	objects.DrawTree(s.root, screen)
 }

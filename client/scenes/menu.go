@@ -25,7 +25,7 @@ type MenuSceneOptions struct {
 func NewMenuScene(opts MenuSceneOptions) (Scene, error) {
 	return &MenuScene{
 		BaseScene{
-			Root: objects.NewBaseObject("menu-root"),
+			root: objects.NewBaseObject("menu-root", nil),
 		},
 		initUI(InitUIOptions(opts)),
 	}, nil
@@ -157,9 +157,10 @@ func initUI(opts InitUIOptions) *ebitenui.UI {
 
 func (s *MenuScene) Update() error {
 	s.ui.Update()
-	return nil
+	return s.BaseScene.Update()
 }
 
 func (s *MenuScene) Draw(screen *ebiten.Image) {
 	s.ui.Draw(screen)
+	s.BaseScene.Draw(screen)
 }

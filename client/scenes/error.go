@@ -9,7 +9,7 @@ type ErrorScene struct {
 func NewErrorScene(msg string) (Scene, error) {
 	return &ErrorScene{
 		BaseScene{
-			Root: objects.NewTextOverlayObject("overlay-error", msg),
+			root: objects.NewTextOverlayObject("overlay-error", msg),
 		},
 	}, nil
 }

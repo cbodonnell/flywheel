@@ -1,17 +1,13 @@
 package objects
 
 import (
-	"fmt"
 	"image/color"
 	"strings"
-	"time"
 
 	"github.com/cbodonnell/flywheel/client/animations"
 	"github.com/cbodonnell/flywheel/client/fonts"
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
-	"github.com/cbodonnell/flywheel/pkg/log"
-	"github.com/google/uuid"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -33,8 +29,12 @@ type NPC struct {
 func NewNPC(id string, state *gametypes.NPCState) (*NPC, error) {
 	state.Object = resolv.NewObject(state.Position.X, state.Position.Y, constants.NPCWidth, constants.NPCHeight, gametypes.CollisionSpaceTagNPC)
 
+	baseObjectOpts := &NewBaseObjectOpts{
+		ZIndex: 10,
+	}
+
 	return &NPC{
-		BaseObject: NewBaseObject(id),
+		BaseObject: NewBaseObject(id, baseObjectOpts),
 		ID:         id,
 		// debug: true,
 		State: state,
@@ -122,27 +122,4 @@ func (o *NPC) ExtrapolateState(from *gametypes.NPCState, to *gametypes.NPCState,
 	o.State.Hitpoints = to.Hitpoints
 	o.State.Object.Position.X = o.State.Position.X
 	o.State.Object.Position.Y = o.State.Position.Y
-}
-
-func (o *NPC) DamageEffect(damage int16) error {
-	hitID := fmt.Sprintf("%s-hit-%d", o.ID, uuid.New().ID())
-	hitObject := NewTextEffect(hitID, NewTextEffectOptions{
-		Text:   fmt.Sprintf("%d", damage),
-		X:      o.State.Position.X + constants.NPCWidth/2,
-		Y:      o.State.Position.Y + constants.NPCHeight/2,
-		Color:  color.RGBA{255, 0, 0, 255}, // Red
-		Scroll: true,
-	})
-	if err := o.AddChild(hitObject.GetID(), hitObject); err != nil {
-		return fmt.Errorf("failed to add hit object: %v", err)
-	}
-
-	go func() {
-		<-time.After(1500 * time.Millisecond)
-		if err := o.RemoveChild(hitID); err != nil {
-			log.Error("Failed to remove hit object: %v", err)
-		}
-	}()
-
-	return nil
 }

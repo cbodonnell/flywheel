@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"image/color"
 	"math"
-	"strings"
 	"time"
 
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/client/objects"
 	"github.com/cbodonnell/flywheel/pkg/game"
+	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	gametypes "github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
+	"github.com/google/uuid"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/solarlune/resolv"
@@ -38,7 +39,7 @@ type GameScene struct {
 func NewGameScene(networkManager *network.NetworkManager) (Scene, error) {
 	return &GameScene{
 		BaseScene: BaseScene{
-			Root: objects.NewBaseObject("game-root"),
+			root: objects.NewBaseObject("game-root", nil),
 		},
 		networkManager: networkManager,
 		collisionSpace: game.NewCollisionSpace(),
@@ -55,8 +56,8 @@ func (g *GameScene) Update() error {
 		return fmt.Errorf("failed to update game state: %v", err)
 	}
 
-	if err := objects.UpdateTree(g.Root); err != nil {
-		return fmt.Errorf("failed to update object tree: %v", err)
+	if err := g.BaseScene.Update(); err != nil {
+		return fmt.Errorf("failed to update base scene: %v", err)
 	}
 
 	if err := g.cleanupDeletedObjects(); err != nil {
@@ -220,8 +221,24 @@ func (g *GameScene) handleServerNPCHit(message *messages.Message) error {
 	if !ok {
 		return fmt.Errorf("failed to cast game object %s to *objects.NPC", npcID)
 	}
-	if err := npcObject.DamageEffect(npcHit.Damage); err != nil {
-		return fmt.Errorf("failed to apply damage effect to NPC: %v", err)
+
+	hitID := fmt.Sprintf("%s-hit-%d", npcObject.ID, uuid.New().ID())
+	zIndex := 15
+	if npcHit.PlayerID == g.networkManager.ClientID() {
+		// TODO: determine if this should show above or below the local player
+		zIndex = 25
+	}
+	hitObject := objects.NewTextEffect(hitID, objects.NewTextEffectOptions{
+		Text:   fmt.Sprintf("%d", npcHit.Damage),
+		X:      npcObject.State.Position.X + constants.NPCWidth/2,
+		Y:      npcObject.State.Position.Y + constants.NPCHeight/2,
+		Color:  color.RGBA{255, 0, 0, 255}, // Red
+		Scroll: true,
+		TTL:    1500,
+		ZIndex: zIndex,
+	})
+	if err := g.GetRoot().AddChild(hitID, hitObject); err != nil {
+		return fmt.Errorf("failed to add text effect: %v", err)
 	}
 
 	return nil
@@ -398,7 +415,6 @@ func (g *GameScene) cleanupDeletedObjects() error {
 }
 
 func (g *GameScene) Draw(screen *ebiten.Image) {
-	// light blue sky background
 	vector.DrawFilledRect(screen, 0, 0, float32(screen.Bounds().Dx()), float32(screen.Bounds().Dy()), color.RGBA{0x87, 0xce, 0xeb, 0xff}, false)
 
 	for _, obj := range g.collisionSpace.Objects() {
@@ -408,26 +424,5 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	// TODO: draw with z-index/layering instead of doing this
-	for _, obj := range g.GetRoot().GetChildren() {
-		if strings.HasPrefix(obj.GetID(), "player-") {
-			continue
-		}
-		objects.DrawTree(obj, screen)
-	}
-	playerObjectID := fmt.Sprintf("player-%d", g.networkManager.ClientID())
-	for _, obj := range g.GetRoot().GetChildren() {
-		if !strings.HasPrefix(obj.GetID(), "player-") {
-			continue
-		}
-		if obj.GetID() == playerObjectID {
-			// skip the player object, we'll draw it last so it's on top
-			continue
-		}
-		objects.DrawTree(obj, screen)
-	}
-	obj := g.GetRoot().GetChild(playerObjectID)
-	if obj != nil {
-		objects.DrawTree(obj, screen)
-	}
+	g.BaseScene.Draw(screen)
 }

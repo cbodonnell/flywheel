@@ -58,13 +58,22 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 		return nil, fmt.Errorf("client ID is required")
 	}
 
+	isLocalPlayer := id == fmt.Sprintf("player-%d", networkManager.ClientID())
+
 	state.Object = resolv.NewObject(state.Position.X, state.Position.Y, constants.PlayerWidth, constants.PlayerHeight, gametypes.CollisionSpaceTagPlayer)
 
+	baseObjectOpts := &NewBaseObjectOpts{
+		ZIndex: 20,
+	}
+	if isLocalPlayer {
+		baseObjectOpts.ZIndex = 30
+	}
+
 	return &Player{
-		BaseObject:     NewBaseObject(id),
+		BaseObject:     NewBaseObject(id, baseObjectOpts),
 		ID:             id,
 		networkManager: networkManager,
-		isLocalPlayer:  id == fmt.Sprintf("player-%d", networkManager.ClientID()),
+		isLocalPlayer:  isLocalPlayer,
 		// debug:          true,
 		State: state,
 		animations: map[gametypes.PlayerAnimation]*animations.Animation{
