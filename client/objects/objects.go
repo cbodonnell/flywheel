@@ -16,42 +16,74 @@ type GameObject interface {
 
 	GetID() string
 	GetChildren() []GameObject
+	GetChildrenSorted() []GameObject
 	GetChild(id string) GameObject
 	AddChild(id string, child GameObject) error
 	RemoveChild(id string) error
+
+	SetParent(parent GameObject)
+	RemoveFromParent() error
+
+	GetZIndex() int
 }
 
+// TODO: unit tests for IndexedObjectList
 type IndexedObjectList struct {
-	objects []GameObject
-	idxID   map[string]int
+	objects               []GameObject
+	idxIDObjects          map[string]int
+	objectsSortedByZIndex []GameObject
+	idxIDObjectsSorted    map[string]int
 }
 
 func NewIndexedObjectList() *IndexedObjectList {
 	return &IndexedObjectList{
-		objects: make([]GameObject, 0),
-		idxID:   make(map[string]int),
+		objects:               make([]GameObject, 0),
+		idxIDObjects:          make(map[string]int),
+		objectsSortedByZIndex: make([]GameObject, 0),
+		idxIDObjectsSorted:    make(map[string]int),
 	}
 }
 
 func (l *IndexedObjectList) Add(id string, object GameObject) {
 	l.objects = append(l.objects, object)
-	l.idxID[id] = len(l.objects) - 1
+	l.idxIDObjects[id] = len(l.objects) - 1
+	for i := len(l.objectsSortedByZIndex) - 1; i >= 0; i-- {
+		if l.objectsSortedByZIndex[i].GetZIndex() <= object.GetZIndex() {
+			l.objectsSortedByZIndex = append(l.objectsSortedByZIndex[:i+1], append([]GameObject{object}, l.objectsSortedByZIndex[i+1:]...)...)
+			l.idxIDObjectsSorted[id] = i + 1
+			for j := i + 1; j < len(l.objectsSortedByZIndex); j++ {
+				l.idxIDObjectsSorted[l.objectsSortedByZIndex[j].GetID()] = j
+			}
+			return
+		}
+	}
+	l.objectsSortedByZIndex = append([]GameObject{object}, l.objectsSortedByZIndex...)
+	l.idxIDObjectsSorted[id] = 0
 }
 
 func (l *IndexedObjectList) Remove(id string) {
-	idx, ok := l.idxID[id]
+	idx, ok := l.idxIDObjects[id]
 	if !ok {
 		return
 	}
+	delete(l.idxIDObjects, id)
 	l.objects = append(l.objects[:idx], l.objects[idx+1:]...)
 	for i := idx; i < len(l.objects); i++ {
-		l.idxID[l.objects[i].GetID()] = i
+		l.idxIDObjects[l.objects[i].GetID()] = i
 	}
-	delete(l.idxID, id)
+	idxSorted, ok := l.idxIDObjectsSorted[id]
+	if !ok {
+		return
+	}
+	delete(l.idxIDObjectsSorted, id)
+	l.objectsSortedByZIndex = append(l.objectsSortedByZIndex[:idxSorted], l.objectsSortedByZIndex[idxSorted+1:]...)
+	for i := idxSorted; i < len(l.objectsSortedByZIndex); i++ {
+		l.idxIDObjectsSorted[l.objectsSortedByZIndex[i].GetID()] = i
+	}
 }
 
 func (l *IndexedObjectList) Get(id string) GameObject {
-	idx, ok := l.idxID[id]
+	idx, ok := l.idxIDObjects[id]
 	if !ok {
 		return nil
 	}
@@ -62,19 +94,33 @@ func (l *IndexedObjectList) GetAll() []GameObject {
 	return l.objects
 }
 
+func (l *IndexedObjectList) GetSorted() []GameObject {
+	return l.objectsSortedByZIndex
+}
+
 // BaseObject is a base implementation of GameObject.
 // All game objects should embed this struct to inherit its methods.
 type BaseObject struct {
 	id       string
 	children *IndexedObjectList
+	zIndex   int
+	parent   GameObject
 }
 
 var _ GameObject = &BaseObject{}
 
-func NewBaseObject(id string) *BaseObject {
+type NewBaseObjectOpts struct {
+	ZIndex int
+}
+
+func NewBaseObject(id string, opts *NewBaseObjectOpts) *BaseObject {
+	if opts == nil {
+		opts = &NewBaseObjectOpts{}
+	}
 	return &BaseObject{
 		id:       id,
 		children: NewIndexedObjectList(),
+		zIndex:   opts.ZIndex,
 	}
 }
 
@@ -100,18 +146,23 @@ func (o *BaseObject) GetChildren() []GameObject {
 	return o.children.GetAll()
 }
 
+func (o *BaseObject) GetChildrenSorted() []GameObject {
+	return o.children.GetSorted()
+}
+
 func (o *BaseObject) GetChild(id string) GameObject {
 	return o.children.Get(id)
 }
 
 func (o *BaseObject) AddChild(id string, child GameObject) error {
-	if _, ok := o.children.idxID[id]; ok {
+	if _, ok := o.children.idxIDObjects[id]; ok {
 		return fmt.Errorf("child object with id already exists")
 	}
 	if err := InitTree(child); err != nil {
 		return fmt.Errorf("failed to initialize child object tree: %v", err)
 	}
 	o.children.Add(id, child)
+	child.SetParent(o)
 	return nil
 }
 
@@ -124,7 +175,23 @@ func (o *BaseObject) RemoveChild(id string) error {
 		return fmt.Errorf("failed to destroy child object tree: %v", err)
 	}
 	o.children.Remove(id)
+	child.SetParent(nil)
 	return nil
+}
+
+func (o *BaseObject) SetParent(parent GameObject) {
+	o.parent = parent
+}
+
+func (o *BaseObject) RemoveFromParent() error {
+	if o.parent == nil {
+		return nil
+	}
+	return o.parent.RemoveChild(o.id)
+}
+
+func (o *BaseObject) GetZIndex() int {
+	return o.zIndex
 }
 
 func InitTree(object GameObject) error {
@@ -165,7 +232,7 @@ func UpdateTree(object GameObject) error {
 
 func DrawTree(object GameObject, screen *ebiten.Image) {
 	object.Draw(screen)
-	for _, child := range object.GetChildren() {
+	for _, child := range object.GetChildrenSorted() {
 		DrawTree(child, screen)
 	}
 }

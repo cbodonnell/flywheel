@@ -18,7 +18,7 @@ type TextOverlayObject struct {
 
 func NewTextOverlayObject(id string, text string) GameObject {
 	return &TextOverlayObject{
-		BaseObject: NewBaseObject(id),
+		BaseObject: NewBaseObject(id, nil),
 		text:       text,
 	}
 }
