@@ -3,6 +3,7 @@ package scenes
 import (
 	"encoding/json"
 	"fmt"
+	"image"
 	"image/color"
 	"math"
 	"time"
@@ -414,14 +415,70 @@ func (g *GameScene) cleanupDeletedObjects() error {
 }
 
 func (g *GameScene) Draw(screen *ebiten.Image) {
-	vector.DrawFilledRect(screen, 0, 0, float32(screen.Bounds().Dx()), float32(screen.Bounds().Dy()), color.RGBA{0x87, 0xce, 0xeb, 0xff}, false)
+	world := ebiten.NewImage(g.collisionSpace.Width()*g.collisionSpace.CellWidth, g.collisionSpace.Height()*g.collisionSpace.CellHeight)
+
+	vector.DrawFilledRect(world, 0, 0, float32(world.Bounds().Dx()), float32(world.Bounds().Dy()), color.RGBA{0x87, 0xce, 0xeb, 0xff}, false)
 
 	for _, obj := range g.collisionSpace.Objects() {
 		if obj.HasTags(gametypes.CollisionSpaceTagLevel) {
 			levelColor := color.RGBA{0x80, 0x80, 0x80, 0xff} // white
-			vector.DrawFilledRect(screen, float32(obj.Position.X), float32(screen.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
+			vector.DrawFilledRect(world, float32(obj.Position.X), float32(world.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
 		}
 	}
 
-	g.BaseScene.Draw(screen)
+	g.BaseScene.Draw(world)
+
+	// get the player position
+	playerID := fmt.Sprintf("player-%d", g.networkManager.ClientID())
+	playerObj := g.GetRoot().GetChild(playerID)
+	if playerObj == nil {
+		log.Warn("Player object for client %d not found", g.networkManager.ClientID())
+		return
+	}
+	player, ok := playerObj.(*objects.Player)
+	if !ok {
+		log.Warn("Failed to cast game object %s to *objects.Player", playerID)
+		return
+	}
+	playerPos := player.State.Position
+	log.Debug("Player position: %d %d", int(playerPos.X), int(playerPos.Y))
+
+	zoom := 1.25
+	zoomFactor := 1.0 / (zoom * 2)
+
+	// TODO: figure out when to use screen bounds vs world bounds
+
+	// calculate the viewport center based on the player position
+	vx, vy := int(playerPos.X-constants.PlayerWidth*zoomFactor), world.Bounds().Dy()-int(playerPos.Y-constants.PlayerHeight*zoomFactor)
+	log.Debug("Viewport center: %d, %d", vx, vy)
+
+	// clamp the viewport to the world bounds
+	wx, wy := float64(world.Bounds().Dx()), float64(world.Bounds().Dy())
+
+	if vx < int(wx*zoomFactor) {
+		vx = int(wx * zoomFactor)
+	}
+	if vx > int(wx-(wx*zoomFactor)) {
+		vx = int(wx - (wx * zoomFactor))
+	}
+	if vy < int(wy*zoomFactor) {
+		vy = int(wy * zoomFactor)
+	}
+	if vy > int(wy-(wy*zoomFactor)) {
+		vy = int(wy - (wy * zoomFactor))
+	}
+
+	minX, maxX := float64(vx)-float64(world.Bounds().Dx())*zoomFactor, float64(vx)+float64(world.Bounds().Dx())*zoomFactor
+	minY, maxY := float64(vy)-float64(world.Bounds().Dy())*zoomFactor, float64(vy)+float64(world.Bounds().Dy())*zoomFactor
+
+	viewport := world.SubImage(image.Rectangle{
+		Min: image.Point{X: int(minX), Y: int(minY)},
+		Max: image.Point{X: int(maxX), Y: int(maxY)},
+	}).(*ebiten.Image)
+
+	opts := &ebiten.DrawImageOptions{}
+
+	opts.GeoM.Scale(zoom, zoom)
+
+	screen.DrawImage(viewport, opts)
 }
