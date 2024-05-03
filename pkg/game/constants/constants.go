@@ -1,7 +1,6 @@
 package constants
 
 const (
-
 	// PlayerSpeed is the speed at which players move
 	PlayerSpeed float64 = 350.0
 	// PlayerJumpSpeed is the speed at which players jump
@@ -11,7 +10,7 @@ const (
 	// Player Width
 	PlayerWidth float64 = 64.0
 	// Player Starting X
-	PlayerStartingX float64 = 320.0 - PlayerWidth/2
+	PlayerStartingX float64 = 640.0 - PlayerWidth/2
 	// Player Starting Y
 	PlayerStartingY float64 = 240.0 - PlayerHeight/2
 	// PlayerGravityMultiplier

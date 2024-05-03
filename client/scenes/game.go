@@ -21,6 +21,13 @@ import (
 	"github.com/solarlune/resolv"
 )
 
+const (
+	// Zoom is the zoom scale of the game viewport.
+	Zoom = 1.0
+	// InterpolationOffset is how far back in time we want to interpolate.
+	InterpolationOffset = 150 // ms - currently 3x the server tick rate (50ms)
+)
+
 type GameScene struct {
 	*BaseScene
 
@@ -28,6 +35,8 @@ type GameScene struct {
 	networkManager *network.NetworkManager
 	// collisionSpace is the collision space.
 	collisionSpace *resolv.Space
+	// world is the world image.
+	world *ebiten.Image
 	// deletedObjects is a map of deleted game objects indexed by a unique identifier
 	// and the timestamp of the deletion.
 	deletedObjects map[string]int64
@@ -40,10 +49,13 @@ type GameScene struct {
 var _ Scene = &GameScene{}
 
 func NewGameScene(networkManager *network.NetworkManager) (Scene, error) {
+	collisionSpace := game.NewCollisionSpace()
+	world := ebiten.NewImage(collisionSpace.Width()*collisionSpace.CellWidth, collisionSpace.Height()*collisionSpace.CellHeight)
 	return &GameScene{
 		BaseScene:      NewBaseScene(objects.NewSortedZIndexObject("game-root")),
 		networkManager: networkManager,
 		collisionSpace: game.NewCollisionSpace(),
+		world:          world,
 		deletedObjects: make(map[string]int64),
 	}, nil
 }
@@ -124,33 +136,42 @@ func (g *GameScene) handleServerGameUpdate(message *messages.Message) error {
 	g.lastGameStateReceived = gameState.Timestamp
 	g.gameStates = append(g.gameStates, gameState)
 
-	if err := g.reconcilePlayerState(gameState); err != nil {
-		log.Warn("Failed to reconcile player state: %v", err)
+	if err := g.reconcileLocalPlayerState(gameState); err != nil {
+		log.Warn("Failed to reconcile local player state: %v", err)
 		return nil
 	}
 
 	return nil
 }
 
-func (g *GameScene) reconcilePlayerState(gameState *gametypes.GameState) error {
+func (g *GameScene) reconcileLocalPlayerState(gameState *gametypes.GameState) error {
 	playerState := gameState.Players[g.networkManager.ClientID()]
 	if playerState == nil {
 		return nil
 	}
 
-	playerObjectID := fmt.Sprintf("player-%d", g.networkManager.ClientID())
-	obj := g.GetRoot().GetChild(playerObjectID)
-	if obj == nil {
-		log.Warn("Player object for client %d not found", g.networkManager.ClientID())
-		return nil
+	localPlayer, err := g.getLocalPlayer()
+	if err != nil {
+		return fmt.Errorf("failed to get local player: %v", err)
 	}
 
+	return localPlayer.ReconcileState(playerState)
+}
+
+func (g *GameScene) getLocalPlayer() (*objects.Player, error) {
+	if !g.networkManager.IsConnected() {
+		return nil, nil
+	}
+	id := fmt.Sprintf("player-%d", g.networkManager.ClientID())
+	obj := g.GetRoot().GetChild(id)
+	if obj == nil {
+		return nil, nil
+	}
 	playerObject, ok := obj.(*objects.Player)
 	if !ok {
-		return fmt.Errorf("failed to cast game object %s to *objects.Player", playerObjectID)
+		return nil, fmt.Errorf("failed to cast game object %s to *objects.Player", id)
 	}
-
-	return playerObject.ReconcileState(playerState)
+	return playerObject, nil
 }
 
 func (g *GameScene) handleServerPlayerConnect(message *messages.Message) error {
@@ -252,11 +273,6 @@ func (g *GameScene) handleServerNPCKill(message *messages.Message) error {
 	log.Debug("Player %d killed NPC %d", npcKill.PlayerID, npcKill.NPCID)
 	return nil
 }
-
-const (
-	// InterpolationOffset is how far back in time we want to interpolate.
-	InterpolationOffset = 150 // ms - currently 3x the server tick rate (50ms)
-)
 
 func (g *GameScene) updateGameState() error {
 	if len(g.gameStates) < 2 {
@@ -415,69 +431,65 @@ func (g *GameScene) cleanupDeletedObjects() error {
 }
 
 func (g *GameScene) Draw(screen *ebiten.Image) {
-	world := ebiten.NewImage(g.collisionSpace.Width()*g.collisionSpace.CellWidth, g.collisionSpace.Height()*g.collisionSpace.CellHeight)
+	localPlayer, err := g.getLocalPlayer()
+	if err != nil {
+		log.Error("Failed to get local player: %v", err)
+		return
+	}
+	if localPlayer == nil {
+		log.Debug("Not drawing game scene because local player object not found")
+		return
+	}
+	g.drawWorld()
+	g.drawViewport(screen, localPlayer, Zoom)
+}
 
-	vector.DrawFilledRect(world, 0, 0, float32(world.Bounds().Dx()), float32(world.Bounds().Dy()), color.RGBA{0x87, 0xce, 0xeb, 0xff}, false)
+func (g *GameScene) drawWorld() {
+	vector.DrawFilledRect(g.world, 0, 0, float32(g.world.Bounds().Dx()), float32(g.world.Bounds().Dy()), color.RGBA{0x87, 0xce, 0xeb, 0xff}, false)
 
 	for _, obj := range g.collisionSpace.Objects() {
 		if obj.HasTags(gametypes.CollisionSpaceTagLevel) {
-			levelColor := color.RGBA{0x80, 0x80, 0x80, 0xff} // white
-			vector.DrawFilledRect(world, float32(obj.Position.X), float32(world.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
+			levelColor := color.RGBA{0x80, 0x80, 0x80, 0xff} // Gray
+			vector.DrawFilledRect(g.world, float32(obj.Position.X), float32(g.world.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
 		}
 	}
 
-	g.BaseScene.Draw(world)
+	g.BaseScene.Draw(g.world)
+}
 
-	// get the player position
-	playerID := fmt.Sprintf("player-%d", g.networkManager.ClientID())
-	playerObj := g.GetRoot().GetChild(playerID)
-	if playerObj == nil {
-		log.Warn("Player object for client %d not found", g.networkManager.ClientID())
-		return
-	}
-	player, ok := playerObj.(*objects.Player)
-	if !ok {
-		log.Warn("Failed to cast game object %s to *objects.Player", playerID)
-		return
-	}
-	playerPos := player.State.Position
-	log.Debug("Player position: %d %d", int(playerPos.X), int(playerPos.Y))
-
-	zoom := 1.25
-	zoomFactor := 1.0 / (zoom * 2)
-
-	// TODO: figure out when to use screen bounds vs world bounds
-
+func (g *GameScene) drawViewport(screen *ebiten.Image, player *objects.Player, zoom float64) {
 	// calculate the viewport center based on the player position
-	vx, vy := int(playerPos.X-constants.PlayerWidth*zoomFactor), world.Bounds().Dy()-int(playerPos.Y-constants.PlayerHeight*zoomFactor)
-	log.Debug("Viewport center: %d, %d", vx, vy)
+	vx, vy := int(player.State.Position.X+constants.PlayerWidth/2), g.world.Bounds().Dy()-int(player.State.Position.Y)-int(constants.PlayerHeight/2)
+
+	// calculate the viewport bounds based on the zoom level
+	zoomFactor := 1.0 / (zoom * 2)
+	minX, maxX := float64(vx)-float64(screen.Bounds().Dx())*zoomFactor, float64(vx)+float64(screen.Bounds().Dx())*zoomFactor
+	minY, maxY := float64(vy)-float64(screen.Bounds().Dy())*zoomFactor, float64(vy)+float64(screen.Bounds().Dy())*zoomFactor
 
 	// clamp the viewport to the world bounds
-	wx, wy := float64(world.Bounds().Dx()), float64(world.Bounds().Dy())
+	if minX < 0 {
+		maxX += math.Abs(minX)
+		minX = 0
+	}
+	if maxX > float64(g.world.Bounds().Dx()) {
+		minX -= maxX - float64(g.world.Bounds().Dx())
+		maxX = float64(g.world.Bounds().Dx())
+	}
+	if minY < 0 {
+		maxY += math.Abs(minY)
+		minY = 0
+	}
+	if maxY > float64(g.world.Bounds().Dy()) {
+		minY -= maxY - float64(g.world.Bounds().Dy())
+		maxY = float64(g.world.Bounds().Dy())
+	}
 
-	if vx < int(wx*zoomFactor) {
-		vx = int(wx * zoomFactor)
-	}
-	if vx > int(wx-(wx*zoomFactor)) {
-		vx = int(wx - (wx * zoomFactor))
-	}
-	if vy < int(wy*zoomFactor) {
-		vy = int(wy * zoomFactor)
-	}
-	if vy > int(wy-(wy*zoomFactor)) {
-		vy = int(wy - (wy * zoomFactor))
-	}
-
-	minX, maxX := float64(vx)-float64(world.Bounds().Dx())*zoomFactor, float64(vx)+float64(world.Bounds().Dx())*zoomFactor
-	minY, maxY := float64(vy)-float64(world.Bounds().Dy())*zoomFactor, float64(vy)+float64(world.Bounds().Dy())*zoomFactor
-
-	viewport := world.SubImage(image.Rectangle{
+	viewport := g.world.SubImage(image.Rectangle{
 		Min: image.Point{X: int(minX), Y: int(minY)},
 		Max: image.Point{X: int(maxX), Y: int(maxY)},
 	}).(*ebiten.Image)
 
 	opts := &ebiten.DrawImageOptions{}
-
 	opts.GeoM.Scale(zoom, zoom)
 
 	screen.DrawImage(viewport, opts)
