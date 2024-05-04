@@ -221,6 +221,7 @@ func (o *Player) Draw(screen *ebiten.Image) {
 
 func (o *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) {
 	o.State.LastProcessedTimestamp = to.LastProcessedTimestamp
+	// TODO: extend or shorten movement based on number of client updates processed to address jitter
 	o.State.Position.X = from.Position.X + (to.Position.X-from.Position.X)*factor
 	o.State.Position.Y = from.Position.Y + (to.Position.Y-from.Position.Y)*factor
 	o.State.Velocity.X = to.Velocity.X

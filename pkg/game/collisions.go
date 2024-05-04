@@ -7,16 +7,16 @@ import (
 
 // TODO: make this dynamic
 func NewCollisionSpace() *resolv.Space {
-	spaceWidth, spaceHeight := 640, 480
+	spaceWidth, spaceHeight := 1280, 480
 	cellWidth, cellHeight := 16, 16
 	space := resolv.NewSpace(spaceWidth, spaceHeight, cellWidth, cellHeight)
 	space.Add(
-		resolv.NewObject(0, 0, 640, 16, types.CollisionSpaceTagLevel),
-		resolv.NewObject(0, 480-16, 640, 16, types.CollisionSpaceTagLevel),
-		resolv.NewObject(0, 16, 16, 480-32, types.CollisionSpaceTagLevel),
-		resolv.NewObject(640-16, 16, 16, 480-32, types.CollisionSpaceTagLevel),
+		resolv.NewObject(0, 0, float64(spaceWidth), float64(cellHeight), types.CollisionSpaceTagLevel),
+		resolv.NewObject(0, float64(spaceHeight-cellHeight), float64(spaceWidth), float64(cellHeight), types.CollisionSpaceTagLevel),
+		resolv.NewObject(0, float64(cellHeight), float64(cellWidth), float64(spaceHeight-cellHeight*2), types.CollisionSpaceTagLevel),
+		resolv.NewObject(float64(spaceWidth-cellWidth), float64(cellHeight), float64(cellWidth), float64(spaceHeight-cellHeight*2), types.CollisionSpaceTagLevel),
 		// add a platform
-		resolv.NewObject(320-64, 96, 128, 16, types.CollisionSpaceTagLevel),
+		resolv.NewObject(float64(spaceWidth/2-cellWidth*4), float64(cellHeight*6), float64(cellWidth*8), float64(cellHeight), types.CollisionSpaceTagLevel),
 	)
 	return space
 }
