@@ -71,14 +71,14 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 			s.ClientManager.DisconnectClient(connectedClientID)
 		}
 		conn.Close()
-		log.Debug("TCP Connection closed for client %d", connectedClientID)
+		log.Info("Client %d disconnected", connectedClientID)
 	}()
 
 	for {
 		message, err := ReadMessageFromTCP(conn)
 		if err != nil {
 			if _, ok := err.(*ErrConnectionClosed); ok {
-				log.Debug("Client %d disconnected", connectedClientID)
+				log.Trace("Connection closed for client %d: %v", connectedClientID, err)
 				return
 			}
 			log.Error("Error reading TCP message from client %d: %v", connectedClientID, err)
@@ -195,10 +195,12 @@ func WriteMessageToTCP(conn net.Conn, msg *messages.Message) error {
 }
 
 // ErrConnectionClosed is returned when the TCP connection is closed
-type ErrConnectionClosed struct{}
+type ErrConnectionClosed struct {
+	Err error
+}
 
 func (e *ErrConnectionClosed) Error() string {
-	return "connection closed"
+	return e.Err.Error()
 }
 
 // ReadMessageFromTCP reads a Message from a TCP connection
@@ -206,10 +208,7 @@ func ReadMessageFromTCP(conn net.Conn) (*messages.Message, error) {
 	buf := make([]byte, messages.TCPMessageBufferSize)
 	n, err := conn.Read(buf)
 	if err != nil {
-		if err.Error() == "EOF" {
-			return nil, &ErrConnectionClosed{}
-		}
-		return nil, fmt.Errorf("failed to read message from TCP connection: %v", err)
+		return nil, &ErrConnectionClosed{err}
 	}
 
 	msg, err := messages.DeserializeMessage(buf[:n])
