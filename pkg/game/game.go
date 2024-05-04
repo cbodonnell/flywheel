@@ -226,7 +226,6 @@ func (gm *GameManager) processClientMessages() {
 
 		switch message.Type {
 		case messages.MessageTypeClientPlayerUpdate:
-			// TODO: investigate spikes in messages from a given client
 			if err := gm.handleClientPlayerUpdate(message); err != nil {
 				log.Error("Failed to handle client player update: %v", err)
 			}
