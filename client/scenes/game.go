@@ -114,6 +114,14 @@ func (g *GameScene) processPendingServerMessages() error {
 			if err := g.handleServerNPCKill(message); err != nil {
 				log.Error("Failed to handle server NPC kill: %v", err)
 			}
+		case messages.MessageTypeServerPlayerHit:
+			if err := g.handleServerPlayerHit(message); err != nil {
+				log.Error("Failed to handle server player hit: %v", err)
+			}
+		case messages.MessageTypeServerPlayerKill:
+			if err := g.handleServerPlayerKill(message); err != nil {
+				log.Error("Failed to handle server player kill: %v", err)
+			}
 		default:
 			log.Warn("Received unexpected message type from server: %s", message.Type)
 		}
@@ -271,6 +279,24 @@ func (g *GameScene) handleServerNPCKill(message *messages.Message) error {
 		return fmt.Errorf("failed to unmarshal NPC kill message: %v", err)
 	}
 	log.Debug("Player %d killed NPC %d", npcKill.PlayerID, npcKill.NPCID)
+	return nil
+}
+
+func (g *GameScene) handleServerPlayerHit(message *messages.Message) error {
+	playerHit := &messages.ServerPlayerHit{}
+	if err := json.Unmarshal(message.Payload, playerHit); err != nil {
+		return fmt.Errorf("failed to unmarshal player hit message: %v", err)
+	}
+	log.Debug("NPC %d hit player %d for %d damage", playerHit.NPCID, playerHit.PlayerID, playerHit.Damage)
+	return nil
+}
+
+func (g *GameScene) handleServerPlayerKill(message *messages.Message) error {
+	playerKill := &messages.ServerPlayerKill{}
+	if err := json.Unmarshal(message.Payload, playerKill); err != nil {
+		return fmt.Errorf("failed to unmarshal player kill message: %v", err)
+	}
+	log.Debug("NPC %d killed player %d", playerKill.NPCID, playerKill.PlayerID)
 	return nil
 }
 

@@ -61,4 +61,19 @@ const (
 	NPCRespawnTime float64 = 10.0
 	// NPC Hitpoints
 	NPCHitpoints int16 = 100
+	// NPC Line of Sight
+	NPCLineOfSight float64 = 320.0
+	// NPC Attack Range
+	NPCAttackRange float64 = 48.0
+
+	// NPCAttack1Duration is the duration of the attack (channel time + cooldown time)
+	NPCAttack1Duration float64 = 1.4 // seconds
+	// NPCAttack1ChannelTime is the time it takes for the attack to register
+	NPCAttack1ChannelTime float64 = 0.7 // seconds
+	// NPCAttack1HitboxWidth is the width of the attack hitbox
+	NPCAttack1HitboxWidth float64 = NPCWidth
+	// NPCAttack1HitboxOffset is the offset from the npc's position to the attack hitbox
+	NPCAttack1HitboxOffset float64 = NPCWidth / 2
+	// NPCAttack1Damage is the amount of damage a npc does
+	NPCAttack1Damage int16 = 30
 )

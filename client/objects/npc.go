@@ -39,8 +39,10 @@ func NewNPC(id string, state *gametypes.NPCState) (*NPC, error) {
 		// debug: true,
 		State: state,
 		animations: map[gametypes.NPCAnimation]*animations.Animation{
-			gametypes.NPCAnimationIdle: animations.NewNPCIdleAnimation(),
-			gametypes.NPCAnimationDead: animations.NewNPCDeadAnimation(),
+			gametypes.NPCAnimationIdle:    animations.NewNPCIdleAnimation(),
+			gametypes.NPCAnimationWalk:    animations.NewNPCWalkAnimation(),
+			gametypes.NPCAnimationDead:    animations.NewNPCDeadAnimation(),
+			gametypes.NPCAnimationAttack1: animations.NewNPCAttack1Animation(),
 		},
 	}, nil
 }
@@ -99,8 +101,13 @@ func (o *NPC) Draw(screen *ebiten.Image) {
 }
 
 func (o *NPC) InterpolateState(from *gametypes.NPCState, to *gametypes.NPCState, factor float64) {
-	o.State.Position.X = from.Position.X + (to.Position.X-from.Position.X)*factor
-	o.State.Position.Y = from.Position.Y + (to.Position.Y-from.Position.Y)*factor
+	if from.IsDead() && !to.IsDead() {
+		o.State.Position.X = to.Position.X
+		o.State.Position.Y = to.Position.Y
+	} else {
+		o.State.Position.X = from.Position.X + (to.Position.X-from.Position.X)*factor
+		o.State.Position.Y = from.Position.Y + (to.Position.Y-from.Position.Y)*factor
+	}
 	o.State.Velocity.X = to.Velocity.X
 	o.State.Velocity.Y = to.Velocity.X
 	o.State.IsOnGround = to.IsOnGround

@@ -23,5 +23,11 @@ var PlayerSwordsmanAttack3 []byte
 //go:embed skeleton/Idle.png
 var SkeletonIdle []byte
 
+//go:embed skeleton/Walk.png
+var SkeletonWalk []byte
+
 //go:embed skeleton/Dead.png
 var SkeletonDead []byte
+
+//go:embed skeleton/Attack_1.png
+var SkeletonAttack1 []byte

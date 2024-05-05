@@ -25,6 +25,7 @@ type PlayerState struct {
 	DidAttackHit           bool
 	Animation              PlayerAnimation
 	AnimationFlip          bool
+	Hitpoints              int16
 }
 
 type PlayerAttack uint8
@@ -50,6 +51,9 @@ const (
 func NewPlayerState(playerID string, positionX, positionY float64) *PlayerState {
 	name := fmt.Sprintf("%x", sha256.Sum256([]byte(playerID)))[:8]
 
+	object := resolv.NewObject(positionX, positionY, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer)
+	object.SetShape(resolv.NewRectangle(0, 0, constants.PlayerWidth, constants.PlayerHeight))
+
 	return &PlayerState{
 		UserID: playerID,
 		Name:   name,
@@ -61,7 +65,7 @@ func NewPlayerState(playerID string, positionX, positionY float64) *PlayerState 
 			X: 0,
 			Y: 0,
 		},
-		Object: resolv.NewObject(positionX, positionY, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer),
+		Object: object,
 	}
 }
 
@@ -74,7 +78,8 @@ func (p *PlayerState) Equal(other *PlayerState) bool {
 		p.IsOnGround == other.IsOnGround &&
 		p.IsAttacking == other.IsAttacking &&
 		p.Animation == other.Animation &&
-		p.AnimationFlip == other.AnimationFlip
+		p.AnimationFlip == other.AnimationFlip &&
+		p.Hitpoints == other.Hitpoints
 }
 
 // Copy returns a copy of the player state with an empty object reference
@@ -87,8 +92,13 @@ func (p *PlayerState) Copy() *PlayerState {
 		Velocity:               p.Velocity,
 		IsOnGround:             p.IsOnGround,
 		IsAttacking:            p.IsAttacking,
+		CurrentAttack:          p.CurrentAttack,
+		AttackTimeLeft:         p.AttackTimeLeft,
+		IsAttackHitting:        p.IsAttackHitting,
+		DidAttackHit:           p.DidAttackHit,
 		Animation:              p.Animation,
 		AnimationFlip:          p.AnimationFlip,
+		Hitpoints:              p.Hitpoints,
 	}
 }
 
@@ -231,4 +241,14 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 
 	// TODO: return false if the update did not change the state
 	return true
+}
+
+// TakeDamage reduces the player's hitpoints by the given amount
+func (p *PlayerState) TakeDamage(damage int16) {
+	p.Hitpoints -= damage
+}
+
+// IsDead returns true if the player's hitpoints are less than or equal to zero
+func (p *PlayerState) IsDead() bool {
+	return p.Hitpoints <= 0
 }

@@ -30,6 +30,8 @@ const (
 	MessageTypeServerPlayerDisconnect
 	MessageTypeServerNPCHit
 	MessageTypeServerNPCKill
+	MessageTypeServerPlayerHit
+	MessageTypeServerPlayerKill
 )
 
 func (m MessageType) String() string {
@@ -46,6 +48,8 @@ func (m MessageType) String() string {
 		"ServerPlayerDisconnect",
 		"ServerNPCHit",
 		"ServerNPCKill",
+		"ServerPlayerHit",
+		"ServerPlayerKill",
 	}[m]
 }
 
@@ -186,4 +190,22 @@ type ServerNPCKill struct {
 	NPCID uint32 `json:"npcID"`
 	// PlayerID is the ID of the player that killed the NPC
 	PlayerID uint32 `json:"playerID"`
+}
+
+// ServerPlayerHit is a message sent by the server to notify clients that a player has been hit
+type ServerPlayerHit struct {
+	// PlayerID is the ID of the player that has been hit
+	PlayerID uint32 `json:"playerID"`
+	// NPCID is the ID of the NPC that hit the player
+	NPCID uint32 `json:"npcID"`
+	// Damage is the amount of damage dealt to the player
+	Damage int16 `json:"damage"`
+}
+
+// ServerPlayerKill is a message sent by the server to notify clients that a player has been killed
+type ServerPlayerKill struct {
+	// PlayerID is the ID of the player that has been killed
+	PlayerID uint32 `json:"playerID"`
+	// NPCID is the ID of the NPC that killed the player
+	NPCID uint32 `json:"npcID"`
 }

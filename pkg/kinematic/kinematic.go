@@ -15,6 +15,10 @@ type Vector struct {
 	Y float64
 }
 
+func (v Vector) DistanceFrom(other Vector) float64 {
+	return math.Sqrt(math.Pow(v.X-other.X, 2) + math.Pow(v.Y-other.Y, 2))
+}
+
 // Displacement returns the displacement of an object given its initial velocity, time, and acceleration.
 func Displacement(initialVelocity float64, time float64, acceleration float64) float64 {
 	return initialVelocity*time + 0.5*acceleration*math.Pow(time, 2)
