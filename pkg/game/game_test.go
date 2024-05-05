@@ -49,6 +49,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 							IsAttacking:   false,
 							Animation:     types.PlayerAnimationIdle,
 							AnimationFlip: false,
+							Hitpoints:     100,
 							Object:        resolv.NewObject(constants.PlayerStartingX, constants.PlayerStartingY, constants.PlayerWidth, constants.PlayerHeight, types.CollisionSpaceTagPlayer),
 						},
 					},
@@ -102,6 +103,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 						IsAttacking:   false,
 						Animation:     types.PlayerAnimationFall,
 						AnimationFlip: false,
+						Hitpoints:     100,
 					},
 				},
 			},
@@ -127,6 +129,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 							IsAttacking:   false,
 							Animation:     types.PlayerAnimationIdle,
 							AnimationFlip: false,
+							Hitpoints:     100,
 							Object:        resolv.NewObject(constants.PlayerStartingX, constants.PlayerStartingY, constants.PlayerWidth, constants.PlayerHeight, types.CollisionSpaceTagPlayer),
 						},
 					},
@@ -152,6 +155,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 						IsAttacking:   false,
 						Animation:     types.PlayerAnimationIdle,
 						AnimationFlip: false,
+						Hitpoints:     100,
 					},
 				},
 			},
@@ -177,6 +181,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 							IsAttacking:   false,
 							Animation:     types.PlayerAnimationIdle,
 							AnimationFlip: false,
+							Hitpoints:     100,
 							Object:        resolv.NewObject(constants.PlayerStartingX, constants.PlayerStartingY, constants.PlayerWidth, constants.PlayerHeight, types.CollisionSpaceTagPlayer),
 						},
 					},
@@ -230,6 +235,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 						IsAttacking:   false,
 						Animation:     types.PlayerAnimationFall,
 						AnimationFlip: false,
+						Hitpoints:     100,
 					},
 				},
 			},
@@ -253,6 +259,7 @@ func TestGameManager_processClientMessages(t *testing.T) {
 					assert.Equal(t, wantPlayerState.IsAttacking, tt.fields.gameState.Players[clientID].IsAttacking, fmt.Sprintf("IsAttacking for clientID %d", clientID))
 					assert.Equal(t, wantPlayerState.Animation, tt.fields.gameState.Players[clientID].Animation, fmt.Sprintf("Animation for clientID %d", clientID))
 					assert.Equal(t, wantPlayerState.AnimationFlip, tt.fields.gameState.Players[clientID].AnimationFlip, fmt.Sprintf("AnimationFlip for clientID %d", clientID))
+					assert.Equal(t, wantPlayerState.Hitpoints, tt.fields.gameState.Players[clientID].Hitpoints, fmt.Sprintf("Hitpoints for clientID %d", clientID))
 				}
 			}
 		})
