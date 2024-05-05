@@ -57,6 +57,16 @@ run-client:
 	-debug \
 	-log-level=debug
 
+.PHONY: run-client-automation
+run-client-automation:
+	go run \
+	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
+	./cmd/client/main.go \
+	-debug \
+	-log-level=debug \
+	-automation-email=${FLYWHEEL_AUTOMATION_EMAIL} \
+	-automation-password=${FLYWHEEL_AUTOMATION_PASSWORD}
+
 .PHONY: run-client-remote
 run-client-remote:
 	go run \

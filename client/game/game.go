@@ -62,6 +62,12 @@ type NewGameOptions struct {
 	Debug          bool
 	AuthURL        string
 	NetworkManager *network.NetworkManager
+	GameAutomation *GameAutomation
+}
+
+type GameAutomation struct {
+	Email    string
+	Password string
 }
 
 func NewGame(opts NewGameOptions) (ebiten.Game, error) {
@@ -71,8 +77,14 @@ func NewGame(opts NewGameOptions) (ebiten.Game, error) {
 		networkManager: opts.NetworkManager,
 	}
 
-	if err := g.loadMenu(); err != nil {
-		return nil, fmt.Errorf("failed to load menu scene: %v", err)
+	if opts.GameAutomation != nil {
+		if err := g.login(opts.GameAutomation.Email, opts.GameAutomation.Password); err != nil {
+			return nil, fmt.Errorf("failed to start game: %v", err)
+		}
+	} else {
+		if err := g.loadMenu(); err != nil {
+			return nil, fmt.Errorf("failed to load menu scene: %v", err)
+		}
 	}
 
 	return g, nil

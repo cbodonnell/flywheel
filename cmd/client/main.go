@@ -23,6 +23,8 @@ func main() {
 	serverTCPPort := flag.Int("server-tcp-port", network.DefaultServerTCPPort, "Server TCP port")
 	serverUDPPort := flag.Int("server-udp-port", network.DefaultServerUDPPort, "Server UDP port")
 	authServerURL := flag.String("auth-server-url", game.DefaultAuthServerURL, "Auth server URL")
+	automationEmail := flag.String("automation-email", "", "Automation email")
+	automationPassword := flag.String("automation-password", "", "Automation password")
 	flag.Parse()
 
 	parsedLogLevel, err := log.ParseLogLevel(*logLevel)
@@ -47,11 +49,18 @@ func main() {
 	log.Info("Configured for game server %s ports %d (TCP) and %d (UDP)", serverSettings.Hostname, serverSettings.TCPPort, serverSettings.UDPPort)
 	log.Info("Configured for auth server %s", *authServerURL)
 
-	game, err := clientgame.NewGame(clientgame.NewGameOptions{
+	gameOpts := clientgame.NewGameOptions{
 		Debug:          *debug,
 		AuthURL:        *authServerURL,
 		NetworkManager: networkManager,
-	})
+	}
+	if *automationEmail != "" && *automationPassword != "" {
+		gameOpts.GameAutomation = &clientgame.GameAutomation{
+			Email:    *automationEmail,
+			Password: *automationPassword,
+		}
+	}
+	game, err := clientgame.NewGame(gameOpts)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create game: %v", err))
 	}
