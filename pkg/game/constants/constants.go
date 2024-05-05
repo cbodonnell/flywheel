@@ -15,6 +15,8 @@ const (
 	PlayerStartingY float64 = 240.0 - PlayerHeight/2
 	// PlayerGravityMultiplier
 	PlayerGravityMultiplier float64 = 300.0
+	// PlayerHitpoints is the amount of hitpoints a player has
+	PlayerHitpoints int16 = 100
 
 	// PlayerAttack1Duration is the duration of the attack (channel time + cooldown time)
 	PlayerAttack1Duration float64 = 0.6 // seconds

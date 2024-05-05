@@ -46,6 +46,7 @@ const (
 	PlayerAnimationAttack1
 	PlayerAnimationAttack2
 	PlayerAnimationAttack3
+	PlayerAnimationDead
 )
 
 func NewPlayerState(playerID string, positionX, positionY float64) *PlayerState {
@@ -65,21 +66,24 @@ func NewPlayerState(playerID string, positionX, positionY float64) *PlayerState 
 			X: 0,
 			Y: 0,
 		},
-		Object: object,
+		Hitpoints: constants.PlayerHitpoints,
+		Object:    object,
 	}
 }
 
-// Equal returns true if the player state is equal to the other player state
-func (p *PlayerState) Equal(other *PlayerState) bool {
-	return p.Position.X == other.Position.X &&
+// NeedsReconciliation returns true if the player state needs to be reconciled with an authoritative state
+func (p *PlayerState) NeedsReconciliation(other *PlayerState) bool {
+	if p.Position.X == other.Position.X &&
 		p.Position.Y == other.Position.Y &&
 		p.Velocity.X == other.Velocity.X &&
 		p.Velocity.Y == other.Velocity.Y &&
 		p.IsOnGround == other.IsOnGround &&
 		p.IsAttacking == other.IsAttacking &&
 		p.Animation == other.Animation &&
-		p.AnimationFlip == other.AnimationFlip &&
-		p.Hitpoints == other.Hitpoints
+		p.AnimationFlip == other.AnimationFlip {
+		return false
+	}
+	return true
 }
 
 // Copy returns a copy of the player state with an empty object reference
@@ -105,6 +109,8 @@ func (p *PlayerState) Copy() *PlayerState {
 // ApplyInput updates the player's state based on the client's input
 // and returns whether the state has changed
 func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate) (changed bool) {
+	p.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
+
 	// Attack
 
 	if p.AttackTimeLeft > 0 {
@@ -134,7 +140,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		p.DidAttackHit = false
 	}
 
-	if !p.IsAttacking {
+	if !p.IsAttacking && !p.IsDead() {
 		switch {
 		case clientPlayerUpdate.InputAttack1:
 			p.IsAttacking = true
@@ -155,7 +161,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 
 	// X-axis
 	var dx, vx float64
-	if !p.IsAttacking {
+	if !p.IsAttacking && !p.IsDead() {
 		dx = kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
 		vx = kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
 	} else if !p.IsOnGround {
@@ -174,7 +180,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	// Y-axis
 	// Apply input
 	vy := p.Velocity.Y
-	if !p.IsAttacking && p.IsOnGround && clientPlayerUpdate.InputJump {
+	if !p.IsAttacking && !p.IsDead() && p.IsOnGround && clientPlayerUpdate.InputJump {
 		vy = constants.PlayerJumpSpeed
 	}
 
@@ -191,7 +197,6 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	}
 
 	// Update player state
-	p.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
 	p.Position.X += dx
 	p.Velocity.X = vx
 	p.Position.Y += dy
@@ -199,7 +204,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	p.IsOnGround = isOnGround
 
 	// Update the player animation
-	if !p.IsAttacking {
+	if !p.IsAttacking && !p.IsDead() {
 		if clientPlayerUpdate.InputX > 0 {
 			p.AnimationFlip = false
 		} else if clientPlayerUpdate.InputX < 0 {
@@ -224,17 +229,21 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 			p.Animation = PlayerAnimationAttack3
 		}
 	} else {
-		if isOnGround {
-			if clientPlayerUpdate.InputX != 0 {
-				p.Animation = PlayerAnimationRun
-			} else {
-				p.Animation = PlayerAnimationIdle
-			}
+		if p.IsDead() {
+			p.Animation = PlayerAnimationDead
 		} else {
-			if vy < 0 {
-				p.Animation = PlayerAnimationFall
+			if isOnGround {
+				if clientPlayerUpdate.InputX != 0 {
+					p.Animation = PlayerAnimationRun
+				} else {
+					p.Animation = PlayerAnimationIdle
+				}
 			} else {
-				p.Animation = PlayerAnimationJump
+				if vy < 0 {
+					p.Animation = PlayerAnimationFall
+				} else {
+					p.Animation = PlayerAnimationJump
+				}
 			}
 		}
 	}

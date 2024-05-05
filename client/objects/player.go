@@ -84,6 +84,7 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 			gametypes.PlayerAnimationAttack1: animations.NewPlayerAttack1Animation(),
 			gametypes.PlayerAnimationAttack2: animations.NewPlayerAttack2Animation(),
 			gametypes.PlayerAnimationAttack3: animations.NewPlayerAttack3Animation(),
+			gametypes.PlayerAnimationDead:    animations.NewPlayerDeadAnimation(),
 		},
 	}, nil
 }
@@ -183,22 +184,24 @@ func (o *Player) Draw(screen *ebiten.Image) {
 	op.ColorScale.ScaleWithColor(color.White)
 	text.DrawWithOptions(screen, t, f, op)
 
-	// Draw hitpoints bar
-	hitpointsBarWidth := float32(constants.NPCWidth)
-	hitpointsBarHeight := float32(8)
-	hitpointsBarYOffset := float32(12)
-	hitpointsBarX := float32(o.State.Position.X)
-	hitpointsBarY := float32(float64(screen.Bounds().Dy())-constants.NPCHeight) - float32(o.State.Position.Y) - hitpointsBarHeight - hitpointsBarYOffset
-	hitpointsBarColor := color.RGBA{255, 0, 0, 255} // Red
-	vector.DrawFilledRect(screen, hitpointsBarX, hitpointsBarY, hitpointsBarWidth, hitpointsBarHeight, hitpointsBarColor, false)
+	if !o.State.IsDead() {
+		// Draw hitpoints bar
+		hitpointsBarWidth := float32(constants.NPCWidth)
+		hitpointsBarHeight := float32(8)
+		hitpointsBarYOffset := float32(12)
+		hitpointsBarX := float32(o.State.Position.X)
+		hitpointsBarY := float32(float64(screen.Bounds().Dy())-constants.NPCHeight) - float32(o.State.Position.Y) - hitpointsBarHeight - hitpointsBarYOffset
+		hitpointsBarColor := color.RGBA{255, 0, 0, 255} // Red
+		vector.DrawFilledRect(screen, hitpointsBarX, hitpointsBarY, hitpointsBarWidth, hitpointsBarHeight, hitpointsBarColor, false)
 
-	// Draw hitpoints
-	hitpointsWidth := float32(float64(hitpointsBarWidth) * 1.0) // TODO: player hitpoints
-	hitpointsHeight := float32(hitpointsBarHeight)
-	hitpointsX := hitpointsBarX
-	hitpointsY := hitpointsBarY
-	hitpointsColor := color.RGBA{0, 255, 0, 255} // Green
-	vector.DrawFilledRect(screen, hitpointsX, hitpointsY, hitpointsWidth, hitpointsHeight, hitpointsColor, false)
+		// Draw hitpoints
+		hitpointsWidth := float32(float64(hitpointsBarWidth) * (float64(o.State.Hitpoints) / float64(constants.PlayerHitpoints)))
+		hitpointsHeight := float32(hitpointsBarHeight)
+		hitpointsX := hitpointsBarX
+		hitpointsY := hitpointsBarY
+		hitpointsColor := color.RGBA{0, 255, 0, 255} // Green
+		vector.DrawFilledRect(screen, hitpointsX, hitpointsY, hitpointsWidth, hitpointsHeight, hitpointsColor, false)
+	}
 
 	if o.debug {
 		strokeWidth := float32(1)
@@ -230,6 +233,7 @@ func (o *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.Pla
 	o.State.IsAttacking = to.IsAttacking
 	o.State.Animation = to.Animation
 	o.State.AnimationFlip = to.AnimationFlip
+	o.State.Hitpoints = to.Hitpoints
 	o.State.Object.Position.X = o.State.Position.X
 	o.State.Object.Position.Y = o.State.Position.Y
 }
@@ -244,6 +248,7 @@ func (o *Player) ExtrapolateState(from *gametypes.PlayerState, to *gametypes.Pla
 	o.State.IsAttacking = to.IsAttacking
 	o.State.Animation = to.Animation
 	o.State.AnimationFlip = to.AnimationFlip
+	o.State.Hitpoints = to.Hitpoints
 	o.State.Object.Position.X = o.State.Position.X
 	o.State.Object.Position.Y = o.State.Position.Y
 }
@@ -259,12 +264,15 @@ func (o *Player) ReconcileState(state *gametypes.PlayerState) error {
 		return nil
 	}
 
+	// update pieces of the state that are not predicted (e.g. hitpoints)
+	o.State.Hitpoints = state.Hitpoints
+
 	foundPreviousState := false
 	for i := len(o.previousStates) - 1; i >= 0; i-- {
 		ps := o.previousStates[i]
 		if ps.Timestamp == state.LastProcessedTimestamp {
 			foundPreviousState = true
-			if !ps.State.Equal(state) {
+			if ps.State.NeedsReconciliation(state) {
 				log.Warn("Reconciling player state at timestamp %d for %s", state.LastProcessedTimestamp, o.ID)
 				log.Warn("Client state: %v", ps.State)
 				log.Warn("Server state: %v", state)

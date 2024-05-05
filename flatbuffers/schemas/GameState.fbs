@@ -21,6 +21,7 @@ table PlayerState {
   is_attacking: bool;
   animation: uint8;
   animation_flip: bool;
+  hitpoints: int16;
 }
 
 table Position {

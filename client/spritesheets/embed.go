@@ -20,6 +20,9 @@ var PlayerSwordsmanAttack2 []byte
 //go:embed player/swordsman/Attack_3.png
 var PlayerSwordsmanAttack3 []byte
 
+//go:embed player/swordsman/Dead.png
+var PlayerSwordsmanDead []byte
+
 //go:embed skeleton/Idle.png
 var SkeletonIdle []byte
 

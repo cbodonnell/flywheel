@@ -98,7 +98,7 @@ func NewNPCAttack1Animation() *Animation {
 		FrameWidth:  128,
 		FrameHeight: 128,
 		FrameCount:  7,
-		FrameSpeed:  7,
+		FrameSpeed:  10,
 		ScaleX:      1.0,
 		ScaleY:      1.0,
 		ShiftX:      -32,

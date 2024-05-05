@@ -143,8 +143,20 @@ func (rcv *PlayerState) MutateAnimationFlip(n bool) bool {
 	return rcv._tab.MutateBoolSlot(20, n)
 }
 
+func (rcv *PlayerState) Hitpoints() int16 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(22))
+	if o != 0 {
+		return rcv._tab.GetInt16(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *PlayerState) MutateHitpoints(n int16) bool {
+	return rcv._tab.MutateInt16Slot(22, n)
+}
+
 func PlayerStateStart(builder *flatbuffers.Builder) {
-	builder.StartObject(9)
+	builder.StartObject(10)
 }
 func PlayerStateAddLastProcessedTimestamp(builder *flatbuffers.Builder, lastProcessedTimestamp int64) {
 	builder.PrependInt64Slot(0, lastProcessedTimestamp, 0)
@@ -172,6 +184,9 @@ func PlayerStateAddAnimation(builder *flatbuffers.Builder, animation byte) {
 }
 func PlayerStateAddAnimationFlip(builder *flatbuffers.Builder, animationFlip bool) {
 	builder.PrependBoolSlot(8, animationFlip, false)
+}
+func PlayerStateAddHitpoints(builder *flatbuffers.Builder, hitpoints int16) {
+	builder.PrependInt16Slot(9, hitpoints, 0)
 }
 func PlayerStateEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

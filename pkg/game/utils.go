@@ -52,6 +52,7 @@ func PlayerStateUpdateFromState(state *types.PlayerState) *messages.PlayerStateU
 		IsAttacking:            state.IsAttacking,
 		Animation:              uint8(state.Animation),
 		AnimationFlip:          state.AnimationFlip,
+		Hitpoints:              state.Hitpoints,
 	}
 }
 
@@ -66,6 +67,7 @@ func PlayerStateFromServerUpdate(update *messages.PlayerStateUpdate) *types.Play
 		IsAttacking:            update.IsAttacking,
 		Animation:              types.PlayerAnimation(update.Animation),
 		AnimationFlip:          update.AnimationFlip,
+		Hitpoints:              update.Hitpoints,
 	}
 }
 

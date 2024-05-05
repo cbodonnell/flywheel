@@ -166,6 +166,7 @@ func SerializePlayerStateFlatbuffer(builder *flatbuffers.Builder, state *PlayerS
 	gamestatefb.PlayerStateAddIsAttacking(builder, state.IsAttacking)
 	gamestatefb.PlayerStateAddAnimation(builder, byte(state.Animation))
 	gamestatefb.PlayerStateAddAnimationFlip(builder, state.AnimationFlip)
+	gamestatefb.PlayerStateAddHitpoints(builder, state.Hitpoints)
 	playerState := gamestatefb.PlayerStateEnd(builder)
 
 	return playerState
@@ -234,6 +235,7 @@ func DeserializePlayerStateFlatbuffer(playerStateKV *gamestatefb.PlayerStateKeyV
 	playerState.IsAttacking = playerStateKV.Value(nil).IsAttacking()
 	playerState.Animation = playerStateKV.Value(nil).Animation()
 	playerState.AnimationFlip = playerStateKV.Value(nil).AnimationFlip()
+	playerState.Hitpoints = playerStateKV.Value(nil).Hitpoints()
 
 	return playerState
 }

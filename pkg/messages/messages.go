@@ -128,6 +128,8 @@ type PlayerStateUpdate struct {
 	Animation uint8 `json:"animation"`
 	// AnimationFlip is a flag indicating whether the animation should be flipped
 	AnimationFlip bool `json:"animationFlip"`
+	// Hitpoints is the current hitpoints of the player
+	Hitpoints int16 `json:"hitpoints"`
 }
 
 // NPCStateUpdate is a message sent by the server to update clients on an NPC's state
