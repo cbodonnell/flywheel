@@ -125,8 +125,17 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 		}
 	} else {
 		n.IsAttacking = false
+		n.IsInAttackRange = false
 		n.IsAttackHitting = false
 		n.DidAttackHit = false
+	}
+
+	if n.IsFollowing() {
+		// check if the npc is within attack range
+		// TODO: distance check should probably just be x-axis accounting for direction facing
+		if n.Position.DistanceFrom(n.followTarget.Position) < constants.NPCAttackRange {
+			n.IsInAttackRange = true
+		}
 	}
 
 	if !n.IsAttacking && n.IsInAttackRange {
@@ -141,7 +150,7 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	dx := 0.0
 	vx := 0.0
 	if !n.IsAttacking {
-		if n.mode == NPCModeFollow {
+		if n.IsFollowing() {
 			if n.followTarget.Position.X < n.Position.X {
 				vx = -constants.NPCSpeed
 			} else if n.followTarget.Position.X > n.Position.X {
@@ -273,12 +282,8 @@ func (n *NPCState) IsFollowing() bool {
 }
 
 func (n *NPCState) UpdateFollowing() {
-	// TODO: figure out why this is not toggling off properly
-	n.IsInAttackRange = false
-
 	// check if the npc is too far from the player
-	distanceFromTarget := n.Position.DistanceFrom(n.followTarget.Position)
-	if distanceFromTarget > 2*constants.NPCLineOfSight {
+	if n.Position.DistanceFrom(n.followTarget.Position) > 2*constants.NPCLineOfSight {
 		n.StopFollowing()
 		return
 	}
@@ -293,10 +298,5 @@ func (n *NPCState) UpdateFollowing() {
 			n.StopFollowing()
 			return
 		}
-	}
-
-	// check if the npc is close enough to the player to attack
-	if distanceFromTarget < constants.NPCAttackRange {
-		n.IsInAttackRange = true
 	}
 }

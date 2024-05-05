@@ -80,21 +80,21 @@ func (gm *GameManager) Stop() {
 }
 
 func (gm *GameManager) initializeGameState(_ context.Context) error {
-	npc1State := types.NewNPCState(128.0-constants.NPCWidth/2, 16.0, false)
-	gm.gameState.NPCs[1] = npc1State
-	gm.gameState.CollisionSpace.Add(npc1State.Object)
+	// npc1State := types.NewNPCState(128.0-constants.NPCWidth/2, 16.0, false)
+	// gm.gameState.NPCs[1] = npc1State
+	// gm.gameState.CollisionSpace.Add(npc1State.Object)
 
 	npc2State := types.NewNPCState(384.0-constants.NPCWidth/2, 16.0, false)
 	gm.gameState.NPCs[2] = npc2State
 	gm.gameState.CollisionSpace.Add(npc2State.Object)
 
-	npc3State := types.NewNPCState(896.0-constants.NPCWidth/2, 16.0, true)
-	gm.gameState.NPCs[3] = npc3State
-	gm.gameState.CollisionSpace.Add(npc3State.Object)
+	// npc3State := types.NewNPCState(896.0-constants.NPCWidth/2, 16.0, true)
+	// gm.gameState.NPCs[3] = npc3State
+	// gm.gameState.CollisionSpace.Add(npc3State.Object)
 
-	npc4State := types.NewNPCState(1152.0-constants.NPCWidth/2, 16.0, true)
-	gm.gameState.NPCs[4] = npc4State
-	gm.gameState.CollisionSpace.Add(npc4State.Object)
+	// npc4State := types.NewNPCState(1152.0-constants.NPCWidth/2, 16.0, true)
+	// gm.gameState.NPCs[4] = npc4State
+	// gm.gameState.CollisionSpace.Add(npc4State.Object)
 
 	return nil
 }
