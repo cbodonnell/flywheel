@@ -128,6 +128,8 @@ type PlayerStateUpdate struct {
 	Animation uint8 `json:"animation"`
 	// AnimationFlip is a flag indicating whether the animation should be flipped
 	AnimationFlip bool `json:"animationFlip"`
+	// AnimationSequence is used to differentiate between different instances of the same animation
+	AnimationSequence uint8 `json:"animationSequence"`
 	// Hitpoints is the current hitpoints of the player
 	Hitpoints int16 `json:"hitpoints"`
 }
@@ -144,6 +146,8 @@ type NPCStateUpdate struct {
 	Animation uint8 `json:"animation"`
 	// AnimationFlip is a flag indicating whether the animation should be flipped
 	AnimationFlip bool `json:"animationFlip"`
+	// AnimationSequence is used to differentiate between different instances of the same animation
+	AnimationSequence uint8 `json:"animationSequence"`
 	// Hitpoints is the current hitpoints of the NPC
 	Hitpoints int16 `json:"hitpoints"`
 }

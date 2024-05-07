@@ -23,7 +23,8 @@ type NPC struct {
 	// TODO: make this private with a getter and setter
 	State *gametypes.NPCState
 
-	animations map[gametypes.NPCAnimation]*animations.Animation
+	animations                 map[gametypes.NPCAnimation]*animations.Animation
+	lastDrawnAnimationSequence uint8
 }
 
 func NewNPC(id string, state *gametypes.NPCState) (*NPC, error) {
@@ -43,6 +44,8 @@ func NewNPC(id string, state *gametypes.NPCState) (*NPC, error) {
 			gametypes.NPCAnimationWalk:    animations.NewNPCWalkAnimation(),
 			gametypes.NPCAnimationDead:    animations.NewNPCDeadAnimation(),
 			gametypes.NPCAnimationAttack1: animations.NewNPCAttack1Animation(),
+			gametypes.NPCAnimationAttack2: animations.NewNPCAttack2Animation(),
+			gametypes.NPCAnimationAttack3: animations.NewNPCAttack3Animation(),
 		},
 	}, nil
 }
@@ -53,13 +56,11 @@ func (o *NPC) Update() error {
 }
 
 func (o *NPC) Draw(screen *ebiten.Image) {
-	o.animations[o.State.Animation].Draw(screen, o.State.Position.X, o.State.Position.Y, o.State.AnimationFlip)
-	for a, anim := range o.animations {
-		if a == o.State.Animation {
-			continue
-		}
-		anim.Reset()
+	if o.State.AnimationSequence != o.lastDrawnAnimationSequence {
+		o.animations[o.State.Animation].Reset()
 	}
+	o.animations[o.State.Animation].Draw(screen, o.State.Position.X, o.State.Position.Y, o.State.AnimationFlip)
+	o.lastDrawnAnimationSequence = o.State.AnimationSequence
 
 	if !o.State.IsDead() {
 		// Draw Name
@@ -113,6 +114,7 @@ func (o *NPC) InterpolateState(from *gametypes.NPCState, to *gametypes.NPCState,
 	o.State.IsOnGround = to.IsOnGround
 	o.State.Animation = to.Animation
 	o.State.AnimationFlip = to.AnimationFlip
+	o.State.AnimationSequence = to.AnimationSequence
 	o.State.Hitpoints = to.Hitpoints
 	o.State.Object.Position.X = o.State.Position.X
 	o.State.Object.Position.Y = o.State.Position.Y
@@ -126,6 +128,7 @@ func (o *NPC) ExtrapolateState(from *gametypes.NPCState, to *gametypes.NPCState,
 	o.State.IsOnGround = to.IsOnGround
 	o.State.Animation = to.Animation
 	o.State.AnimationFlip = to.AnimationFlip
+	o.State.AnimationSequence = to.AnimationSequence
 	o.State.Hitpoints = to.Hitpoints
 	o.State.Object.Position.X = o.State.Position.X
 	o.State.Object.Position.Y = o.State.Position.Y

@@ -14,6 +14,8 @@ var (
 	npcWalkSpritesheet    image.Image
 	npcDeadSpritesheet    image.Image
 	npcAttack1Spritesheet image.Image
+	npcAttack2Spritesheet image.Image
+	npcAttack3Spritesheet image.Image
 )
 
 func init() {
@@ -34,6 +36,16 @@ func init() {
 	}
 
 	npcAttack1Spritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.SkeletonAttack1))
+	if err != nil {
+		panic(fmt.Sprintf("failed to decode image: %v", err))
+	}
+
+	npcAttack2Spritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.SkeletonAttack2))
+	if err != nil {
+		panic(fmt.Sprintf("failed to decode image: %v", err))
+	}
+
+	npcAttack3Spritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.SkeletonAttack3))
 	if err != nil {
 		panic(fmt.Sprintf("failed to decode image: %v", err))
 	}
@@ -93,6 +105,40 @@ func NewNPCDeadAnimation() *Animation {
 func NewNPCAttack1Animation() *Animation {
 	return NewAnimation(NewAnimationOptions{
 		Image:       ebiten.NewImageFromImage(npcAttack1Spritesheet),
+		FrameOX:     0,
+		FrameOY:     0,
+		FrameWidth:  128,
+		FrameHeight: 128,
+		FrameCount:  7,
+		FrameSpeed:  10,
+		ScaleX:      1.0,
+		ScaleY:      1.0,
+		ShiftX:      -32,
+		ShiftY:      0,
+		IsLooping:   false,
+	})
+}
+
+func NewNPCAttack2Animation() *Animation {
+	return NewAnimation(NewAnimationOptions{
+		Image:       ebiten.NewImageFromImage(npcAttack2Spritesheet),
+		FrameOX:     0,
+		FrameOY:     0,
+		FrameWidth:  128,
+		FrameHeight: 128,
+		FrameCount:  4,
+		FrameSpeed:  8,
+		ScaleX:      1.0,
+		ScaleY:      1.0,
+		ShiftX:      -32,
+		ShiftY:      0,
+		IsLooping:   false,
+	})
+}
+
+func NewNPCAttack3Animation() *Animation {
+	return NewAnimation(NewAnimationOptions{
+		Image:       ebiten.NewImageFromImage(npcAttack3Spritesheet),
 		FrameOX:     0,
 		FrameOY:     0,
 		FrameWidth:  128,

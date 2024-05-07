@@ -25,6 +25,8 @@ type PlayerState struct {
 	DidAttackHit           bool
 	Animation              PlayerAnimation
 	AnimationFlip          bool
+	AnimationSequence      uint8
+	ResetAnimation         bool
 	Hitpoints              int16
 }
 
@@ -80,7 +82,8 @@ func (p *PlayerState) NeedsReconciliation(other *PlayerState) bool {
 		p.IsOnGround == other.IsOnGround &&
 		p.IsAttacking == other.IsAttacking &&
 		p.Animation == other.Animation &&
-		p.AnimationFlip == other.AnimationFlip {
+		p.AnimationFlip == other.AnimationFlip &&
+		p.AnimationSequence == other.AnimationSequence {
 		return false
 	}
 	return true
@@ -102,6 +105,7 @@ func (p *PlayerState) Copy() *PlayerState {
 		DidAttackHit:           p.DidAttackHit,
 		Animation:              p.Animation,
 		AnimationFlip:          p.AnimationFlip,
+		AnimationSequence:      p.AnimationSequence,
 		Hitpoints:              p.Hitpoints,
 	}
 }
@@ -112,7 +116,9 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	p.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
 
 	// Attack
+	beforeIsAttacking := p.IsAttacking
 
+	// TODO: roll this into some kind of attack manager
 	if p.AttackTimeLeft > 0 {
 		p.AttackTimeLeft -= clientPlayerUpdate.DeltaTime
 		if !p.DidAttackHit {
@@ -138,6 +144,11 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		p.IsAttacking = false
 		p.IsAttackHitting = false
 		p.DidAttackHit = false
+	}
+
+	// Reset the animation sequence if the player is no longer attacking
+	if beforeIsAttacking && !p.IsAttacking {
+		p.ResetAnimation = true
 	}
 
 	if !p.IsAttacking && !p.IsDead() {
@@ -218,6 +229,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	p.Object.Update()
 
 	// Animation
+	beforeAnimation := p.Animation
 
 	if p.IsAttacking {
 		switch p.CurrentAttack {
@@ -246,6 +258,12 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 				}
 			}
 		}
+	}
+
+	// Update the player animation sequence
+	if beforeAnimation != p.Animation || p.ResetAnimation {
+		p.AnimationSequence++
+		p.ResetAnimation = false
 	}
 
 	// TODO: return false if the update did not change the state

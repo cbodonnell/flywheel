@@ -166,6 +166,7 @@ func SerializePlayerStateFlatbuffer(builder *flatbuffers.Builder, state *PlayerS
 	gamestatefb.PlayerStateAddIsAttacking(builder, state.IsAttacking)
 	gamestatefb.PlayerStateAddAnimation(builder, byte(state.Animation))
 	gamestatefb.PlayerStateAddAnimationFlip(builder, state.AnimationFlip)
+	gamestatefb.PlayerStateAddAnimationSequence(builder, state.AnimationSequence)
 	gamestatefb.PlayerStateAddHitpoints(builder, state.Hitpoints)
 	playerState := gamestatefb.PlayerStateEnd(builder)
 
@@ -189,6 +190,7 @@ func SerializeNPCStateFlatbuffer(builder *flatbuffers.Builder, state *NPCStateUp
 	gamestatefb.NPCStateAddIsOnGround(builder, state.IsOnGround)
 	gamestatefb.NPCStateAddAnimation(builder, byte(state.Animation))
 	gamestatefb.NPCStateAddAnimationFlip(builder, state.AnimationFlip)
+	gamestatefb.NPCStateAddAnimationSequence(builder, state.AnimationSequence)
 	gamestatefb.NPCStateAddHitpoints(builder, state.Hitpoints)
 	npcState := gamestatefb.NPCStateEnd(builder)
 
@@ -235,6 +237,7 @@ func DeserializePlayerStateFlatbuffer(playerStateKV *gamestatefb.PlayerStateKeyV
 	playerState.IsAttacking = playerStateKV.Value(nil).IsAttacking()
 	playerState.Animation = playerStateKV.Value(nil).Animation()
 	playerState.AnimationFlip = playerStateKV.Value(nil).AnimationFlip()
+	playerState.AnimationSequence = playerStateKV.Value(nil).AnimationSequence()
 	playerState.Hitpoints = playerStateKV.Value(nil).Hitpoints()
 
 	return playerState
@@ -249,6 +252,7 @@ func DeserializeNPCStateFlatbuffer(npcStateKV *gamestatefb.NPCStateKeyValue) *NP
 	npcState.IsOnGround = npcStateKV.Value(nil).IsOnGround()
 	npcState.Animation = npcStateKV.Value(nil).Animation()
 	npcState.AnimationFlip = npcStateKV.Value(nil).AnimationFlip()
+	npcState.AnimationSequence = npcStateKV.Value(nil).AnimationSequence()
 	npcState.Hitpoints = npcStateKV.Value(nil).Hitpoints()
 
 	return npcState

@@ -34,3 +34,9 @@ var SkeletonDead []byte
 
 //go:embed skeleton/Attack_1.png
 var SkeletonAttack1 []byte
+
+//go:embed skeleton/Attack_2.png
+var SkeletonAttack2 []byte
+
+//go:embed skeleton/Attack_3.png
+var SkeletonAttack3 []byte

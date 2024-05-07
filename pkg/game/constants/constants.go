@@ -71,11 +71,33 @@ const (
 	// NPCAttack1Duration is the duration of the attack (channel time + cooldown time)
 	NPCAttack1Duration float64 = 1.4 // seconds
 	// NPCAttack1ChannelTime is the time it takes for the attack to register
-	NPCAttack1ChannelTime float64 = 0.7 // seconds
+	NPCAttack1ChannelTime float64 = 0.55 // seconds
 	// NPCAttack1HitboxWidth is the width of the attack hitbox
 	NPCAttack1HitboxWidth float64 = NPCWidth
 	// NPCAttack1HitboxOffset is the offset from the npc's position to the attack hitbox
 	NPCAttack1HitboxOffset float64 = NPCWidth / 2
 	// NPCAttack1Damage is the amount of damage a npc does
 	NPCAttack1Damage int16 = 30
+
+	// NPCAttack2Duration is the duration of the attack (channel time + cooldown time)
+	NPCAttack2Duration float64 = 0.8 // seconds
+	// NPCAttack2ChannelTime is the time it takes for the attack to register
+	NPCAttack2ChannelTime float64 = 0.3 // seconds
+	// NPCAttack2HitboxWidth is the width of the attack hitbox
+	NPCAttack2HitboxWidth float64 = NPCWidth
+	// NPCAttack2HitboxOffset is the offset from the npc's position to the attack hitbox
+	NPCAttack2HitboxOffset float64 = NPCWidth / 2
+	// NPCAttack2Damage is the amount of damage a npc does
+	NPCAttack2Damage int16 = 15
+
+	// NPCAttack3Duration is the duration of the attack (channel time + cooldown time)
+	NPCAttack3Duration float64 = 1.0 // seconds
+	// NPCAttack3ChannelTime is the time it takes for the attack to register
+	NPCAttack3ChannelTime float64 = 0.4 // seconds
+	// NPCAttack3HitboxWidth is the width of the attack hitbox
+	NPCAttack3HitboxWidth float64 = NPCWidth
+	// NPCAttack3HitboxOffset is the offset from the npc's position to the attack hitbox
+	NPCAttack3HitboxOffset float64 = NPCWidth / 2
+	// NPCAttack3Damage is the amount of damage a npc does
+	NPCAttack3Damage int16 = 20
 )

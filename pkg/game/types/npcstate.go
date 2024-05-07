@@ -1,21 +1,25 @@
 package types
 
 import (
+	mathrand "math/rand"
+
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	"github.com/cbodonnell/flywheel/pkg/kinematic"
 	"github.com/solarlune/resolv"
 )
 
 type NPCState struct {
-	SpawnPosition kinematic.Vector
-	SpawnFlip     bool
-	Position      kinematic.Vector
-	Velocity      kinematic.Vector
-	Object        *resolv.Object
-	IsOnGround    bool
-	Animation     NPCAnimation
-	AnimationFlip bool
-	Hitpoints     int16
+	SpawnPosition     kinematic.Vector
+	SpawnFlip         bool
+	Position          kinematic.Vector
+	Velocity          kinematic.Vector
+	Object            *resolv.Object
+	IsOnGround        bool
+	Animation         NPCAnimation
+	AnimationFlip     bool
+	AnimationSequence uint8
+	ResetAnimation    bool
+	Hitpoints         int16
 
 	exists      bool
 	respawnTime float64
@@ -38,6 +42,8 @@ const (
 	NPCAnimationWalk
 	NPCAnimationDead
 	NPCAnimationAttack1
+	NPCAnimationAttack2
+	NPCAnimationAttack3
 )
 
 type NPCMode uint8
@@ -51,8 +57,8 @@ type NPCAttack uint8
 
 const (
 	NPCAttack1 NPCAttack = iota
-	// NPCAttack2
-	// NPCAttack3
+	NPCAttack2
+	NPCAttack3
 )
 
 func NewNPCState(positionX float64, positionY float64, flip bool) *NPCState {
@@ -75,17 +81,18 @@ func NewNPCState(positionX float64, positionY float64, flip bool) *NPCState {
 
 func (n *NPCState) Copy() *NPCState {
 	return &NPCState{
-		Position:        n.Position,
-		Velocity:        n.Velocity,
-		IsOnGround:      n.IsOnGround,
-		IsAttacking:     n.IsAttacking,
-		CurrentAttack:   n.CurrentAttack,
-		AttackTimeLeft:  n.AttackTimeLeft,
-		IsAttackHitting: n.IsAttackHitting,
-		DidAttackHit:    n.DidAttackHit,
-		Animation:       n.Animation,
-		AnimationFlip:   n.AnimationFlip,
-		Hitpoints:       n.Hitpoints,
+		Position:          n.Position,
+		Velocity:          n.Velocity,
+		IsOnGround:        n.IsOnGround,
+		IsAttacking:       n.IsAttacking,
+		CurrentAttack:     n.CurrentAttack,
+		AttackTimeLeft:    n.AttackTimeLeft,
+		IsAttackHitting:   n.IsAttackHitting,
+		DidAttackHit:      n.DidAttackHit,
+		Animation:         n.Animation,
+		AnimationFlip:     n.AnimationFlip,
+		AnimationSequence: n.AnimationSequence,
+		Hitpoints:         n.Hitpoints,
 	}
 }
 
@@ -101,7 +108,9 @@ func (n *NPCState) RespawnTime() float64 {
 // and returns whether the state has changed
 func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	// Attack
+	beforeIsAttacking := n.IsAttacking
 
+	// TODO: roll this into some kind of attack manager
 	if n.AttackTimeLeft > 0 {
 		n.AttackTimeLeft -= deltaTime
 		if !n.DidAttackHit {
@@ -109,10 +118,10 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 			switch n.CurrentAttack {
 			case NPCAttack1:
 				attackHitTime = constants.NPCAttack1Duration - constants.NPCAttack1ChannelTime
-				// case NPCAttack2:
-				// 	attackHitTime = constants.NPCAttack2Duration - constants.NPCAttack2ChannelTime
-				// case NPCAttack3:
-				// 	attackHitTime = constants.NPCAttack3Duration - constants.NPCAttack3ChannelTime
+			case NPCAttack2:
+				attackHitTime = constants.NPCAttack2Duration - constants.NPCAttack2ChannelTime
+			case NPCAttack3:
+				attackHitTime = constants.NPCAttack3Duration - constants.NPCAttack3ChannelTime
 			}
 
 			if n.AttackTimeLeft <= attackHitTime {
@@ -125,19 +134,34 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 		}
 	} else {
 		n.IsAttacking = false
-		n.IsInAttackRange = false
 		n.IsAttackHitting = false
 		n.DidAttackHit = false
 	}
 
-	if n.IsFollowing() {
-		n.UpdateFollowing()
+	// Reset the animation sequence if the player is no longer attacking
+	if beforeIsAttacking && !n.IsAttacking {
+		n.ResetAnimation = true
 	}
+
+	// Following
+
+	n.UpdateFollowing()
 
 	if !n.IsAttacking && n.IsInAttackRange {
 		n.IsAttacking = true
-		n.CurrentAttack = NPCAttack1 // TODO: randomize
-		n.AttackTimeLeft = constants.NPCAttack1Duration
+		// randomly choose an attack
+		attack := mathrand.Intn(3)
+		switch attack {
+		case 0:
+			n.CurrentAttack = NPCAttack1
+			n.AttackTimeLeft = constants.NPCAttack1Duration
+		case 1:
+			n.CurrentAttack = NPCAttack2
+			n.AttackTimeLeft = constants.NPCAttack2Duration
+		case 2:
+			n.CurrentAttack = NPCAttack3
+			n.AttackTimeLeft = constants.NPCAttack3Duration
+		}
 	}
 
 	// Movement
@@ -154,6 +178,12 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 			}
 			dx = kinematic.Displacement(vx, deltaTime, 0)
 			vx = kinematic.FinalVelocity(vx, deltaTime, 0)
+
+			if n.followTarget.Position.X < n.Position.X && n.Position.X+dx < n.followTarget.Position.X ||
+				n.followTarget.Position.X > n.Position.X && n.Position.X+dx > n.followTarget.Position.X {
+				// handle edge case where npc is directly on top of player and oscillates
+				dx = 0
+			}
 		}
 		// TODO: else wander
 	}
@@ -199,15 +229,16 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	n.Object.Update()
 
 	// Animation
+	beforeAnimation := n.Animation
 
 	if n.IsAttacking {
 		switch n.CurrentAttack {
 		case NPCAttack1:
 			n.Animation = NPCAnimationAttack1
-			// case NPCAttack2:
-			// 	n.Animation = NPCAnimationAttack2
-			// case NPCAttack3:
-			// 	n.Animation = NPCAnimationAttack3
+		case NPCAttack2:
+			n.Animation = NPCAnimationAttack2
+		case NPCAttack3:
+			n.Animation = NPCAnimationAttack3
 		}
 	} else {
 		if n.IsDead() {
@@ -219,6 +250,12 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 				n.Animation = NPCAnimationIdle
 			}
 		}
+	}
+
+	// Update the animation sequence
+	if beforeAnimation != n.Animation || n.ResetAnimation {
+		n.AnimationSequence++
+		n.ResetAnimation = false
 	}
 
 	// TODO: return false if the update did not change the state
@@ -271,6 +308,7 @@ func (n *NPCState) StartFollowing(target *PlayerState) {
 func (n *NPCState) StopFollowing() {
 	n.mode = NPCModeIdle
 	n.followTarget = nil
+	n.IsInAttackRange = false
 }
 
 func (n *NPCState) IsFollowing() bool {
@@ -278,6 +316,11 @@ func (n *NPCState) IsFollowing() bool {
 }
 
 func (n *NPCState) UpdateFollowing() {
+	if n.followTarget == nil {
+		n.StopFollowing()
+		return
+	}
+
 	if n.followTarget.IsDead() {
 		n.StopFollowing()
 		return

@@ -390,7 +390,6 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 // updateServerObjects updates server objects (e.g. npcs, items, projectiles, etc.)
 func (gm *GameManager) updateServerObjects(deltaTime float64) {
 	for npcID, npcState := range gm.gameState.NPCs {
-		npcState.Update(deltaTime)
 		if !npcState.Exists() {
 			// npc does not exist, so respawn it
 			if npcState.RespawnTime() <= 0 {
@@ -413,12 +412,12 @@ func (gm *GameManager) updateServerObjects(deltaTime float64) {
 				case types.NPCAttack1:
 					attackHitboxWidth = constants.NPCAttack1HitboxWidth
 					attackHitboxOffset = constants.NPCAttack1HitboxOffset
-				// case types.NPCAttack2:
-				// 	attackHitboxWidth = constants.NPCAttack2HitboxWidth
-				// 	attackHitboxOffset = constants.NPCAttack2HitboxOffset
-				// case types.NPCAttack3:
-				// 	attackHitboxWidth = constants.NPCAttack3HitboxWidth
-				// 	attackHitboxOffset = constants.NPCAttack3HitboxOffset
+				case types.NPCAttack2:
+					attackHitboxWidth = constants.NPCAttack2HitboxWidth
+					attackHitboxOffset = constants.NPCAttack2HitboxOffset
+				case types.NPCAttack3:
+					attackHitboxWidth = constants.NPCAttack3HitboxWidth
+					attackHitboxOffset = constants.NPCAttack3HitboxOffset
 				default:
 					log.Warn("Unhandled NPC attack type: %d", npcState.CurrentAttack)
 				}
@@ -447,10 +446,10 @@ func (gm *GameManager) updateServerObjects(deltaTime float64) {
 					switch npcState.CurrentAttack {
 					case types.NPCAttack1:
 						damage = constants.NPCAttack1Damage
-					// case types.NPCAttack2:
-					// 	damage = constants.NPCAttack2Damage
-					// case types.NPCAttack3:
-					// 	damage = constants.NPCAttack3Damage
+					case types.NPCAttack2:
+						damage = constants.NPCAttack2Damage
+					case types.NPCAttack3:
+						damage = constants.NPCAttack3Damage
 					default:
 						log.Warn("Unhandled NPC attack type: %d", npcState.CurrentAttack)
 					}
@@ -529,6 +528,8 @@ func (gm *GameManager) updateServerObjects(deltaTime float64) {
 				}
 			}
 		}
+		// TODO: would be nice to roll most of the above into the npcState.Update method
+		npcState.Update(deltaTime)
 	}
 }
 

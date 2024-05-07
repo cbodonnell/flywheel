@@ -21,6 +21,7 @@ table PlayerState {
   is_attacking: bool;
   animation: uint8;
   animation_flip: bool;
+  animation_sequence: uint8;
   hitpoints: int16;
 }
 
@@ -45,6 +46,7 @@ table NPCState {
   is_on_ground: bool;
   animation: uint8;
   animation_flip: bool;
+  animation_sequence: uint8;
   hitpoints: int16;
 }
  
