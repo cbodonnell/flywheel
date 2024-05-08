@@ -25,6 +25,8 @@ type Game struct {
 	authURL string
 	// networkManager is the network manager.
 	networkManager *network.NetworkManager
+	// gameAutomation is the game automation configuration.
+	gameAutomation *GameAutomation
 	// mode is the current game mode.
 	mode GameMode
 	// scene is the current scene.
@@ -75,16 +77,11 @@ func NewGame(opts NewGameOptions) (ebiten.Game, error) {
 		debug:          opts.Debug,
 		authURL:        opts.AuthURL,
 		networkManager: opts.NetworkManager,
+		gameAutomation: opts.GameAutomation,
 	}
 
-	if opts.GameAutomation != nil {
-		if err := g.login(opts.GameAutomation.Email, opts.GameAutomation.Password); err != nil {
-			return nil, fmt.Errorf("failed to start game: %v", err)
-		}
-	} else {
-		if err := g.loadMenu(); err != nil {
-			return nil, fmt.Errorf("failed to load menu scene: %v", err)
-		}
+	if err := g.loadMenu(); err != nil {
+		return nil, fmt.Errorf("failed to load menu scene: %v", err)
 	}
 
 	return g, nil
@@ -106,6 +103,13 @@ func (g *Game) SetScene(scene scenes.Scene) error {
 }
 
 func (g *Game) loadMenu() error {
+	if g.gameAutomation != nil {
+		if err := g.login(g.gameAutomation.Email, g.gameAutomation.Password); err != nil {
+			return fmt.Errorf("failed to start game: %v", err)
+		}
+		return nil
+	}
+
 	menu, err := scenes.NewMenuScene(scenes.MenuSceneOptions{
 		OnLogin: func(email, password string) {
 			// TODO: this blocks the main thread

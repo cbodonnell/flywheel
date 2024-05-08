@@ -114,6 +114,14 @@ func (g *GameScene) processPendingServerMessages() error {
 			if err := g.handleServerNPCKill(message); err != nil {
 				log.Error("Failed to handle server NPC kill: %v", err)
 			}
+		case messages.MessageTypeServerPlayerHit:
+			if err := g.handleServerPlayerHit(message); err != nil {
+				log.Error("Failed to handle server player hit: %v", err)
+			}
+		case messages.MessageTypeServerPlayerKill:
+			if err := g.handleServerPlayerKill(message); err != nil {
+				log.Error("Failed to handle server player kill: %v", err)
+			}
 		default:
 			log.Warn("Received unexpected message type from server: %s", message.Type)
 		}
@@ -271,6 +279,55 @@ func (g *GameScene) handleServerNPCKill(message *messages.Message) error {
 		return fmt.Errorf("failed to unmarshal NPC kill message: %v", err)
 	}
 	log.Debug("Player %d killed NPC %d", npcKill.PlayerID, npcKill.NPCID)
+	return nil
+}
+
+func (g *GameScene) handleServerPlayerHit(message *messages.Message) error {
+	playerHit := &messages.ServerPlayerHit{}
+	if err := json.Unmarshal(message.Payload, playerHit); err != nil {
+		return fmt.Errorf("failed to unmarshal player hit message: %v", err)
+	}
+	log.Debug("NPC %d hit player %d for %d damage", playerHit.NPCID, playerHit.PlayerID, playerHit.Damage)
+	playerID := fmt.Sprintf("player-%d", playerHit.PlayerID)
+	obj := g.GetRoot().GetChild(playerID)
+	if obj == nil {
+		log.Warn("Player object with id %d not found", playerHit.PlayerID)
+		return nil
+	}
+	playerObject, ok := obj.(*objects.Player)
+	if !ok {
+		return fmt.Errorf("failed to cast game object %s to *objects.Player", playerID)
+	}
+
+	zIndex := 25
+	isLocalPlayer := playerHit.PlayerID == g.networkManager.ClientID()
+	if isLocalPlayer {
+		zIndex = 35
+	}
+
+	hitID := fmt.Sprintf("%s-hit-%d", playerObject.ID, uuid.New().ID())
+	hitObject := objects.NewTextEffect(hitID, objects.NewTextEffectOptions{
+		Text:   fmt.Sprintf("%d", playerHit.Damage),
+		X:      playerObject.State.Position.X + constants.PlayerWidth/2,
+		Y:      playerObject.State.Position.Y + constants.PlayerHeight/2,
+		Color:  color.RGBA{255, 0, 0, 255}, // Red
+		Scroll: true,
+		TTL:    1500,
+		ZIndex: zIndex,
+	})
+	if err := g.GetRoot().AddChild(hitID, hitObject); err != nil {
+		return fmt.Errorf("failed to add text effect: %v", err)
+	}
+
+	return nil
+}
+
+func (g *GameScene) handleServerPlayerKill(message *messages.Message) error {
+	playerKill := &messages.ServerPlayerKill{}
+	if err := json.Unmarshal(message.Payload, playerKill); err != nil {
+		return fmt.Errorf("failed to unmarshal player kill message: %v", err)
+	}
+	log.Debug("NPC %d killed player %d", playerKill.NPCID, playerKill.PlayerID)
 	return nil
 }
 

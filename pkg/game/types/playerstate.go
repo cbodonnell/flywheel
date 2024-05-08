@@ -25,6 +25,9 @@ type PlayerState struct {
 	DidAttackHit           bool
 	Animation              PlayerAnimation
 	AnimationFlip          bool
+	AnimationSequence      uint8
+	ResetAnimation         bool
+	Hitpoints              int16
 }
 
 type PlayerAttack uint8
@@ -45,10 +48,14 @@ const (
 	PlayerAnimationAttack1
 	PlayerAnimationAttack2
 	PlayerAnimationAttack3
+	PlayerAnimationDead
 )
 
 func NewPlayerState(playerID string, positionX, positionY float64) *PlayerState {
 	name := fmt.Sprintf("%x", sha256.Sum256([]byte(playerID)))[:8]
+
+	object := resolv.NewObject(positionX, positionY, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer)
+	object.SetShape(resolv.NewRectangle(0, 0, constants.PlayerWidth, constants.PlayerHeight))
 
 	return &PlayerState{
 		UserID: playerID,
@@ -61,20 +68,25 @@ func NewPlayerState(playerID string, positionX, positionY float64) *PlayerState 
 			X: 0,
 			Y: 0,
 		},
-		Object: resolv.NewObject(positionX, positionY, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer),
+		Hitpoints: constants.PlayerHitpoints,
+		Object:    object,
 	}
 }
 
-// Equal returns true if the player state is equal to the other player state
-func (p *PlayerState) Equal(other *PlayerState) bool {
-	return p.Position.X == other.Position.X &&
+// NeedsReconciliation returns true if the player state needs to be reconciled with an authoritative state
+func (p *PlayerState) NeedsReconciliation(other *PlayerState) bool {
+	if p.Position.X == other.Position.X &&
 		p.Position.Y == other.Position.Y &&
 		p.Velocity.X == other.Velocity.X &&
 		p.Velocity.Y == other.Velocity.Y &&
 		p.IsOnGround == other.IsOnGround &&
 		p.IsAttacking == other.IsAttacking &&
 		p.Animation == other.Animation &&
-		p.AnimationFlip == other.AnimationFlip
+		p.AnimationFlip == other.AnimationFlip &&
+		p.AnimationSequence == other.AnimationSequence {
+		return false
+	}
+	return true
 }
 
 // Copy returns a copy of the player state with an empty object reference
@@ -87,44 +99,65 @@ func (p *PlayerState) Copy() *PlayerState {
 		Velocity:               p.Velocity,
 		IsOnGround:             p.IsOnGround,
 		IsAttacking:            p.IsAttacking,
+		CurrentAttack:          p.CurrentAttack,
+		AttackTimeLeft:         p.AttackTimeLeft,
+		IsAttackHitting:        p.IsAttackHitting,
+		DidAttackHit:           p.DidAttackHit,
 		Animation:              p.Animation,
 		AnimationFlip:          p.AnimationFlip,
+		AnimationSequence:      p.AnimationSequence,
+		Hitpoints:              p.Hitpoints,
 	}
 }
 
 // ApplyInput updates the player's state based on the client's input
 // and returns whether the state has changed
 func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate) (changed bool) {
-	// Attack
+	p.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
 
-	if p.AttackTimeLeft > 0 {
-		p.AttackTimeLeft -= clientPlayerUpdate.DeltaTime
-		if !p.DidAttackHit {
-			attackHitTime := 0.0
-			switch p.CurrentAttack {
-			case PlayerAttack1:
-				attackHitTime = constants.PlayerAttack1Duration - constants.PlayerAttack1ChannelTime
-			case PlayerAttack2:
-				attackHitTime = constants.PlayerAttack2Duration - constants.PlayerAttack2ChannelTime
-			case PlayerAttack3:
-				attackHitTime = constants.PlayerAttack3Duration - constants.PlayerAttack3ChannelTime
-			}
-
-			if p.AttackTimeLeft <= attackHitTime {
-				// register the hit only once
-				p.IsAttackHitting = true
-				p.DidAttackHit = true
-			}
-		} else {
-			p.IsAttackHitting = false
-		}
-	} else {
-		p.IsAttacking = false
-		p.IsAttackHitting = false
-		p.DidAttackHit = false
+	// Respawn
+	if p.IsDead() && clientPlayerUpdate.InputRespawn {
+		p.Respawn(kinematic.NewVector(constants.PlayerStartingX, constants.PlayerStartingY))
 	}
 
-	if !p.IsAttacking {
+	// Attack - TODO: roll this into some kind of attack manager
+	if p.IsAttacking {
+		beforeIsAttacking := p.IsAttacking
+
+		if p.AttackTimeLeft > 0 {
+			p.AttackTimeLeft -= clientPlayerUpdate.DeltaTime
+			if !p.DidAttackHit {
+				attackHitTime := 0.0
+				switch p.CurrentAttack {
+				case PlayerAttack1:
+					attackHitTime = constants.PlayerAttack1Duration - constants.PlayerAttack1ChannelTime
+				case PlayerAttack2:
+					attackHitTime = constants.PlayerAttack2Duration - constants.PlayerAttack2ChannelTime
+				case PlayerAttack3:
+					attackHitTime = constants.PlayerAttack3Duration - constants.PlayerAttack3ChannelTime
+				}
+
+				if p.AttackTimeLeft <= attackHitTime {
+					// register the hit only once
+					p.IsAttackHitting = true
+					p.DidAttackHit = true
+				}
+			} else {
+				p.IsAttackHitting = false
+			}
+		} else {
+			p.IsAttacking = false
+			p.IsAttackHitting = false
+			p.DidAttackHit = false
+		}
+
+		// Reset the animation sequence if the player is no longer attacking
+		if beforeIsAttacking && !p.IsAttacking {
+			p.ResetAnimation = true
+		}
+	}
+
+	if !p.IsAttacking && !p.IsDead() {
 		switch {
 		case clientPlayerUpdate.InputAttack1:
 			p.IsAttacking = true
@@ -145,7 +178,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 
 	// X-axis
 	var dx, vx float64
-	if !p.IsAttacking {
+	if !p.IsAttacking && !p.IsDead() {
 		dx = kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
 		vx = kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
 	} else if !p.IsOnGround {
@@ -154,17 +187,22 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		vx = kinematic.FinalVelocity(p.Velocity.X, clientPlayerUpdate.DeltaTime, 0)
 	}
 
-	// TODO: fix edge case when player hits top corner of a platform
 	// Check for collisions
 	if collision := p.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
 		dx = collision.ContactWithCell(collision.Cells[0]).X
 		vx = 0
 	}
 
+	// Update player state in the X-axis
+	p.Position.X += dx
+	p.Velocity.X = vx
+	p.Object.Position.X = p.Position.X
+	p.Object.Update()
+
 	// Y-axis
 	// Apply input
 	vy := p.Velocity.Y
-	if !p.IsAttacking && p.IsOnGround && clientPlayerUpdate.InputJump {
+	if !p.IsAttacking && !p.IsDead() && p.IsOnGround && clientPlayerUpdate.InputJump {
 		vy = constants.PlayerJumpSpeed
 	}
 
@@ -180,16 +218,15 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		isOnGround = true
 	}
 
-	// Update player state
-	p.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
-	p.Position.X += dx
-	p.Velocity.X = vx
+	// Update player state in the Y-axis
 	p.Position.Y += dy
 	p.Velocity.Y = vy
+	p.Object.Position.Y = p.Position.Y
+	p.Object.Update()
 	p.IsOnGround = isOnGround
 
 	// Update the player animation
-	if !p.IsAttacking {
+	if !p.IsAttacking && !p.IsDead() {
 		if clientPlayerUpdate.InputX > 0 {
 			p.AnimationFlip = false
 		} else if clientPlayerUpdate.InputX < 0 {
@@ -197,12 +234,8 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		}
 	}
 
-	// Update the player collision object
-	p.Object.Position.X = p.Position.X
-	p.Object.Position.Y = p.Position.Y
-	p.Object.Update()
-
 	// Animation
+	beforeAnimation := p.Animation
 
 	if p.IsAttacking {
 		switch p.CurrentAttack {
@@ -214,21 +247,63 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 			p.Animation = PlayerAnimationAttack3
 		}
 	} else {
-		if isOnGround {
-			if clientPlayerUpdate.InputX != 0 {
-				p.Animation = PlayerAnimationRun
-			} else {
-				p.Animation = PlayerAnimationIdle
-			}
+		if p.IsDead() {
+			p.Animation = PlayerAnimationDead
 		} else {
-			if vy < 0 {
-				p.Animation = PlayerAnimationFall
+			if p.IsOnGround {
+				if clientPlayerUpdate.InputX != 0 {
+					p.Animation = PlayerAnimationRun
+				} else {
+					p.Animation = PlayerAnimationIdle
+				}
 			} else {
-				p.Animation = PlayerAnimationJump
+				if vy < 0 {
+					p.Animation = PlayerAnimationFall
+				} else {
+					p.Animation = PlayerAnimationJump
+				}
 			}
 		}
 	}
 
+	// Update the player animation sequence
+	if beforeAnimation != p.Animation || p.ResetAnimation {
+		p.AnimationSequence++
+		p.ResetAnimation = false
+	}
+
 	// TODO: return false if the update did not change the state
 	return true
+}
+
+// TakeDamage reduces the player's hitpoints by the given amount
+func (p *PlayerState) TakeDamage(damage int16) {
+	p.Hitpoints -= damage
+}
+
+// IsDead returns true if the player's hitpoints are less than or equal to zero
+func (p *PlayerState) IsDead() bool {
+	return p.Hitpoints <= 0
+}
+
+// Respawns the player at the given position
+func (p *PlayerState) Respawn(position kinematic.Vector) {
+	p.Position = position
+	p.Velocity = kinematic.ZeroVector()
+	p.Hitpoints = constants.PlayerHitpoints
+
+	p.IsAttacking = false
+	p.CurrentAttack = PlayerAttack1
+	p.AttackTimeLeft = 0
+	p.IsAttackHitting = false
+	p.DidAttackHit = false
+
+	p.Animation = PlayerAnimationIdle
+	p.AnimationFlip = false
+	p.AnimationSequence = 0
+	p.ResetAnimation = false
+
+	p.Object.Position.X = p.Position.X
+	p.Object.Position.Y = p.Position.Y
+	p.Object.Update()
 }

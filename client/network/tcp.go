@@ -82,7 +82,9 @@ func (c *TCPClient) HandleMessages(ctx context.Context) error {
 		case messages.MessageTypeServerPlayerConnect,
 			messages.MessageTypeServerPlayerDisconnect,
 			messages.MessageTypeServerNPCHit,
-			messages.MessageTypeServerNPCKill:
+			messages.MessageTypeServerNPCKill,
+			messages.MessageTypeServerPlayerHit,
+			messages.MessageTypeServerPlayerKill:
 			if err := c.messageQueue.Enqueue(msg); err != nil {
 				log.Error("Failed to enqueue message: %v", err)
 			}

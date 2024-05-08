@@ -14,6 +14,7 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/workers"
+	"github.com/solarlune/resolv"
 )
 
 type GameManager struct {
@@ -79,23 +80,18 @@ func (gm *GameManager) Stop() {
 }
 
 func (gm *GameManager) initializeGameState(_ context.Context) error {
-	npc1State := types.NewNPCState(128.0-constants.NPCWidth/2, 16.0)
-	gm.gameState.NPCs[1] = npc1State
-	gm.gameState.CollisionSpace.Add(npc1State.Object)
+	npcs := []*types.NPCState{
+		types.NewNPCState(1, 128.0-constants.NPCWidth/2, 16.0, false),
+		types.NewNPCState(2, 384.0-constants.NPCWidth/2, 16.0, false),
+		types.NewNPCState(3, 896.0-constants.NPCWidth/2, 16.0, true),
+		types.NewNPCState(4, 1152.0-constants.NPCWidth/2, 16.0, true),
+	}
 
-	npc2State := types.NewNPCState(384.0-constants.NPCWidth/2, 16.0)
-	gm.gameState.NPCs[2] = npc2State
-	gm.gameState.CollisionSpace.Add(npc2State.Object)
-
-	npc3State := types.NewNPCState(896.0-constants.NPCWidth/2, 16.0)
-	npc3State.AnimationFlip = true
-	gm.gameState.NPCs[3] = npc3State
-	gm.gameState.CollisionSpace.Add(npc3State.Object)
-
-	npc4State := types.NewNPCState(1152.0-constants.NPCWidth/2, 16.0)
-	npc4State.AnimationFlip = true
-	gm.gameState.NPCs[4] = npc4State
-	gm.gameState.CollisionSpace.Add(npc4State.Object)
+	for _, npc := range npcs {
+		gm.gameState.NPCs[npc.ID] = npc
+		gm.gameState.CollisionSpace.Add(npc.Object)
+		npc.Spawn()
+	}
 
 	return nil
 }
@@ -301,10 +297,11 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 		attackHitbox.Position.X -= attackHitboxOffset
 	}
 	gm.gameState.CollisionSpace.Add(attackHitbox)
+	defer gm.gameState.CollisionSpace.Remove(attackHitbox)
 
 	// TODO: check for collision and get the ID from the collision shape data
 	for npcID, npcState := range gm.gameState.NPCs {
-		if !npcState.Exists() || npcState.IsDead() {
+		if npcState.IsDead() {
 			continue
 		}
 
@@ -312,6 +309,7 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 			continue
 		}
 
+		// player hit npc
 		log.Debug("Player %d hit NPC %d", clientID, npcID)
 
 		damage := int16(0)
@@ -354,8 +352,14 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 		}
 
 		if !npcState.IsDead() {
+			if !npcState.IsFollowing() {
+				npcState.StartFollowing(playerState)
+			}
 			continue
 		}
+
+		// player killed npc
+		npcState.Despawn()
 
 		log.Debug("Player %d killed NPC %d", clientID, npcID)
 		npcKill := &messages.ServerNPCKill{
@@ -386,16 +390,142 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 
 // updateServerObjects updates server objects (e.g. npcs, items, projectiles, etc.)
 func (gm *GameManager) updateServerObjects(deltaTime float64) {
-	for _, npcState := range gm.gameState.NPCs {
-		npcState.Update(deltaTime)
-		if !npcState.Exists() {
-			if npcState.RespawnTime() <= 0 {
-				npcState.Spawn()
-			} else {
-				npcState.DecrementRespawnTime(deltaTime)
+	for npcID, npcState := range gm.gameState.NPCs {
+		if npcState.IsAttacking {
+			// npc is attacking
+			if npcState.IsAttackHitting {
+				// npc is hitting with an attack
+				gm.checkNPCAttackHit(npcID, npcState)
 			}
-		} else if npcState.IsDead() {
-			npcState.Despawn()
+		} else if !npcState.IsDead() {
+			// npc is not following a player, so check for any players in line of sight
+			gm.checkNPCLineOfSight(npcState)
+		}
+
+		npcState.Update(deltaTime)
+	}
+}
+
+func (gm *GameManager) checkNPCAttackHit(npcID uint32, npcState *types.NPCState) {
+	attackHitbox := npcState.Object.Clone()
+	attackHitboxWidth, attackHitboxOffset := 0.0, 0.0
+	switch npcState.CurrentAttack {
+	case types.NPCAttack1:
+		attackHitboxWidth = constants.NPCAttack1HitboxWidth
+		attackHitboxOffset = constants.NPCAttack1HitboxOffset
+	case types.NPCAttack2:
+		attackHitboxWidth = constants.NPCAttack2HitboxWidth
+		attackHitboxOffset = constants.NPCAttack2HitboxOffset
+	case types.NPCAttack3:
+		attackHitboxWidth = constants.NPCAttack3HitboxWidth
+		attackHitboxOffset = constants.NPCAttack3HitboxOffset
+	default:
+		log.Warn("Unhandled NPC attack type: %d", npcState.CurrentAttack)
+	}
+
+	attackHitbox.Size.X = attackHitboxWidth
+	if !npcState.AnimationFlip {
+		attackHitbox.Position.X += attackHitboxOffset
+	} else {
+		attackHitbox.Position.X -= attackHitboxOffset
+	}
+	gm.gameState.CollisionSpace.Add(attackHitbox)
+	defer gm.gameState.CollisionSpace.Remove(attackHitbox)
+
+	for playerID, playerState := range gm.gameState.Players {
+		if playerState.IsDead() {
+			continue
+		}
+
+		if !attackHitbox.SharesCells(playerState.Object) {
+			continue
+		}
+
+		log.Debug("NPC %d hit player %d", npcID, playerID)
+
+		damage := int16(0)
+		switch npcState.CurrentAttack {
+		case types.NPCAttack1:
+			damage = constants.NPCAttack1Damage
+		case types.NPCAttack2:
+			damage = constants.NPCAttack2Damage
+		case types.NPCAttack3:
+			damage = constants.NPCAttack3Damage
+		default:
+			log.Warn("Unhandled NPC attack type: %d", npcState.CurrentAttack)
+		}
+
+		playerState.TakeDamage(damage)
+
+		playerHit := &messages.ServerPlayerHit{
+			PlayerID: playerID,
+			NPCID:    npcID,
+			Damage:   damage,
+		}
+		payload, err := json.Marshal(playerHit)
+		if err != nil {
+			log.Error("Failed to marshal player hit message: %v", err)
+			continue
+		}
+
+		for _, client := range gm.clientManager.GetClients() {
+			msg := &messages.Message{
+				ClientID: 0, // ClientID 0 means the message is from the server
+				Type:     messages.MessageTypeServerPlayerHit,
+				Payload:  payload,
+			}
+
+			err := network.WriteMessageToTCP(client.TCPConn, msg)
+			if err != nil {
+				log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
+				continue
+			}
+		}
+
+		if !playerState.IsDead() {
+			continue
+		}
+
+		log.Debug("NPC %d killed player %d", npcID, playerID)
+		playerKill := &messages.ServerPlayerKill{
+			PlayerID: playerID,
+			NPCID:    npcID,
+		}
+		payload, err = json.Marshal(playerKill)
+		if err != nil {
+			log.Error("Failed to marshal player kill message: %v", err)
+			continue
+		}
+
+		for _, client := range gm.clientManager.GetClients() {
+			msg := &messages.Message{
+				ClientID: 0, // ClientID 0 means the message is from the server
+				Type:     messages.MessageTypeServerPlayerKill,
+				Payload:  payload,
+			}
+
+			err := network.WriteMessageToTCP(client.TCPConn, msg)
+			if err != nil {
+				log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
+				continue
+			}
+		}
+	}
+}
+
+func (gm *GameManager) checkNPCLineOfSight(npcState *types.NPCState) {
+	flip := 1.0
+	if npcState.AnimationFlip {
+		flip = -1.0
+	}
+	lineOfSight := resolv.NewLine(npcState.Position.X+constants.NPCWidth/2, npcState.Position.Y+constants.NPCHeight/2, npcState.Position.X+constants.NPCWidth/2+flip*constants.NPCLineOfSight, npcState.Position.Y+constants.NPCHeight/2)
+	for _, playerState := range gm.gameState.Players {
+		if playerState.IsDead() {
+			continue
+		}
+		if contact := lineOfSight.Intersection(0, 0, playerState.Object.Shape); contact != nil {
+			npcState.StartFollowing(playerState)
+			break
 		}
 	}
 }
@@ -410,6 +540,7 @@ func (gm *GameManager) broadcastGameState() {
 	}
 	// TODO: this is not scalable for large numbers of clients.
 	// sending individual player and npc updates may be more efficient.
+	// TODO: player vs localPlayer updates should be handled differently
 
 	for _, client := range gm.clientManager.GetClients() {
 		message := &messages.Message{

@@ -74,3 +74,7 @@ func IsAttack2JustPressed() bool {
 func IsAttack3JustPressed() bool {
 	return inpututil.IsKeyJustPressed(ebiten.KeyE)
 }
+
+func IsRespawnJustPressed() bool {
+	return inpututil.IsKeyJustPressed(ebiten.KeyR)
+}

@@ -30,6 +30,8 @@ const (
 	MessageTypeServerPlayerDisconnect
 	MessageTypeServerNPCHit
 	MessageTypeServerNPCKill
+	MessageTypeServerPlayerHit
+	MessageTypeServerPlayerKill
 )
 
 func (m MessageType) String() string {
@@ -46,6 +48,8 @@ func (m MessageType) String() string {
 		"ServerPlayerDisconnect",
 		"ServerNPCHit",
 		"ServerNPCKill",
+		"ServerPlayerHit",
+		"ServerPlayerKill",
 	}[m]
 }
 
@@ -87,6 +91,8 @@ type ClientPlayerUpdate struct {
 	InputAttack2 bool `json:"inputAttack2"`
 	// InputAttack3 is the attack 3 input from the client
 	InputAttack3 bool `json:"inputAttack3"`
+	// InputRespawn is the respawn input from the client
+	InputRespawn bool `json:"inputRespawn"`
 	// DeltaTime is the time since the last update as recorded by the client
 	DeltaTime float64 `json:"deltaTime"`
 	// PastUpdates is a list of past updates from the client to
@@ -124,6 +130,10 @@ type PlayerStateUpdate struct {
 	Animation uint8 `json:"animation"`
 	// AnimationFlip is a flag indicating whether the animation should be flipped
 	AnimationFlip bool `json:"animationFlip"`
+	// AnimationSequence is used to differentiate between different instances of the same animation
+	AnimationSequence uint8 `json:"animationSequence"`
+	// Hitpoints is the current hitpoints of the player
+	Hitpoints int16 `json:"hitpoints"`
 }
 
 // NPCStateUpdate is a message sent by the server to update clients on an NPC's state
@@ -138,6 +148,8 @@ type NPCStateUpdate struct {
 	Animation uint8 `json:"animation"`
 	// AnimationFlip is a flag indicating whether the animation should be flipped
 	AnimationFlip bool `json:"animationFlip"`
+	// AnimationSequence is used to differentiate between different instances of the same animation
+	AnimationSequence uint8 `json:"animationSequence"`
 	// Hitpoints is the current hitpoints of the NPC
 	Hitpoints int16 `json:"hitpoints"`
 }
@@ -186,4 +198,22 @@ type ServerNPCKill struct {
 	NPCID uint32 `json:"npcID"`
 	// PlayerID is the ID of the player that killed the NPC
 	PlayerID uint32 `json:"playerID"`
+}
+
+// ServerPlayerHit is a message sent by the server to notify clients that a player has been hit
+type ServerPlayerHit struct {
+	// PlayerID is the ID of the player that has been hit
+	PlayerID uint32 `json:"playerID"`
+	// NPCID is the ID of the NPC that hit the player
+	NPCID uint32 `json:"npcID"`
+	// Damage is the amount of damage dealt to the player
+	Damage int16 `json:"damage"`
+}
+
+// ServerPlayerKill is a message sent by the server to notify clients that a player has been killed
+type ServerPlayerKill struct {
+	// PlayerID is the ID of the player that has been killed
+	PlayerID uint32 `json:"playerID"`
+	// NPCID is the ID of the NPC that killed the player
+	NPCID uint32 `json:"npcID"`
 }

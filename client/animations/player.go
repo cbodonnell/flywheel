@@ -16,6 +16,7 @@ var (
 	swordsmanAttack1Spritesheet image.Image
 	swordsmanAttack2Spritesheet image.Image
 	swordsmanAttack3Spritesheet image.Image
+	swordsmanDeadSpritesheet    image.Image
 )
 
 func init() {
@@ -46,6 +47,11 @@ func init() {
 	}
 
 	swordsmanAttack3Spritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.PlayerSwordsmanAttack3))
+	if err != nil {
+		panic(fmt.Sprintf("failed to decode image: %v", err))
+	}
+
+	swordsmanDeadSpritesheet, _, err = image.Decode(bytes.NewReader(spritesheets.PlayerSwordsmanDead))
 	if err != nil {
 		panic(fmt.Sprintf("failed to decode image: %v", err))
 	}
@@ -162,6 +168,23 @@ func NewPlayerAttack3Animation() *Animation {
 		FrameHeight: 128,
 		FrameCount:  4,
 		FrameSpeed:  4,
+		ScaleX:      1.0,
+		ScaleY:      1.0,
+		ShiftX:      -32,
+		ShiftY:      0,
+		IsLooping:   false,
+	})
+}
+
+func NewPlayerDeadAnimation() *Animation {
+	return NewAnimation(NewAnimationOptions{
+		Image:       ebiten.NewImageFromImage(swordsmanDeadSpritesheet),
+		FrameOX:     0,
+		FrameOY:     0,
+		FrameWidth:  128,
+		FrameHeight: 128,
+		FrameCount:  3,
+		FrameSpeed:  3,
 		ScaleX:      1.0,
 		ScaleY:      1.0,
 		ShiftX:      -32,

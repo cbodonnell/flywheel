@@ -79,6 +79,20 @@ run-client-remote:
 	-server-udp-port=${FLYWHEEL_SERVER_UDP_PORT} \
 	-auth-server-url=${FLYWHEEL_AUTH_SERVER_URL}
 
+.PHONY: run-client-remote-automation
+run-client-remote-automation:
+	go run \
+	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
+	./cmd/client/main.go \
+	-debug \
+	-log-level=debug \
+	-server-hostname=${FLYWHEEL_SERVER_HOSTNAME} \
+	-server-tcp-port=${FLYWHEEL_SERVER_TCP_PORT} \
+	-server-udp-port=${FLYWHEEL_SERVER_UDP_PORT} \
+	-auth-server-url=${FLYWHEEL_AUTH_SERVER_URL} \
+	-automation-email=${FLYWHEEL_AUTOMATION_EMAIL} \
+	-automation-password=${FLYWHEEL_AUTOMATION_PASSWORD}
+
 .PHONY: container
 container:
 	docker build \

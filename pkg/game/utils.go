@@ -52,6 +52,8 @@ func PlayerStateUpdateFromState(state *types.PlayerState) *messages.PlayerStateU
 		IsAttacking:            state.IsAttacking,
 		Animation:              uint8(state.Animation),
 		AnimationFlip:          state.AnimationFlip,
+		AnimationSequence:      state.AnimationSequence,
+		Hitpoints:              state.Hitpoints,
 	}
 }
 
@@ -66,27 +68,31 @@ func PlayerStateFromServerUpdate(update *messages.PlayerStateUpdate) *types.Play
 		IsAttacking:            update.IsAttacking,
 		Animation:              types.PlayerAnimation(update.Animation),
 		AnimationFlip:          update.AnimationFlip,
+		AnimationSequence:      update.AnimationSequence,
+		Hitpoints:              update.Hitpoints,
 	}
 }
 
 func NPCStateUpdateFromState(state *types.NPCState) *messages.NPCStateUpdate {
 	return &messages.NPCStateUpdate{
-		Position:      state.Position,
-		Velocity:      state.Velocity,
-		IsOnGround:    state.IsOnGround,
-		Animation:     uint8(state.Animation),
-		AnimationFlip: state.AnimationFlip,
-		Hitpoints:     state.Hitpoints,
+		Position:          state.Position,
+		Velocity:          state.Velocity,
+		IsOnGround:        state.IsOnGround,
+		Animation:         uint8(state.Animation),
+		AnimationFlip:     state.AnimationFlip,
+		AnimationSequence: state.AnimationSequence,
+		Hitpoints:         state.Hitpoints,
 	}
 }
 
 func NPCStateFromServerUpdate(update *messages.NPCStateUpdate) *types.NPCState {
 	return &types.NPCState{
-		Position:      update.Position,
-		Velocity:      update.Velocity,
-		IsOnGround:    update.IsOnGround,
-		Animation:     types.NPCAnimation(update.Animation),
-		AnimationFlip: update.AnimationFlip,
-		Hitpoints:     update.Hitpoints,
+		Position:          update.Position,
+		Velocity:          update.Velocity,
+		IsOnGround:        update.IsOnGround,
+		Animation:         types.NPCAnimation(update.Animation),
+		AnimationFlip:     update.AnimationFlip,
+		AnimationSequence: update.AnimationSequence,
+		Hitpoints:         update.Hitpoints,
 	}
 }
