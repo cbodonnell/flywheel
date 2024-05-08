@@ -15,6 +15,14 @@ type Vector struct {
 	Y float64
 }
 
+func NewVector(x float64, y float64) Vector {
+	return Vector{X: x, Y: y}
+}
+
+func ZeroVector() Vector {
+	return Vector{X: 0, Y: 0}
+}
+
 func (v Vector) DistanceFrom(other Vector) float64 {
 	return math.Sqrt(math.Pow(v.X-other.X, 2) + math.Pow(v.Y-other.Y, 2))
 }

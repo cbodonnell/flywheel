@@ -10,6 +10,7 @@ import (
 
 type NPCState struct {
 	// TODO: assess public/private fields
+	ID                uint32
 	SpawnPosition     kinematic.Vector
 	SpawnFlip         bool
 	Position          kinematic.Vector
@@ -22,7 +23,7 @@ type NPCState struct {
 	ResetAnimation    bool
 	Hitpoints         int16
 
-	exists      bool
+	// exists      bool
 	respawnTime float64
 
 	mode         NPCMode
@@ -62,7 +63,7 @@ const (
 	NPCAttack3
 )
 
-func NewNPCState(positionX float64, positionY float64, flip bool) *NPCState {
+func NewNPCState(id uint32, positionX float64, positionY float64, flip bool) *NPCState {
 	spawnPosition := kinematic.Vector{
 		X: positionX,
 		Y: positionY,
@@ -72,11 +73,10 @@ func NewNPCState(positionX float64, positionY float64, flip bool) *NPCState {
 	object.SetShape(resolv.NewRectangle(0, 0, constants.NPCWidth, constants.NPCHeight))
 
 	return &NPCState{
+		ID:            id,
 		SpawnPosition: spawnPosition,
 		SpawnFlip:     flip,
-		AnimationFlip: flip,
 		Object:        object,
-		Hitpoints:     constants.NPCHitpoints,
 	}
 }
 
@@ -97,9 +97,9 @@ func (n *NPCState) Copy() *NPCState {
 	}
 }
 
-func (n *NPCState) Exists() bool {
-	return n.exists
-}
+// func (n *NPCState) Exists() bool {
+// 	return n.exists
+// }
 
 func (n *NPCState) RespawnTime() float64 {
 	return n.respawnTime
@@ -108,44 +108,53 @@ func (n *NPCState) RespawnTime() float64 {
 // Update updates the NPC state based on the current state and the time passed
 // and returns whether the state has changed
 func (n *NPCState) Update(deltaTime float64) (changed bool) {
-	// Attack
-	beforeIsAttacking := n.IsAttacking
-
-	// TODO: roll this into some kind of attack manager
-	if n.AttackTimeLeft > 0 {
-		n.AttackTimeLeft -= deltaTime
-		if !n.DidAttackHit {
-			attackHitTime := 0.0
-			switch n.CurrentAttack {
-			case NPCAttack1:
-				attackHitTime = constants.NPCAttack1Duration - constants.NPCAttack1ChannelTime
-			case NPCAttack2:
-				attackHitTime = constants.NPCAttack2Duration - constants.NPCAttack2ChannelTime
-			case NPCAttack3:
-				attackHitTime = constants.NPCAttack3Duration - constants.NPCAttack3ChannelTime
-			}
-
-			if n.AttackTimeLeft <= attackHitTime {
-				// register the hit only once
-				n.IsAttackHitting = true
-				n.DidAttackHit = true
-			}
+	// Respawn
+	if n.IsDead() {
+		if n.RespawnTime() <= 0 {
+			n.Spawn()
 		} else {
-			n.IsAttackHitting = false
+			n.DecrementRespawnTime(deltaTime)
 		}
-	} else {
-		n.IsAttacking = false
-		n.IsAttackHitting = false
-		n.DidAttackHit = false
 	}
 
-	// Reset the animation sequence if the player is no longer attacking
-	if beforeIsAttacking && !n.IsAttacking {
-		n.ResetAnimation = true
+	// Attack - TODO: roll this into some kind of attack manager
+	if n.IsAttacking {
+		beforeIsAttacking := n.IsAttacking
+
+		if n.AttackTimeLeft > 0 {
+			n.AttackTimeLeft -= deltaTime
+			if !n.DidAttackHit {
+				attackHitTime := 0.0
+				switch n.CurrentAttack {
+				case NPCAttack1:
+					attackHitTime = constants.NPCAttack1Duration - constants.NPCAttack1ChannelTime
+				case NPCAttack2:
+					attackHitTime = constants.NPCAttack2Duration - constants.NPCAttack2ChannelTime
+				case NPCAttack3:
+					attackHitTime = constants.NPCAttack3Duration - constants.NPCAttack3ChannelTime
+				}
+
+				if n.AttackTimeLeft <= attackHitTime {
+					// register the hit only once
+					n.IsAttackHitting = true
+					n.DidAttackHit = true
+				}
+			} else {
+				n.IsAttackHitting = false
+			}
+		} else {
+			n.IsAttacking = false
+			n.IsAttackHitting = false
+			n.DidAttackHit = false
+		}
+
+		// Reset the animation sequence if the player is no longer attacking
+		if beforeIsAttacking && !n.IsAttacking {
+			n.ResetAnimation = true
+		}
 	}
 
 	// Following
-
 	n.UpdateFollowing()
 
 	if !n.IsAttacking && n.IsInAttackRange {
@@ -195,6 +204,12 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 		vx = 0
 	}
 
+	// Update npc state in the X-axis
+	n.Position.X += dx
+	n.Velocity.X = vx
+	n.Object.Position.X = n.Position.X
+	n.Object.Update()
+
 	// Y-axis
 	vy := n.Velocity.Y
 
@@ -210,11 +225,11 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 		isOnGround = true
 	}
 
-	// Update npc state
-	n.Position.X += dx
-	n.Velocity.X = vx
+	// Update npc state in the Y-axis
 	n.Position.Y += dy
 	n.Velocity.Y = vy
+	n.Object.Position.Y = n.Position.Y
+	n.Object.Update()
 	n.IsOnGround = isOnGround
 
 	// Update the npc animation
@@ -223,11 +238,6 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	} else if n.Velocity.X < 0 {
 		n.AnimationFlip = true
 	}
-
-	// Update the npc collision object
-	n.Object.Position.X = n.Position.X
-	n.Object.Position.Y = n.Position.Y
-	n.Object.Update()
 
 	// Animation
 	beforeAnimation := n.Animation
@@ -276,19 +286,26 @@ func (n *NPCState) DecrementRespawnTime(deltaTime float64) {
 }
 
 func (n *NPCState) Spawn() {
-	n.exists = true
 	n.respawnTime = 0
+	n.mode = NPCModeIdle
+	n.followTarget = nil
 
-	n.Position.X = n.SpawnPosition.X
-	n.Position.Y = n.SpawnPosition.Y
-	n.Velocity.X = 0
-	n.Velocity.Y = 0
+	n.Position = kinematic.NewVector(n.SpawnPosition.X, n.SpawnPosition.Y)
+	n.Velocity = kinematic.ZeroVector()
 	n.IsOnGround = false
 
 	n.Hitpoints = constants.NPCHitpoints
 
 	n.AnimationFlip = n.SpawnFlip
 	n.Animation = NPCAnimationIdle
+	n.AnimationSequence = 0
+	n.ResetAnimation = false
+
+	n.IsAttacking = false
+	n.CurrentAttack = NPCAttack1
+	n.AttackTimeLeft = 0
+	n.IsAttackHitting = false
+	n.DidAttackHit = false
 
 	n.Object.Position.X = n.Position.X
 	n.Object.Position.Y = n.Position.Y
@@ -297,7 +314,6 @@ func (n *NPCState) Spawn() {
 
 func (n *NPCState) Despawn() {
 	n.StopFollowing()
-	n.exists = false
 	n.respawnTime = constants.NPCRespawnTime
 }
 

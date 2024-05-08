@@ -121,6 +121,8 @@ func (o *Player) Update() error {
 	inputAttack2 := input.IsAttack2JustPressed()
 	inputAttack3 := input.IsAttack3JustPressed()
 
+	inputRespawn := input.IsRespawnJustPressed()
+
 	cpu := &messages.ClientPlayerUpdate{
 		Timestamp:    time.Now().UnixMilli(),
 		InputX:       inputX,
@@ -129,6 +131,7 @@ func (o *Player) Update() error {
 		InputAttack1: inputAttack1,
 		InputAttack2: inputAttack2,
 		InputAttack3: inputAttack3,
+		InputRespawn: inputRespawn,
 		DeltaTime:    1.0 / float64(ebiten.TPS()),
 		PastUpdates:  o.pastUpdates,
 	}

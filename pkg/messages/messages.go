@@ -91,6 +91,8 @@ type ClientPlayerUpdate struct {
 	InputAttack2 bool `json:"inputAttack2"`
 	// InputAttack3 is the attack 3 input from the client
 	InputAttack3 bool `json:"inputAttack3"`
+	// InputRespawn is the respawn input from the client
+	InputRespawn bool `json:"inputRespawn"`
 	// DeltaTime is the time since the last update as recorded by the client
 	DeltaTime float64 `json:"deltaTime"`
 	// PastUpdates is a list of past updates from the client to

@@ -115,40 +115,49 @@ func (p *PlayerState) Copy() *PlayerState {
 func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate) (changed bool) {
 	p.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
 
-	// Attack
-	beforeIsAttacking := p.IsAttacking
-
-	// TODO: roll this into some kind of attack manager
-	if p.AttackTimeLeft > 0 {
-		p.AttackTimeLeft -= clientPlayerUpdate.DeltaTime
-		if !p.DidAttackHit {
-			attackHitTime := 0.0
-			switch p.CurrentAttack {
-			case PlayerAttack1:
-				attackHitTime = constants.PlayerAttack1Duration - constants.PlayerAttack1ChannelTime
-			case PlayerAttack2:
-				attackHitTime = constants.PlayerAttack2Duration - constants.PlayerAttack2ChannelTime
-			case PlayerAttack3:
-				attackHitTime = constants.PlayerAttack3Duration - constants.PlayerAttack3ChannelTime
-			}
-
-			if p.AttackTimeLeft <= attackHitTime {
-				// register the hit only once
-				p.IsAttackHitting = true
-				p.DidAttackHit = true
-			}
-		} else {
-			p.IsAttackHitting = false
+	// Respawn
+	if p.IsDead() {
+		// TODO: handle respawn input
+		if clientPlayerUpdate.InputRespawn {
+			p.Respawn(kinematic.NewVector(constants.PlayerStartingX, constants.PlayerStartingY))
 		}
-	} else {
-		p.IsAttacking = false
-		p.IsAttackHitting = false
-		p.DidAttackHit = false
 	}
 
-	// Reset the animation sequence if the player is no longer attacking
-	if beforeIsAttacking && !p.IsAttacking {
-		p.ResetAnimation = true
+	// Attack - TODO: roll this into some kind of attack manager
+	if p.IsAttacking {
+		beforeIsAttacking := p.IsAttacking
+
+		if p.AttackTimeLeft > 0 {
+			p.AttackTimeLeft -= clientPlayerUpdate.DeltaTime
+			if !p.DidAttackHit {
+				attackHitTime := 0.0
+				switch p.CurrentAttack {
+				case PlayerAttack1:
+					attackHitTime = constants.PlayerAttack1Duration - constants.PlayerAttack1ChannelTime
+				case PlayerAttack2:
+					attackHitTime = constants.PlayerAttack2Duration - constants.PlayerAttack2ChannelTime
+				case PlayerAttack3:
+					attackHitTime = constants.PlayerAttack3Duration - constants.PlayerAttack3ChannelTime
+				}
+
+				if p.AttackTimeLeft <= attackHitTime {
+					// register the hit only once
+					p.IsAttackHitting = true
+					p.DidAttackHit = true
+				}
+			} else {
+				p.IsAttackHitting = false
+			}
+		} else {
+			p.IsAttacking = false
+			p.IsAttackHitting = false
+			p.DidAttackHit = false
+		}
+
+		// Reset the animation sequence if the player is no longer attacking
+		if beforeIsAttacking && !p.IsAttacking {
+			p.ResetAnimation = true
+		}
 	}
 
 	if !p.IsAttacking && !p.IsDead() {
@@ -181,12 +190,17 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		vx = kinematic.FinalVelocity(p.Velocity.X, clientPlayerUpdate.DeltaTime, 0)
 	}
 
-	// TODO: fix edge case when player hits top corner of a platform
 	// Check for collisions
 	if collision := p.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
 		dx = collision.ContactWithCell(collision.Cells[0]).X
 		vx = 0
 	}
+
+	// Update player state in the X-axis
+	p.Position.X += dx
+	p.Velocity.X = vx
+	p.Object.Position.X = p.Position.X
+	p.Object.Update()
 
 	// Y-axis
 	// Apply input
@@ -207,11 +221,11 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		isOnGround = true
 	}
 
-	// Update player state
-	p.Position.X += dx
-	p.Velocity.X = vx
+	// Update player state in the Y-axis
 	p.Position.Y += dy
 	p.Velocity.Y = vy
+	p.Object.Position.Y = p.Position.Y
+	p.Object.Update()
 	p.IsOnGround = isOnGround
 
 	// Update the player animation
@@ -222,11 +236,6 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 			p.AnimationFlip = true
 		}
 	}
-
-	// Update the player collision object
-	p.Object.Position.X = p.Position.X
-	p.Object.Position.Y = p.Position.Y
-	p.Object.Update()
 
 	// Animation
 	beforeAnimation := p.Animation
@@ -244,7 +253,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		if p.IsDead() {
 			p.Animation = PlayerAnimationDead
 		} else {
-			if isOnGround {
+			if p.IsOnGround {
 				if clientPlayerUpdate.InputX != 0 {
 					p.Animation = PlayerAnimationRun
 				} else {
@@ -278,4 +287,26 @@ func (p *PlayerState) TakeDamage(damage int16) {
 // IsDead returns true if the player's hitpoints are less than or equal to zero
 func (p *PlayerState) IsDead() bool {
 	return p.Hitpoints <= 0
+}
+
+// Respawns the player at the given position
+func (p *PlayerState) Respawn(position kinematic.Vector) {
+	p.Position = position
+	p.Velocity = kinematic.ZeroVector()
+	p.Hitpoints = constants.PlayerHitpoints
+
+	p.IsAttacking = false
+	p.CurrentAttack = PlayerAttack1
+	p.AttackTimeLeft = 0
+	p.IsAttackHitting = false
+	p.DidAttackHit = false
+
+	p.Animation = PlayerAnimationIdle
+	p.AnimationFlip = false
+	p.AnimationSequence = 0
+	p.ResetAnimation = false
+
+	p.Object.Position.X = p.Position.X
+	p.Object.Position.Y = p.Position.Y
+	p.Object.Update()
 }
