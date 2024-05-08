@@ -116,11 +116,8 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	p.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
 
 	// Respawn
-	if p.IsDead() {
-		// TODO: handle respawn input
-		if clientPlayerUpdate.InputRespawn {
-			p.Respawn(kinematic.NewVector(constants.PlayerStartingX, constants.PlayerStartingY))
-		}
+	if p.IsDead() && clientPlayerUpdate.InputRespawn {
+		p.Respawn(kinematic.NewVector(constants.PlayerStartingX, constants.PlayerStartingY))
 	}
 
 	// Attack - TODO: roll this into some kind of attack manager
