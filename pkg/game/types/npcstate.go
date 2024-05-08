@@ -308,7 +308,6 @@ func (n *NPCState) Spawn() {
 }
 
 func (n *NPCState) Despawn() {
-	n.StopFollowing()
 	n.respawnTime = constants.NPCRespawnTime
 }
 
@@ -329,6 +328,11 @@ func (n *NPCState) IsFollowing() bool {
 
 func (n *NPCState) UpdateFollowing() {
 	if n.followTarget == nil {
+		n.StopFollowing()
+		return
+	}
+
+	if n.IsDead() {
 		n.StopFollowing()
 		return
 	}
