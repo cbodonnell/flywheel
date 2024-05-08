@@ -23,7 +23,6 @@ type NPCState struct {
 	ResetAnimation    bool
 	Hitpoints         int16
 
-	// exists      bool
 	respawnTime float64
 
 	mode         NPCMode
@@ -96,10 +95,6 @@ func (n *NPCState) Copy() *NPCState {
 		Hitpoints:         n.Hitpoints,
 	}
 }
-
-// func (n *NPCState) Exists() bool {
-// 	return n.exists
-// }
 
 func (n *NPCState) RespawnTime() float64 {
 	return n.respawnTime
