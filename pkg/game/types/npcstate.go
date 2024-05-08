@@ -1,7 +1,7 @@
 package types
 
 import (
-	mathrand "math/rand"
+	"math/rand"
 
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	"github.com/cbodonnell/flywheel/pkg/kinematic"
@@ -9,6 +9,7 @@ import (
 )
 
 type NPCState struct {
+	// TODO: assess public/private fields
 	SpawnPosition     kinematic.Vector
 	SpawnFlip         bool
 	Position          kinematic.Vector
@@ -150,7 +151,7 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	if !n.IsAttacking && n.IsInAttackRange {
 		n.IsAttacking = true
 		// randomly choose an attack
-		attack := mathrand.Intn(3)
+		attack := rand.Intn(3)
 		switch attack {
 		case 0:
 			n.CurrentAttack = NPCAttack1

@@ -11,7 +11,7 @@ func NewCollisionSpace() *resolv.Space {
 	cellWidth, cellHeight := 16, 16
 
 	levelObjects := []*resolv.Object{
-		// valls
+		// walls
 		resolv.NewObject(0, 0, float64(spaceWidth), float64(cellHeight), types.CollisionSpaceTagLevel),
 		resolv.NewObject(0, float64(spaceHeight-cellHeight), float64(spaceWidth), float64(cellHeight), types.CollisionSpaceTagLevel),
 		resolv.NewObject(0, float64(cellHeight), float64(cellWidth), float64(spaceHeight-cellHeight*2), types.CollisionSpaceTagLevel),
