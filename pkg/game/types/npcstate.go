@@ -26,7 +26,7 @@ type NPCState struct {
 	respawnTime float64
 
 	mode         NPCMode
-	followTarget *PlayerState
+	FollowTarget *PlayerState
 
 	IsInAttackRange bool
 	IsAttacking     bool
@@ -176,16 +176,16 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	vx := 0.0
 	if !n.IsAttacking {
 		if n.IsFollowing() {
-			if n.followTarget.Position.X < n.Position.X {
+			if n.FollowTarget.Position.X < n.Position.X {
 				vx = -constants.NPCSpeed
-			} else if n.followTarget.Position.X > n.Position.X {
+			} else if n.FollowTarget.Position.X > n.Position.X {
 				vx = constants.NPCSpeed
 			}
 			dx = kinematic.Displacement(vx, deltaTime, 0)
 			vx = kinematic.FinalVelocity(vx, deltaTime, 0)
 
-			if n.followTarget.Position.X < n.Position.X && n.Position.X+dx < n.followTarget.Position.X ||
-				n.followTarget.Position.X > n.Position.X && n.Position.X+dx > n.followTarget.Position.X {
+			if n.FollowTarget.Position.X < n.Position.X && n.Position.X+dx < n.FollowTarget.Position.X ||
+				n.FollowTarget.Position.X > n.Position.X && n.Position.X+dx > n.FollowTarget.Position.X {
 				// handle edge case where npc is directly on top of player and oscillates
 				dx = 0
 			}
@@ -283,7 +283,7 @@ func (n *NPCState) DecrementRespawnTime(deltaTime float64) {
 func (n *NPCState) Spawn() {
 	n.respawnTime = 0
 	n.mode = NPCModeIdle
-	n.followTarget = nil
+	n.FollowTarget = nil
 
 	n.Position = kinematic.NewVector(n.SpawnPosition.X, n.SpawnPosition.Y)
 	n.Velocity = kinematic.ZeroVector()
@@ -313,12 +313,12 @@ func (n *NPCState) Despawn() {
 
 func (n *NPCState) StartFollowing(target *PlayerState) {
 	n.mode = NPCModeFollow
-	n.followTarget = target
+	n.FollowTarget = target
 }
 
 func (n *NPCState) StopFollowing() {
 	n.mode = NPCModeIdle
-	n.followTarget = nil
+	n.FollowTarget = nil
 	n.IsInAttackRange = false
 }
 
@@ -327,7 +327,7 @@ func (n *NPCState) IsFollowing() bool {
 }
 
 func (n *NPCState) UpdateFollowing() {
-	if n.followTarget == nil {
+	if n.FollowTarget == nil {
 		n.StopFollowing()
 		return
 	}
@@ -337,19 +337,19 @@ func (n *NPCState) UpdateFollowing() {
 		return
 	}
 
-	if n.followTarget.IsDead() {
+	if n.FollowTarget.IsDead() {
 		n.StopFollowing()
 		return
 	}
 
 	// check if the npc is too far from the player
-	if n.Position.DistanceFrom(n.followTarget.Position) > 2*constants.NPCLineOfSight {
+	if n.Position.DistanceFrom(n.FollowTarget.Position) > 2*constants.NPCLineOfSight {
 		n.StopFollowing()
 		return
 	}
 
 	// check if the npc has a direct line of sight to the player
-	lineOfSight := resolv.NewLine(n.Position.X+constants.NPCWidth/2, n.Position.Y+constants.NPCHeight/2, n.followTarget.Position.X+constants.PlayerWidth/2, n.followTarget.Position.Y+constants.PlayerHeight/2)
+	lineOfSight := resolv.NewLine(n.Position.X+constants.NPCWidth/2, n.Position.Y+constants.NPCHeight/2, n.FollowTarget.Position.X+constants.PlayerWidth/2, n.FollowTarget.Position.Y+constants.PlayerHeight/2)
 	for _, obj := range n.Object.Space.Objects() {
 		if !obj.HasTags(CollisionSpaceTagLevel) {
 			continue
@@ -365,7 +365,7 @@ func (n *NPCState) UpdateFollowing() {
 	if n.AnimationFlip {
 		flip = -1.0
 	}
-	xDistance := n.followTarget.Position.X - n.Position.X
+	xDistance := n.FollowTarget.Position.X - n.Position.X
 	if flip*xDistance > 0 && flip*xDistance < constants.NPCAttackRange {
 		n.IsInAttackRange = true
 	} else {

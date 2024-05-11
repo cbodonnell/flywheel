@@ -176,6 +176,12 @@ func (gm *GameManager) handleDisconnectPlayerEvent(event *types.DisconnectPlayer
 	gm.savePlayerStateChan <- saveRequest
 	// remove the player object from the collision space
 	gm.gameState.CollisionSpace.Remove(gm.gameState.Players[event.ClientID].Object)
+	// npc follow target cleanup
+	for _, npcState := range gm.gameState.NPCs {
+		if npcState.FollowTarget == gm.gameState.Players[event.ClientID] {
+			npcState.StopFollowing()
+		}
+	}
 	// delete the player from the game state
 	delete(gm.gameState.Players, event.ClientID)
 
