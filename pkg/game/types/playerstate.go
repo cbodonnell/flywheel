@@ -251,7 +251,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 			p.Animation = PlayerAnimationDead
 		} else {
 			if p.IsOnGround {
-				if clientPlayerUpdate.InputX != 0 {
+				if p.Velocity.X != 0 {
 					p.Animation = PlayerAnimationRun
 				} else {
 					p.Animation = PlayerAnimationIdle

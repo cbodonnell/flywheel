@@ -1,6 +1,15 @@
 package constants
 
 const (
+	// SpaceWidth is the width of the game space
+	SpaceWidth int = 1280
+	// SpaceHeight is the height of the game space
+	SpaceHeight int = 480
+	// CellWidth is the width of a cell in the collision space
+	CellWidth int = 16
+	// CellHeight is the height of a cell in the collision space
+	CellHeight int = 16
+
 	// PlayerSpeed is the speed at which players move
 	PlayerSpeed float64 = 350.0
 	// PlayerJumpSpeed is the speed at which players jump
@@ -67,6 +76,10 @@ const (
 	NPCLineOfSight float64 = 320.0
 	// NPC Attack Range
 	NPCAttackRange float64 = 48.0
+	// NPC Wander Range
+	NPCWanderRange float64 = 512.0
+	// NPC Max Idle Time
+	NPCMaxIdleTime float64 = 5.0
 
 	// NPCAttack1Duration is the duration of the attack (channel time + cooldown time)
 	NPCAttack1Duration float64 = 1.4 // seconds

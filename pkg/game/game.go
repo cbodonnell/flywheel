@@ -8,6 +8,7 @@ import (
 
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	"github.com/cbodonnell/flywheel/pkg/game/types"
+	"github.com/cbodonnell/flywheel/pkg/kinematic"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/network"
@@ -80,17 +81,30 @@ func (gm *GameManager) Stop() {
 }
 
 func (gm *GameManager) initializeGameState(_ context.Context) error {
-	npcs := []*types.NPCState{
-		types.NewNPCState(1, 128.0-constants.NPCWidth/2, 16.0, false),
-		types.NewNPCState(2, 384.0-constants.NPCWidth/2, 16.0, false),
-		types.NewNPCState(3, 896.0-constants.NPCWidth/2, 16.0, true),
-		types.NewNPCState(4, 1152.0-constants.NPCWidth/2, 16.0, true),
+	npcs := []struct {
+		ID            uint32
+		SpawnPosition kinematic.Vector
+		Flip          bool
+	}{
+		{1, kinematic.NewVector(128-constants.NPCWidth/2, 16), false},
+		{2, kinematic.NewVector(384-constants.NPCWidth/2, 16), false},
+		{3, kinematic.NewVector(896-constants.NPCWidth/2, 16), true},
+		{4, kinematic.NewVector(1152-constants.NPCWidth/2, 16), true},
 	}
 
 	for _, npc := range npcs {
-		gm.gameState.NPCs[npc.ID] = npc
-		gm.gameState.CollisionSpace.Add(npc.Object)
-		npc.Spawn()
+		wanderRangeMinX := npc.SpawnPosition.X - constants.NPCWanderRange
+		if wanderRangeMinX < 16 {
+			wanderRangeMinX = 16
+		}
+		wanderRangeMaxX := npc.SpawnPosition.X + constants.NPCWanderRange
+		if wanderRangeMaxX > float64(constants.SpaceWidth)-16-constants.NPCWidth {
+			wanderRangeMaxX = float64(constants.SpaceWidth) - 16 - constants.NPCWidth
+		}
+		npcState := types.NewNPCState(npc.ID, npc.SpawnPosition, wanderRangeMinX, wanderRangeMaxX, npc.Flip)
+		gm.gameState.NPCs[npc.ID] = npcState
+		gm.gameState.CollisionSpace.Add(npcState.Object)
+		npcState.Spawn()
 	}
 
 	return nil
