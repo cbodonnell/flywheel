@@ -13,6 +13,8 @@ type NPCState struct {
 	ID                uint32
 	SpawnPosition     kinematic.Vector
 	SpawnFlip         bool
+	WanderRangeMin    kinematic.Vector
+	WanderRangeMax    kinematic.Vector
 	Position          kinematic.Vector
 	Velocity          kinematic.Vector
 	Object            *resolv.Object
@@ -26,6 +28,8 @@ type NPCState struct {
 	respawnTime float64
 
 	mode         NPCMode
+	IdleTimeLeft float64
+	WanderTarget *kinematic.Vector
 	FollowTarget *PlayerState
 
 	IsInAttackRange bool
@@ -51,6 +55,7 @@ type NPCMode uint8
 
 const (
 	NPCModeIdle NPCMode = iota
+	NPCModeWander
 	NPCModeFollow
 )
 
@@ -62,20 +67,23 @@ const (
 	NPCAttack3
 )
 
-func NewNPCState(id uint32, positionX float64, positionY float64, flip bool) *NPCState {
-	spawnPosition := kinematic.Vector{
-		X: positionX,
-		Y: positionY,
-	}
-
-	object := resolv.NewObject(positionX, positionY, constants.NPCWidth, constants.NPCHeight, CollisionSpaceTagNPC)
+func NewNPCState(id uint32, spawnPosition kinematic.Vector, wanderRangeMinX, wanderRangeMaxX float64, flip bool) *NPCState {
+	object := resolv.NewObject(spawnPosition.X, spawnPosition.Y, constants.NPCWidth, constants.NPCHeight, CollisionSpaceTagNPC)
 	object.SetShape(resolv.NewRectangle(0, 0, constants.NPCWidth, constants.NPCHeight))
 
 	return &NPCState{
 		ID:            id,
 		SpawnPosition: spawnPosition,
 		SpawnFlip:     flip,
-		Object:        object,
+		WanderRangeMin: kinematic.Vector{
+			X: wanderRangeMinX,
+			Y: spawnPosition.Y,
+		},
+		WanderRangeMax: kinematic.Vector{
+			X: wanderRangeMaxX,
+			Y: spawnPosition.Y,
+		},
+		Object: object,
 	}
 }
 
@@ -150,7 +158,14 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	}
 
 	// Following
-	n.UpdateFollowing()
+	if n.IsFollowing() {
+		n.UpdateFollowing()
+	}
+
+	// Wandering
+	if n.IsWandering() {
+		n.UpdateWandering(deltaTime)
+	}
 
 	if !n.IsAttacking && n.IsInAttackRange {
 		n.IsAttacking = true
@@ -172,9 +187,8 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	// Movement
 
 	// X-axis
-	dx := 0.0
-	vx := 0.0
-	if !n.IsAttacking {
+	var dx, vx float64
+	if !n.IsAttacking && !n.IsDead() {
 		if n.IsFollowing() {
 			if n.FollowTarget.Position.X < n.Position.X {
 				vx = -constants.NPCSpeed
@@ -187,10 +201,22 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 			if n.FollowTarget.Position.X < n.Position.X && n.Position.X+dx < n.FollowTarget.Position.X ||
 				n.FollowTarget.Position.X > n.Position.X && n.Position.X+dx > n.FollowTarget.Position.X {
 				// handle edge case where npc is directly on top of player and oscillates
-				dx = 0
+				dx, vx = 0, 0
+			}
+		} else if n.IsWandering() {
+			// move towards the wander target
+			dx = kinematic.MoveTowards(constants.NPCSpeed, deltaTime, 0, n.WanderTarget.X, n.Position.X)
+			vx = kinematic.FinalVelocity(constants.NPCSpeed, deltaTime, 0)
+			if dx < 0 {
+				vx = -vx
+			}
+		} else {
+			// idle for some period of time before wandering
+			n.IdleTimeLeft -= deltaTime
+			if n.IdleTimeLeft <= 0 {
+				n.StartWandering()
 			}
 		}
-		// TODO: else wander
 	}
 
 	// Check for collisions
@@ -250,7 +276,7 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 		if n.IsDead() {
 			n.Animation = NPCAnimationDead
 		} else {
-			if n.mode == NPCModeFollow {
+			if n.Velocity.X != 0 {
 				n.Animation = NPCAnimationWalk
 			} else {
 				n.Animation = NPCAnimationIdle
@@ -283,6 +309,7 @@ func (n *NPCState) DecrementRespawnTime(deltaTime float64) {
 func (n *NPCState) Spawn() {
 	n.respawnTime = 0
 	n.mode = NPCModeIdle
+	n.IdleTimeLeft = rand.Float64() * constants.NPCMaxIdleTime
 	n.FollowTarget = nil
 
 	n.Position = kinematic.NewVector(n.SpawnPosition.X, n.SpawnPosition.Y)
@@ -311,15 +338,33 @@ func (n *NPCState) Despawn() {
 	n.respawnTime = constants.NPCRespawnTime
 }
 
+func (n *NPCState) IsWandering() bool {
+	return n.mode == NPCModeWander
+}
+
+func (n *NPCState) StartWandering() {
+	n.mode = NPCModeWander
+	n.WanderTarget = &kinematic.Vector{
+		X: rand.Float64()*(n.WanderRangeMax.X-n.WanderRangeMin.X) + n.WanderRangeMin.X,
+		Y: n.Position.Y,
+	}
+}
+
+func (n *NPCState) StopWandering() {
+	n.mode = NPCModeIdle
+	n.WanderTarget = nil
+	n.IdleTimeLeft = rand.Float64() * constants.NPCMaxIdleTime
+}
+
 func (n *NPCState) StartFollowing(target *PlayerState) {
 	n.mode = NPCModeFollow
 	n.FollowTarget = target
 }
 
 func (n *NPCState) StopFollowing() {
-	n.mode = NPCModeIdle
 	n.FollowTarget = nil
 	n.IsInAttackRange = false
+	n.StartWandering()
 }
 
 func (n *NPCState) IsFollowing() bool {
@@ -327,11 +372,6 @@ func (n *NPCState) IsFollowing() bool {
 }
 
 func (n *NPCState) UpdateFollowing() {
-	if n.FollowTarget == nil {
-		n.StopFollowing()
-		return
-	}
-
 	if n.IsDead() {
 		n.StopFollowing()
 		return
@@ -370,5 +410,17 @@ func (n *NPCState) UpdateFollowing() {
 		n.IsInAttackRange = true
 	} else {
 		n.IsInAttackRange = false
+	}
+}
+
+func (n *NPCState) UpdateWandering(deltaTime float64) {
+	if n.IsDead() {
+		n.StopWandering()
+		return
+	}
+
+	if n.Position.Equals(*n.WanderTarget) {
+		n.StopWandering()
+		return
 	}
 }

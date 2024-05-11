@@ -1,14 +1,15 @@
 package game
 
 import (
+	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	"github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/solarlune/resolv"
 )
 
 // TODO: make this dynamic
 func NewCollisionSpace() *resolv.Space {
-	spaceWidth, spaceHeight := 1280, 480
-	cellWidth, cellHeight := 16, 16
+	spaceWidth, spaceHeight := constants.SpaceWidth, constants.SpaceHeight
+	cellWidth, cellHeight := constants.CellWidth, constants.CellHeight
 
 	levelObjects := []*resolv.Object{
 		// walls
