@@ -3,9 +3,9 @@ services:
   flywheel-db:
     image: postgres
     environment:
-      POSTGRES_USER: flywheel_user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: flywheel_db
+      POSTGRES_USER: ${FLYWHEEL_DB_USER:-flywheel_user}
+      POSTGRES_PASSWORD: ${FLYWHEEL_DB_PASSWORD:-password}
+      POSTGRES_DB: ${FLYWHEEL_DB_NAME:-flywheel_db}
     volumes:
       - flywheel-db:/var/lib/postgresql/data
       - ./migrations/postgres:/docker-entrypoint-initdb.d
@@ -19,17 +19,28 @@ services:
     networks:
       - flywheel-network
 
-  flywheel:
+  flywheel-auth:
     build:
       context: .
-      dockerfile: ./deploy/Dockerfile
-    command: ["./flywheel", "-log-level", "debug"]
+      dockerfile: ./deploy/Dockerfile.auth
+    command: ["./flywheel-auth", "-log-level", "debug"]
     environment:
-      FLYWHEEL_DATABASE_URL: ${FLYWHEEL_DATABASE_URL:-postgresql://flywheel_user:password@flywheel-db:5432/flywheel_db}
-      FLYWHEEL_FIREBASE_PROJECT_ID: ${FLYWHEEL_FIREBASE_PROJECT_ID}
       FLYWHEEL_FIREBASE_API_KEY: ${FLYWHEEL_FIREBASE_API_KEY}
     ports:
       - 8080:8080/tcp
+    networks:
+      - flywheel-network
+    restart: on-failure
+
+  flywheel-game:
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile.game
+    command: ["./flywheel-game", "-log-level", "debug"]
+    environment:
+      FLYWHEEL_DATABASE_URL: ${FLYWHEEL_DATABASE_URL:-postgresql://flywheel_user:password@flywheel-db:5432/flywheel_db}
+      FLYWHEEL_FIREBASE_PROJECT_ID: ${FLYWHEEL_FIREBASE_PROJECT_ID}
+    ports:
       - 8888:8888/tcp
       - 8889:8889/udp
     networks:

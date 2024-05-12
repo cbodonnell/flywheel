@@ -34,6 +34,18 @@ build:
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
 	-o ./bin/flywheel ./cmd/server/main.go
 
+.PHONY: build-auth
+build-auth:
+	go build \
+	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
+	-o ./bin/flywheel-auth ./cmd/server/auth/main.go
+
+.PHONY: build-game
+build-game:
+	go build \
+	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
+	-o ./bin/flywheel-game ./cmd/server/game/main.go
+
 .PHONY: build-client
 build-client:
 	go build \
