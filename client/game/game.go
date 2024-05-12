@@ -110,14 +110,15 @@ func (g *Game) loadMenu() error {
 		return nil
 	}
 
-	menu, err := scenes.NewMenuScene(scenes.MenuSceneOptions{
+	menuSceneCallbacks := scenes.MenuSceneCallbacks{
 		OnLogin: func(email, password string) {
 			// TODO: this blocks the main thread
 			if err := g.login(email, password); err != nil {
 				log.Error("Failed to start game: %v", err)
 			}
 		},
-	})
+	}
+	menu, err := scenes.NewMenuScene(menuSceneCallbacks)
 	if err != nil {
 		return fmt.Errorf("failed to create menu scene: %v", err)
 	}
@@ -133,6 +134,8 @@ func (g *Game) login(email, password string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get ID token: %v", err)
 	}
+
+	// TODO: load character selection/creation scene here
 
 	if err := g.networkManager.Start(idToken); err != nil {
 		log.Error("Failed to start network manager: %v", err)

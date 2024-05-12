@@ -14,29 +14,30 @@ import (
 type MenuScene struct {
 	*BaseScene
 
-	ui *ebitenui.UI
+	callbacks MenuSceneCallbacks
+	ui        *ebitenui.UI
+}
+
+type MenuSceneCallbacks struct {
+	// OnLogin is called when the start game button is pressed.
+	OnLogin func(email, password string)
 }
 
 var _ Scene = &MenuScene{}
 
-type MenuSceneOptions struct {
-	// OnLogin is called when the start game button is pressed.
-	OnLogin func(email, password string)
-}
-
-func NewMenuScene(opts MenuSceneOptions) (Scene, error) {
+func NewMenuScene(callbacks MenuSceneCallbacks) (Scene, error) {
 	return &MenuScene{
 		BaseScene: NewBaseScene(objects.NewBaseObject("menu-root", nil)),
-		ui:        initUI(InitUIOptions(opts)),
+		callbacks: callbacks,
 	}, nil
 }
 
-type InitUIOptions struct {
-	// OnLogin is called when the start game button is pressed.
-	OnLogin func(email, password string)
+func (s *MenuScene) Init() error {
+	s.ui = s.initUI()
+	return s.BaseScene.Init()
 }
 
-func initUI(opts InitUIOptions) *ebitenui.UI {
+func (s *MenuScene) initUI() *ebitenui.UI {
 	buttonImage := &widget.ButtonImage{
 		Idle:    image.NewNineSliceColor(color.NRGBA{R: 170, G: 170, B: 180, A: 255}),
 		Hover:   image.NewNineSliceColor(color.NRGBA{R: 135, G: 135, B: 150, A: 255}),
@@ -142,7 +143,7 @@ func initUI(opts InitUIOptions) *ebitenui.UI {
 		if email == "" || password == "" {
 			return
 		}
-		opts.OnLogin(email, password)
+		s.callbacks.OnLogin(email, password)
 	}
 	emailTextInput.SubmitEvent.AddHandler(loginHandler)
 	passwordTextInput.SubmitEvent.AddHandler(loginHandler)
