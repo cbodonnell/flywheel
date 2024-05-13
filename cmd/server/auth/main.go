@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -12,7 +13,7 @@ import (
 )
 
 func main() {
-	authPort := flag.Int("auth-port", 8080, "Auth server port")
+	port := flag.Int("port", 8080, "port to listen on")
 	logLevel := flag.String("log-level", "info", "Log level")
 	flag.Parse()
 
@@ -26,23 +27,30 @@ func main() {
 	log.Info("Log level set to %s", parsedLogLevel)
 
 	log.Info("Starting auth server version %s", version.Get())
+	ctx := context.Background()
 
 	firebaseApiKey := os.Getenv("FLYWHEEL_FIREBASE_API_KEY")
 	if firebaseApiKey == "" {
 		panic("FLYWHEEL_FIREBASE_API_KEY environment variable must be set")
 	}
 	authServerOpts := auth.NewAuthServerOptions{
-		Port:    *authPort,
+		Port:    *port,
 		Handler: authhandlers.NewFirebaseAuthHandler(firebaseApiKey),
 	}
-	tlsCertFile := os.Getenv("FLYWHEEL_TLS_CERT_FILE")
-	tlsKeyFile := os.Getenv("FLYWHEEL_TLS_KEY_FILE")
+	tlsCertFile := os.Getenv("FLYWHEEL_AUTH_TLS_CERT_FILE")
+	tlsKeyFile := os.Getenv("FLYWHEEL_AUTH_TLS_KEY_FILE")
 	if tlsCertFile != "" && tlsKeyFile != "" {
 		authServerOpts.TLS = &auth.TLSConfig{
 			CertFile: tlsCertFile,
 			KeyFile:  tlsKeyFile,
 		}
 	}
-	authServer := auth.NewAuthServer(authServerOpts)
-	authServer.Start()
+	server := auth.NewAuthServer(authServerOpts)
+	go server.Start()
+
+	interrupt := make(chan os.Signal, 1)
+	<-interrupt
+	if err := server.Stop(ctx); err != nil {
+		log.Error("Failed to stop server: %v", err)
+	}
 }

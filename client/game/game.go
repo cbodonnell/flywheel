@@ -6,13 +6,16 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/client/scenes"
 	authhandlers "github.com/cbodonnell/flywheel/pkg/auth/handlers"
 	"github.com/cbodonnell/flywheel/pkg/log"
+	"github.com/cbodonnell/flywheel/pkg/repositories/models"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
@@ -21,8 +24,11 @@ import (
 type Game struct {
 	// debug is a boolean value indicating whether debug mode is enabled.
 	debug bool
-	// authURL is the URL of the authentication server.
-	authURL string
+	// TODO: make auth and api clients to pass in
+	// auth is the game authentication configuration.
+	auth GameAuth
+	// api is the game API configuration.
+	api GameAPI
 	// networkManager is the network manager.
 	networkManager *network.NetworkManager
 	// gameAutomation is the game automation configuration.
@@ -33,8 +39,22 @@ type Game struct {
 	scene scenes.Scene
 }
 
+type GameAuth struct {
+	URL          string
+	Email        string
+	Password     string
+	IDToken      string
+	IDTokenExp   time.Time
+	RefreshToken string
+}
+
+type GameAPI struct {
+	URL string
+}
+
 const (
 	DefaultAuthServerURL = "http://localhost:8080"
+	DefaultAPIServerURL  = "http://localhost:9090"
 )
 
 type GameMode int
@@ -63,6 +83,7 @@ func (m GameMode) String() string {
 type NewGameOptions struct {
 	Debug          bool
 	AuthURL        string
+	APIURL         string
 	NetworkManager *network.NetworkManager
 	GameAutomation *GameAutomation
 }
@@ -74,8 +95,13 @@ type GameAutomation struct {
 
 func NewGame(opts NewGameOptions) (ebiten.Game, error) {
 	g := &Game{
-		debug:          opts.Debug,
-		authURL:        opts.AuthURL,
+		debug: opts.Debug,
+		auth: GameAuth{
+			URL: opts.AuthURL,
+		},
+		api: GameAPI{
+			URL: opts.APIURL,
+		},
 		networkManager: opts.NetworkManager,
 		gameAutomation: opts.GameAutomation,
 	}
@@ -130,58 +156,260 @@ func (g *Game) loadMenu() error {
 }
 
 func (g *Game) login(email, password string) error {
-	idToken, err := g.getIDToken(email, password)
-	if err != nil {
-		return fmt.Errorf("failed to get ID token: %v", err)
+	g.setEmailPassword(email, password)
+
+	if err := g.refreshIDToken(); err != nil {
+		return fmt.Errorf("failed to refresh ID token: %v", err)
 	}
 
-	// TODO: load character selection/creation scene here
-
-	if err := g.networkManager.Start(idToken); err != nil {
-		log.Error("Failed to start network manager: %v", err)
-		if err := g.loadNetworkError(); err != nil {
-			return fmt.Errorf("failed to load network error scene: %v", err)
-		}
-		return nil
-	}
-
-	if err := g.loadGame(); err != nil {
-		return fmt.Errorf("failed to load game scene: %v", err)
+	if err := g.loadCharacterSelection(); err != nil {
+		return fmt.Errorf("failed to load character selection scene: %v", err)
 	}
 
 	return nil
 }
 
-func (g *Game) getIDToken(email, password string) (string, error) {
+func (g *Game) setEmailPassword(email, password string) {
+	g.auth.Email = email
+	g.auth.Password = password
+}
+
+func (g *Game) refreshIDToken() error {
+	if g.auth.IDToken != "" {
+		if time.Now().Before(g.auth.IDTokenExp) {
+			// we have a valid token
+			return nil
+		} else if g.auth.RefreshToken != "" {
+			log.Debug("Token expired, refreshing")
+			// we have a refresh token
+			if err := g.getIDTokenWithRefreshToken(); err == nil {
+				return nil
+			} else {
+				// failed to refresh token, fall back to email/password
+				log.Error("Failed to refresh token: %v", err)
+			}
+		}
+	}
+
+	if g.auth.Email == "" || g.auth.Password == "" {
+		return fmt.Errorf("email and password are required")
+	}
+
+	log.Debug("Getting ID token with email/password")
+	err := g.getIDTokenWithEmailPassword()
+	if err != nil {
+		return fmt.Errorf("failed to get ID token: %v", err)
+	}
+
+	return nil
+}
+
+func (g *Game) getIDTokenWithEmailPassword() error {
 	values := url.Values{}
-	values.Set("email", email)
-	values.Set("password", password)
+	values.Set("email", g.auth.Email)
+	values.Set("password", g.auth.Password)
 	requestBody := strings.NewReader(values.Encode())
 
-	req, err := http.NewRequest("POST", g.authURL+"/login", requestBody)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/login", g.auth.URL), requestBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to create login request: %v", err)
+		return fmt.Errorf("failed to create login request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	client := http.DefaultClient
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to send login request: %v", err)
+		return fmt.Errorf("failed to send login request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("failed to login: status: %s, body: %s", resp.Status, string(b))
+		return fmt.Errorf("failed to login: status: %s, body: %s", resp.Status, string(b))
 	}
 
 	loginResponse := &authhandlers.LoginResponseBody{}
 	if err := json.NewDecoder(resp.Body).Decode(loginResponse); err != nil {
-		return "", fmt.Errorf("failed to decode login response: %v", err)
+		return fmt.Errorf("failed to decode login response: %v", err)
 	}
 
-	return loginResponse.IDToken, nil
+	g.auth.IDToken = loginResponse.IDToken
+	expiresIn, err := strconv.Atoi(loginResponse.ExpiresIn)
+	if err != nil {
+		return fmt.Errorf("failed to parse expires in: %v", err)
+	}
+	g.auth.IDTokenExp = time.Now().Add(time.Duration(expiresIn) * time.Second)
+	g.auth.RefreshToken = loginResponse.RefreshToken
+
+	return nil
+}
+
+func (g *Game) getIDTokenWithRefreshToken() error {
+	values := url.Values{}
+	values.Set("refreshToken", g.auth.RefreshToken)
+	requestBody := strings.NewReader(values.Encode())
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/refresh", g.auth.URL), requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to create refresh request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := http.DefaultClient
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send refresh request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to refresh token: status: %s, body: %s", resp.Status, string(b))
+	}
+
+	refreshResponse := &authhandlers.RefreshResponseBody{}
+	if err := json.NewDecoder(resp.Body).Decode(refreshResponse); err != nil {
+		return fmt.Errorf("failed to decode refresh response: %v", err)
+	}
+
+	g.auth.IDToken = refreshResponse.IDToken
+	expiresIn, err := strconv.Atoi(refreshResponse.ExpiresIn)
+	if err != nil {
+		return fmt.Errorf("failed to parse expires in: %v", err)
+	}
+	g.auth.IDTokenExp = time.Now().Add(time.Duration(expiresIn) * time.Second)
+	g.auth.RefreshToken = refreshResponse.RefreshToken
+
+	return nil
+}
+
+func (g *Game) loadCharacterSelection() error {
+	characterSelectionOpts := scenes.CharacterSelectionSceneOpts{
+		FetchCharacters:   g.fetchCharacters,
+		CreateCharacter:   g.createCharacter,
+		DeleteCharacter:   g.deleteCharacter,
+		OnSelectCharacter: g.onSelectCharacter,
+	}
+	characterSelection, err := scenes.NewCharacterSelectionScene(characterSelectionOpts)
+	if err != nil {
+		return fmt.Errorf("failed to create character selection scene: %v", err)
+	}
+	if err := g.SetScene(characterSelection); err != nil {
+		return fmt.Errorf("failed to set character selection scene: %v", err)
+	}
+	g.mode = GameModeMenu
+	return nil
+}
+
+func (g *Game) onSelectCharacter(characterID int32) {
+	if err := g.refreshIDToken(); err != nil {
+		log.Error("Failed to refresh ID token: %v", err)
+		return
+	}
+
+	if err := g.networkManager.Start(g.auth.IDToken, characterID); err != nil {
+		log.Error("Failed to start network manager: %v", err)
+		return
+	}
+
+	if err := g.loadGame(); err != nil {
+		log.Error("Failed to load game scene: %v", err)
+		return
+	}
+}
+
+func (g *Game) fetchCharacters() ([]*models.Character, error) {
+	if err := g.refreshIDToken(); err != nil {
+		return nil, fmt.Errorf("failed to refresh ID token: %v", err)
+	}
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/characters", g.api.URL), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create characters request: %v", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", g.auth.IDToken))
+
+	client := http.DefaultClient
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send characters request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to fetch characters: status: %s, body: %s", resp.Status, string(b))
+	}
+
+	characters := make([]*models.Character, 0)
+	if err := json.NewDecoder(resp.Body).Decode(&characters); err != nil {
+		return nil, fmt.Errorf("failed to decode characters response: %v", err)
+	}
+
+	return characters, nil
+}
+
+func (g *Game) createCharacter(name string) (*models.Character, error) {
+	if err := g.refreshIDToken(); err != nil {
+		return nil, fmt.Errorf("failed to refresh ID token: %v", err)
+	}
+
+	values := url.Values{}
+	values.Set("name", name)
+	requestBody := strings.NewReader(values.Encode())
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/characters", g.api.URL), requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create create character request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", g.auth.IDToken))
+
+	client := http.DefaultClient
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send create character request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to create character: status: %s, body: %s", resp.Status, string(b))
+	}
+
+	character := &models.Character{}
+	if err := json.NewDecoder(resp.Body).Decode(character); err != nil {
+		return nil, fmt.Errorf("failed to decode character response: %v", err)
+	}
+
+	return character, nil
+}
+
+func (g *Game) deleteCharacter(characterID int32) error {
+	if err := g.refreshIDToken(); err != nil {
+		return fmt.Errorf("failed to refresh ID token: %v", err)
+	}
+
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/characters/%d", g.api.URL, characterID), nil)
+	if err != nil {
+		return fmt.Errorf("failed to create delete character request: %v", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", g.auth.IDToken))
+
+	client := http.DefaultClient
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send delete character request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete character: status: %s, body: %s", resp.Status, string(b))
+	}
+
+	return nil
+
 }
 
 func (g *Game) loadGame() error {
@@ -311,7 +539,7 @@ func (g *Game) drawDebugOverlay(screen *ebiten.Image) {
 
 	serverSettings := g.networkManager.ServerSettings()
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n   Game Server: %s", serverSettings.Hostname))
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n\n   Auth Server: %s", g.authURL))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("\n\n\n\n   Auth Server: %s", g.auth.URL))
 
 	if !g.networkManager.IsConnected() {
 		return

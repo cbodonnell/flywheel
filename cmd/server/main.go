@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/cbodonnell/flywheel/pkg/api"
 	"github.com/cbodonnell/flywheel/pkg/auth"
 	authhandlers "github.com/cbodonnell/flywheel/pkg/auth/handlers"
 	authproviders "github.com/cbodonnell/flywheel/pkg/auth/providers"
@@ -25,6 +26,7 @@ func main() {
 	tcpPort := flag.Int("tcp-port", 8888, "TCP port to listen on")
 	udpPort := flag.Int("udp-port", 8889, "UDP port to listen on")
 	authPort := flag.Int("auth-port", 8080, "Auth server port")
+	apiPort := flag.Int("api-port", 9090, "API server port")
 	logLevel := flag.String("log-level", "info", "Log level")
 	flag.Parse()
 
@@ -48,12 +50,12 @@ func main() {
 		Port:    *authPort,
 		Handler: authhandlers.NewFirebaseAuthHandler(firebaseApiKey),
 	}
-	tlsCertFile := os.Getenv("FLYWHEEL_TLS_CERT_FILE")
-	tlsKeyFile := os.Getenv("FLYWHEEL_TLS_KEY_FILE")
-	if tlsCertFile != "" && tlsKeyFile != "" {
+	authTLSCertFile := os.Getenv("FLYWHEEL_AUTH_TLS_CERT_FILE")
+	authTLSKeyFile := os.Getenv("FLYWHEEL_AUTH_TLS_KEY_FILE")
+	if authTLSCertFile != "" && authTLSKeyFile != "" {
 		authServerOpts.TLS = &auth.TLSConfig{
-			CertFile: tlsCertFile,
-			KeyFile:  tlsKeyFile,
+			CertFile: authTLSCertFile,
+			KeyFile:  authTLSKeyFile,
 		}
 	}
 	authServer := auth.NewAuthServer(authServerOpts)
@@ -102,6 +104,22 @@ func main() {
 		panic(fmt.Sprintf("Unknown database type %s", u.Scheme))
 	}
 	defer repository.Close(ctx)
+
+	apiServerOpts := api.NewAPIServerOptions{
+		Port:         *apiPort,
+		AuthProvider: authProvider,
+		Repository:   repository,
+	}
+	apiTLSCertFile := os.Getenv("FLYWHEEL_API_TLS_CERT_FILE")
+	apiTLSKeyFile := os.Getenv("FLYWHEEL_API_TLS_KEY_FILE")
+	if apiTLSCertFile != "" && apiTLSKeyFile != "" {
+		apiServerOpts.TLS = &api.TLSConfig{
+			CertFile: apiTLSCertFile,
+			KeyFile:  apiTLSKeyFile,
+		}
+	}
+	apiServer := api.NewAPIServer(apiServerOpts)
+	go apiServer.Start()
 
 	connectionEventQueue := queue.NewInMemoryQueue(1000)
 

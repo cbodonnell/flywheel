@@ -33,11 +33,11 @@ func NewMenuScene(callbacks MenuSceneCallbacks) (Scene, error) {
 }
 
 func (s *MenuScene) Init() error {
-	s.ui = s.initUI()
+	s.renderUI()
 	return s.BaseScene.Init()
 }
 
-func (s *MenuScene) initUI() *ebitenui.UI {
+func (s *MenuScene) renderUI() {
 	buttonImage := &widget.ButtonImage{
 		Idle:    image.NewNineSliceColor(color.NRGBA{R: 170, G: 170, B: 180, A: 255}),
 		Hover:   image.NewNineSliceColor(color.NRGBA{R: 135, G: 135, B: 150, A: 255}),
@@ -153,7 +153,7 @@ func (s *MenuScene) initUI() *ebitenui.UI {
 		Container: rootContainer,
 	}
 
-	return ui
+	s.ui = ui
 }
 
 func (s *MenuScene) Update() error {

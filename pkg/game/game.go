@@ -146,8 +146,8 @@ func (gm *GameManager) processConnectionEvents() {
 }
 
 func (gm *GameManager) handleConnectPlayerEvent(event *types.ConnectPlayerEvent) error {
-	playerState := types.NewPlayerState(event.UserID, event.Position.X, event.Position.Y)
-	log.Debug("Player %s created as %s", playerState.UserID, playerState.Name)
+	playerState := types.NewPlayerState(event.CharacterID, event.CharacterName, event.CharacterPosition, event.CharacterHitpoints)
+	log.Debug("Client %d connected as %s", event.ClientID, event.CharacterName)
 	// add the player to the game state
 	gm.gameState.Players[event.ClientID] = playerState
 	// add the player object to the collision space
@@ -184,7 +184,7 @@ func (gm *GameManager) handleDisconnectPlayerEvent(event *types.DisconnectPlayer
 	// send a request to save the player state before deleting it
 	saveRequest := workers.SavePlayerStateRequest{
 		Timestamp:   gm.gameState.Timestamp,
-		UserID:      gm.gameState.Players[event.ClientID].UserID,
+		CharacterID: gm.gameState.Players[event.ClientID].CharacterID,
 		PlayerState: gm.gameState.Players[event.ClientID],
 	}
 	gm.savePlayerStateChan <- saveRequest
