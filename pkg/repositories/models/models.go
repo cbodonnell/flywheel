@@ -15,4 +15,5 @@ type Player struct {
 	Timestamp   int64   `json:"timestamp"`
 	X           float64 `json:"x"`
 	Y           float64 `json:"y"`
+	Hitpoints   int16   `json:"hitpoints"`
 }
