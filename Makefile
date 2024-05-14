@@ -95,7 +95,8 @@ run-client-remote:
 	-server-hostname=${FLYWHEEL_SERVER_HOSTNAME} \
 	-server-tcp-port=${FLYWHEEL_SERVER_TCP_PORT} \
 	-server-udp-port=${FLYWHEEL_SERVER_UDP_PORT} \
-	-auth-server-url=${FLYWHEEL_AUTH_SERVER_URL}
+	-auth-server-url=${FLYWHEEL_AUTH_SERVER_URL} \
+	-api-server-url=${FLYWHEEL_API_SERVER_URL}
 
 .PHONY: run-client-remote-automation
 run-client-remote-automation:
@@ -108,6 +109,7 @@ run-client-remote-automation:
 	-server-tcp-port=${FLYWHEEL_SERVER_TCP_PORT} \
 	-server-udp-port=${FLYWHEEL_SERVER_UDP_PORT} \
 	-auth-server-url=${FLYWHEEL_AUTH_SERVER_URL} \
+	-api-server-url=${FLYWHEEL_API_SERVER_URL} \
 	-automation-email=${FLYWHEEL_AUTOMATION_EMAIL} \
 	-automation-password=${FLYWHEEL_AUTOMATION_PASSWORD}
 
