@@ -1,5 +1,7 @@
 package repositories
 
+import "errors"
+
 type ErrNotFound struct {
 }
 
@@ -8,6 +10,5 @@ func (e *ErrNotFound) Error() string {
 }
 
 func IsNotFound(err error) bool {
-	_, ok := err.(*ErrNotFound)
-	return ok
+	return errors.Is(err, &ErrNotFound{})
 }

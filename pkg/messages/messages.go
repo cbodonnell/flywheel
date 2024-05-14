@@ -61,7 +61,8 @@ type Message struct {
 }
 
 type ClientLogin struct {
-	Token string `json:"token"`
+	Token       string `json:"token"`
+	CharacterID int32  `json:"characterID"`
 }
 
 type ServerLoginSuccess struct {
@@ -114,8 +115,8 @@ type ServerGameUpdate struct {
 type PlayerStateUpdate struct {
 	// LastProcessedTimestamp is the timestamp of the last processed update
 	LastProcessedTimestamp int64 `json:"lastProcessedTimestamp"`
-	// UserID is the ID of the player
-	UserID string `json:"playerID"`
+	// CharacterID is the ID of the player's character
+	CharacterID int32 `json:"characterID"`
 	// Name is the name of the player
 	Name string `json:"playerName"`
 	// Position is the position of the player

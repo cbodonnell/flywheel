@@ -23,6 +23,7 @@ func main() {
 	serverTCPPort := flag.Int("server-tcp-port", network.DefaultServerTCPPort, "Server TCP port")
 	serverUDPPort := flag.Int("server-udp-port", network.DefaultServerUDPPort, "Server UDP port")
 	authServerURL := flag.String("auth-server-url", game.DefaultAuthServerURL, "Auth server URL")
+	apiServerURL := flag.String("api-server-url", game.DefaultAPIServerURL, "API server URL")
 	automationEmail := flag.String("automation-email", "", "Automation email")
 	automationPassword := flag.String("automation-password", "", "Automation password")
 	flag.Parse()
@@ -52,6 +53,7 @@ func main() {
 	gameOpts := clientgame.NewGameOptions{
 		Debug:          *debug,
 		AuthURL:        *authServerURL,
+		APIURL:         *apiServerURL,
 		NetworkManager: networkManager,
 	}
 	if *automationEmail != "" && *automationPassword != "" {

@@ -122,7 +122,7 @@ func (s *TCPServer) handleClientLogin(ctx context.Context, conn net.Conn, messag
 		return 0, fmt.Errorf("failed to verify token: %v", err)
 	}
 
-	clientID, err := s.ClientManager.ConnectClient(conn, token.UID)
+	clientID, err := s.ClientManager.ConnectClient(conn, token.UID, clientLogin.CharacterID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to connect client: %v", err)
 	}

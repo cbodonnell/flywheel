@@ -73,7 +73,7 @@ func NewNetworkManager(serverSettings ServerSettings, messageQueue queue.Queue) 
 }
 
 // Start starts the network manager.
-func (m *NetworkManager) Start(token string) error {
+func (m *NetworkManager) Start(token string, characterID int32) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancelClientCtx = cancel
 
@@ -90,7 +90,7 @@ func (m *NetworkManager) Start(token string) error {
 		}
 	}(ctx)
 
-	if err := m.login(token); err != nil {
+	if err := m.login(token, characterID); err != nil {
 		return fmt.Errorf("failed to login: %v", err)
 	}
 
@@ -126,9 +126,10 @@ func (m *NetworkManager) Start(token string) error {
 	return nil
 }
 
-func (m *NetworkManager) login(token string) error {
+func (m *NetworkManager) login(token string, characterID int32) error {
 	login := &messages.ClientLogin{
-		Token: token,
+		Token:       token,
+		CharacterID: characterID,
 	}
 	b, err := json.Marshal(login)
 	if err != nil {

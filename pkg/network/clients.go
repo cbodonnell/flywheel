@@ -19,14 +19,14 @@ type Client struct {
 	ID         uint32
 	TCPConn    net.Conn
 	UDPAddress *net.UDPAddr
-	UserID     string
+	UserID     int32
 }
 
 // ClientEvent represents an event that happened to a client
 type ClientEvent struct {
 	ClientID uint32
 	Type     ClientEventType
-	UserID   string
+	Data     interface{}
 }
 
 // ClientEventType represents the type of a client event
@@ -36,6 +36,11 @@ const (
 	ClientEventTypeConnect ClientEventType = iota
 	ClientEventTypeDisconnect
 )
+
+type ClientConnectData struct {
+	UserID      string
+	CharacterID int32
+}
 
 // ClientManager manages connected clients
 type ClientManager struct {
@@ -95,9 +100,11 @@ func (cm *ClientManager) GetClients() []*Client {
 }
 
 // ConnectClient adds a new client to the manager and returns its ID
-func (cm *ClientManager) ConnectClient(tcpConn net.Conn, userID string) (uint32, error) {
+func (cm *ClientManager) ConnectClient(tcpConn net.Conn, userID string, characterID int32) (uint32, error) {
 	cm.clientsLock.Lock()
 	defer cm.clientsLock.Unlock()
+
+	// TODO: Check if the user is already connected
 
 	clientID, err := cm.generateUniqueID(ClientIDMaxRetries)
 	if err != nil {
@@ -106,14 +113,17 @@ func (cm *ClientManager) ConnectClient(tcpConn net.Conn, userID string) (uint32,
 	client := &Client{
 		ID:      clientID,
 		TCPConn: tcpConn,
-		UserID:  userID,
+		UserID:  characterID,
 	}
 	cm.clients[clientID] = client
 
 	event := ClientEvent{
 		ClientID: clientID,
 		Type:     ClientEventTypeConnect,
-		UserID:   userID,
+		Data: ClientConnectData{
+			UserID:      userID,
+			CharacterID: characterID,
+		},
 	}
 	cm.clientEventChan <- event
 
@@ -145,7 +155,6 @@ func (cm *ClientManager) DisconnectClient(clientID uint32) {
 
 	event := ClientEvent{
 		ClientID: client.ID,
-		UserID:   client.UserID,
 		Type:     ClientEventTypeDisconnect,
 	}
 	cm.clientEventChan <- event

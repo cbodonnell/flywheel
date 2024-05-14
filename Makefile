@@ -15,7 +15,7 @@ mocks:
 
 .PHONY: flatbuffers
 flatbuffers:
-	docker run -v "${PWD}":/src -w /src cheebz/flatbuffers --go ./flatbuffers/schemas/*.fbs
+	docker run --rm -v "${PWD}":/src -w /src cheebz/flatbuffers --go ./flatbuffers/schemas/*.fbs
 
 .PHONY: flatbuffers-image
 flatbuffers-image:
@@ -39,6 +39,12 @@ build-auth:
 	go build \
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
 	-o ./bin/flywheel-auth ./cmd/server/auth/main.go
+
+.PHONY: build-api
+build-api:
+	go build \
+	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
+	-o ./bin/flywheel-api ./cmd/server/api/main.go
 
 .PHONY: build-game
 build-game:

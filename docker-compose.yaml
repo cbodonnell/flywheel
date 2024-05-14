@@ -32,6 +32,22 @@ services:
       - flywheel-network
     restart: on-failure
 
+  flywheel-api:
+    build:
+      context: .
+      dockerfile: ./deploy/Dockerfile.api
+    command: ["./flywheel-api", "-log-level", "debug"]
+    environment:
+      FLYWHEEL_DATABASE_URL: ${FLYWHEEL_DATABASE_URL:-postgresql://flywheel_user:password@flywheel-db:5432/flywheel_db}
+      FLYWHEEL_FIREBASE_PROJECT_ID: ${FLYWHEEL_FIREBASE_PROJECT_ID}
+    ports:
+      - 9090:9090/tcp
+    networks:
+      - flywheel-network
+    depends_on:
+      - flywheel-db
+    restart: on-failure
+
   flywheel-game:
     build:
       context: .

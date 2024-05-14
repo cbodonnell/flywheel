@@ -13,7 +13,7 @@ table PlayerStateKeyValue {
 
 table PlayerState {
   last_processed_timestamp: int64;
-  user_id: string;
+  character_id: int32;
   name: string;
   position: Position;
   velocity: Velocity;

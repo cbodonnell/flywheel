@@ -50,24 +50,41 @@ func (w *ClientEventWorker) Start() {
 }
 
 func (w *ClientEventWorker) handleClientConnect(event network.ClientEvent) {
-	var position *kinematic.Vector
-	if lastKnownState, err := w.repository.LoadPlayerState(context.Background(), event.UserID); err == nil {
-		position = lastKnownState
+	data, ok := event.Data.(network.ClientConnectData)
+	if !ok {
+		log.Error("Failed to cast client connect data")
+		return
+	}
+
+	character, err := w.repository.GetCharacter(context.Background(), data.UserID, data.CharacterID)
+	if err != nil {
+		log.Error("Failed to get character %d for user %s: %v", data.CharacterID, data.UserID, err)
+		return
+	}
+
+	var position kinematic.Vector
+	var hitpoints int16
+	if lastKnownState, err := w.repository.LoadPlayerState(context.Background(), character.ID); err == nil {
+		position = lastKnownState.Position
+		hitpoints = lastKnownState.Hitpoints
 	} else {
 		if !repositories.IsNotFound(err) {
-			log.Error("Failed to get player state for client %d: %v", event.ClientID, err)
+			log.Error("Failed to get player state for character %d: %v", character.ID, err)
 		}
-		log.Debug("Adding player %s with default values", event.UserID)
-		position = &kinematic.Vector{
+		log.Debug("Adding character %d with default values", character.ID)
+		position = kinematic.Vector{
 			X: gameconstants.PlayerStartingX,
 			Y: gameconstants.PlayerStartingY,
 		}
+		hitpoints = gameconstants.PlayerHitpoints
 	}
 
 	if err := w.connectionEventQueue.Enqueue(&gametypes.ConnectPlayerEvent{
-		ClientID: event.ClientID,
-		UserID:   event.UserID,
-		Position: position,
+		ClientID:           event.ClientID,
+		CharacterID:        character.ID,
+		CharacterName:      character.Name,
+		CharacterPosition:  position,
+		CharacterHitpoints: hitpoints,
 	}); err != nil {
 		log.Error("Failed to enqueue connect player event: %v", err)
 	}

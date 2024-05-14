@@ -53,12 +53,16 @@ func (rcv *PlayerState) MutateLastProcessedTimestamp(n int64) bool {
 	return rcv._tab.MutateInt64Slot(4, n)
 }
 
-func (rcv *PlayerState) UserId() []byte {
+func (rcv *PlayerState) CharacterId() int32 {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(6))
 	if o != 0 {
-		return rcv._tab.ByteVector(o + rcv._tab.Pos)
+		return rcv._tab.GetInt32(o + rcv._tab.Pos)
 	}
-	return nil
+	return 0
+}
+
+func (rcv *PlayerState) MutateCharacterId(n int32) bool {
+	return rcv._tab.MutateInt32Slot(6, n)
 }
 
 func (rcv *PlayerState) Name() []byte {
@@ -173,8 +177,8 @@ func PlayerStateStart(builder *flatbuffers.Builder) {
 func PlayerStateAddLastProcessedTimestamp(builder *flatbuffers.Builder, lastProcessedTimestamp int64) {
 	builder.PrependInt64Slot(0, lastProcessedTimestamp, 0)
 }
-func PlayerStateAddUserId(builder *flatbuffers.Builder, userId flatbuffers.UOffsetT) {
-	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(userId), 0)
+func PlayerStateAddCharacterId(builder *flatbuffers.Builder, characterId int32) {
+	builder.PrependInt32Slot(1, characterId, 0)
 }
 func PlayerStateAddName(builder *flatbuffers.Builder, name flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(2, flatbuffers.UOffsetT(name), 0)

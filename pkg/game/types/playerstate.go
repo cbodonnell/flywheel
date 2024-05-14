@@ -1,9 +1,6 @@
 package types
 
 import (
-	"crypto/sha256"
-	"fmt"
-
 	"github.com/cbodonnell/flywheel/pkg/game/constants"
 	"github.com/cbodonnell/flywheel/pkg/kinematic"
 	"github.com/cbodonnell/flywheel/pkg/messages"
@@ -12,7 +9,7 @@ import (
 
 type PlayerState struct {
 	LastProcessedTimestamp int64
-	UserID                 string
+	CharacterID            int32
 	Name                   string
 	Position               kinematic.Vector
 	Velocity               kinematic.Vector
@@ -51,24 +48,19 @@ const (
 	PlayerAnimationDead
 )
 
-func NewPlayerState(playerID string, positionX, positionY float64) *PlayerState {
-	name := fmt.Sprintf("%x", sha256.Sum256([]byte(playerID)))[:8]
-
-	object := resolv.NewObject(positionX, positionY, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer)
+func NewPlayerState(characterID int32, name string, position kinematic.Vector, hitpoints int16) *PlayerState {
+	object := resolv.NewObject(position.X, position.Y, constants.PlayerWidth, constants.PlayerHeight, CollisionSpaceTagPlayer)
 	object.SetShape(resolv.NewRectangle(0, 0, constants.PlayerWidth, constants.PlayerHeight))
 
 	return &PlayerState{
-		UserID: playerID,
-		Name:   name,
-		Position: kinematic.Vector{
-			X: positionX,
-			Y: positionY,
-		},
+		CharacterID: characterID,
+		Name:        name,
+		Position:    position,
 		Velocity: kinematic.Vector{
 			X: 0,
 			Y: 0,
 		},
-		Hitpoints: constants.PlayerHitpoints,
+		Hitpoints: hitpoints,
 		Object:    object,
 	}
 }
@@ -93,7 +85,7 @@ func (p *PlayerState) NeedsReconciliation(other *PlayerState) bool {
 func (p *PlayerState) Copy() *PlayerState {
 	return &PlayerState{
 		LastProcessedTimestamp: p.LastProcessedTimestamp,
-		UserID:                 p.UserID,
+		CharacterID:            p.CharacterID,
 		Name:                   p.Name,
 		Position:               p.Position,
 		Velocity:               p.Velocity,
