@@ -23,6 +23,10 @@ func NewSQLiteRepository(ctx context.Context, path string, migrations string) (R
 		return nil, fmt.Errorf("failed to open database: %v", err)
 	}
 
+	if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys = ON;"); err != nil {
+		return nil, fmt.Errorf("failed to enable foreign keys: %v", err)
+	}
+
 	dir, err := os.ReadDir(migrations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read migrations directory: %v", err)
