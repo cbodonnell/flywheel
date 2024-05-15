@@ -20,10 +20,11 @@ type CharacterSelectionScene struct {
 	fetchCharacters     func() ([]*models.Character, error)
 	createCharacter     func(name string) (*models.Character, error)
 	deleteCharacter     func(characterID int32) error
-	onSelectCharacter   func(characterID int32)
+	onSelectCharacter   func(characterID int32) error
 	characters          []*models.Character
 	isDeletingCharacter bool
 	deletingCharacterID int32
+	selectCharacterErr  string
 }
 
 type CharacterSelectionSceneOpts struct {
@@ -34,7 +35,7 @@ type CharacterSelectionSceneOpts struct {
 	// DeleteCharacter is a function that deletes a character.
 	DeleteCharacter func(characterID int32) error
 	// OnSelectCharacter is a callback that is called when a character is selected.
-	OnSelectCharacter func(characterID int32)
+	OnSelectCharacter func(characterID int32) error
 }
 
 var _ Scene = &CharacterSelectionScene{}
@@ -120,7 +121,10 @@ func (s *CharacterSelectionScene) renderUI() {
 				Bottom: 5,
 			}),
 			widget.ButtonOpts.ClickedHandler(func(args *widget.ButtonClickedEventArgs) {
-				s.onSelectCharacter(character.ID)
+				if err := s.onSelectCharacter(character.ID); err != nil {
+					s.selectCharacterErr = fmt.Sprintf("Failed to select character: %v", err)
+				}
+				s.renderUI()
 			}),
 		)
 		buttonContainer.AddChild(button)
@@ -296,6 +300,17 @@ func (s *CharacterSelectionScene) renderUI() {
 		deleteConfirmationContainer.AddChild(deleteConfirmationNoButton)
 
 		rootContainer.AddChild(deleteConfirmationContainer)
+	}
+
+	if s.selectCharacterErr != "" {
+		rootContainer.AddChild(widget.NewText(
+			widget.TextOpts.Text(s.selectCharacterErr, fontFace, color.NRGBA{R: 255, G: 0, B: 0, A: 255}),
+			widget.TextOpts.WidgetOpts(
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+					Position: widget.RowLayoutPositionCenter,
+				}),
+			),
+		))
 	}
 
 	ui := &ebitenui.UI{

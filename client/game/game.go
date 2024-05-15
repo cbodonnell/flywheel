@@ -136,15 +136,10 @@ func (g *Game) loadMenu() error {
 		return nil
 	}
 
-	menuSceneCallbacks := scenes.MenuSceneCallbacks{
-		OnLogin: func(email, password string) {
-			// TODO: this blocks the main thread
-			if err := g.login(email, password); err != nil {
-				log.Error("Failed to start game: %v", err)
-			}
-		},
+	menuSceneOpts := scenes.MenuSceneOptions{
+		OnLogin: g.login,
 	}
-	menu, err := scenes.NewMenuScene(menuSceneCallbacks)
+	menu, err := scenes.NewMenuScene(menuSceneOpts)
 	if err != nil {
 		return fmt.Errorf("failed to create menu scene: %v", err)
 	}
@@ -297,25 +292,27 @@ func (g *Game) loadCharacterSelection() error {
 	if err := g.SetScene(characterSelection); err != nil {
 		return fmt.Errorf("failed to set character selection scene: %v", err)
 	}
-	g.mode = GameModeMenu
+	g.mode = GameModePlay
 	return nil
 }
 
-func (g *Game) onSelectCharacter(characterID int32) {
+func (g *Game) onSelectCharacter(characterID int32) error {
 	if err := g.refreshIDToken(); err != nil {
-		log.Error("Failed to refresh ID token: %v", err)
-		return
+		return fmt.Errorf("failed to refresh ID token: %v", err)
 	}
 
 	if err := g.networkManager.Start(g.auth.IDToken, characterID); err != nil {
-		log.Error("Failed to start network manager: %v", err)
-		return
+		if err := g.networkManager.Stop(); err != nil {
+			return fmt.Errorf("failed to stop network manager: %v", err)
+		}
+		return fmt.Errorf("failed to start network manager: %v", err)
 	}
 
 	if err := g.loadGame(); err != nil {
-		log.Error("Failed to load game scene: %v", err)
-		return
+		return fmt.Errorf("failed to load game scene: %v", err)
 	}
+
+	return nil
 }
 
 func (g *Game) fetchCharacters() ([]*models.Character, error) {

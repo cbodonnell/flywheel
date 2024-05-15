@@ -20,6 +20,7 @@ type MessageType uint8
 const (
 	MessageTypeClientLogin MessageType = iota
 	MessageTypeServerLoginSuccess
+	MessageTypeServerLoginFailure
 	MessageTypeClientPing
 	MessageTypeServerPong
 	MessageTypeClientPlayerUpdate
@@ -38,6 +39,7 @@ func (m MessageType) String() string {
 	return [...]string{
 		"ClientLogin",
 		"ServerLoginSuccess",
+		"ServerLoginFailure",
 		"ClientPing",
 		"ServerPong",
 		"ClientPlayerUpdate",
@@ -67,6 +69,10 @@ type ClientLogin struct {
 
 type ServerLoginSuccess struct {
 	ClientID uint32 `json:"clientID"`
+}
+
+type ServerLoginFailure struct {
+	Reason string `json:"reason"`
 }
 
 const (

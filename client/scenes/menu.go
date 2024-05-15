@@ -14,21 +14,22 @@ import (
 type MenuScene struct {
 	*BaseScene
 
-	callbacks MenuSceneCallbacks
-	ui        *ebitenui.UI
+	onLogin  func(email, password string) error
+	ui       *ebitenui.UI
+	loginErr string
 }
 
-type MenuSceneCallbacks struct {
+type MenuSceneOptions struct {
 	// OnLogin is called when the start game button is pressed.
-	OnLogin func(email, password string)
+	OnLogin func(email, password string) error
 }
 
 var _ Scene = &MenuScene{}
 
-func NewMenuScene(callbacks MenuSceneCallbacks) (Scene, error) {
+func NewMenuScene(opts MenuSceneOptions) (Scene, error) {
 	return &MenuScene{
 		BaseScene: NewBaseScene(objects.NewBaseObject("menu-root", nil)),
-		callbacks: callbacks,
+		onLogin:   opts.OnLogin,
 	}, nil
 }
 
@@ -134,6 +135,17 @@ func (s *MenuScene) renderUI() {
 	)
 	rootContainer.AddChild(button)
 
+	if s.loginErr != "" {
+		rootContainer.AddChild(widget.NewText(
+			widget.TextOpts.Text(s.loginErr, fontFace, color.NRGBA{R: 255, G: 0, B: 0, A: 255}),
+			widget.TextOpts.WidgetOpts(
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+					Position: widget.RowLayoutPositionCenter,
+				}),
+			),
+		))
+	}
+
 	// auto focus the email text input
 	emailTextInput.Focus(true)
 
@@ -143,7 +155,10 @@ func (s *MenuScene) renderUI() {
 		if email == "" || password == "" {
 			return
 		}
-		s.callbacks.OnLogin(email, password)
+		if err := s.onLogin(email, password); err != nil {
+			s.loginErr = err.Error()
+		}
+		s.renderUI()
 	}
 	emailTextInput.SubmitEvent.AddHandler(loginHandler)
 	passwordTextInput.SubmitEvent.AddHandler(loginHandler)
