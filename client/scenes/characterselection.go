@@ -1,11 +1,12 @@
 package scenes
 
 import (
-	"fmt"
 	"image/color"
 
 	"github.com/cbodonnell/flywheel/client/fonts"
 	"github.com/cbodonnell/flywheel/client/objects"
+	"github.com/cbodonnell/flywheel/client/ui"
+	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/repositories/models"
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/image"
@@ -54,9 +55,15 @@ func NewCharacterSelectionScene(opts CharacterSelectionSceneOpts) (Scene, error)
 func (s *CharacterSelectionScene) Init() error {
 	characters, err := s.fetchCharacters()
 	if err != nil {
-		return fmt.Errorf("failed to fetch characters: %w", err)
+		log.Error("Failed to fetch characters: %v", err)
+		if actionableErr, ok := err.(*ui.ActionableError); ok {
+			s.selectCharacterErr = actionableErr.Message
+		} else {
+			s.selectCharacterErr = "Failed to fetch characters"
+		}
+	} else {
+		s.characters = characters
 	}
-	s.characters = characters
 
 	s.renderUI()
 
@@ -122,7 +129,12 @@ func (s *CharacterSelectionScene) renderUI() {
 			}),
 			widget.ButtonOpts.ClickedHandler(func(args *widget.ButtonClickedEventArgs) {
 				if err := s.onSelectCharacter(character.ID); err != nil {
-					s.selectCharacterErr = fmt.Sprintf("Failed to select character: %v", err)
+					log.Error("Failed to select character: %v", err)
+					if actionableErr, ok := err.(*ui.ActionableError); ok {
+						s.selectCharacterErr = actionableErr.Message
+					} else {
+						s.selectCharacterErr = "Failed to select character"
+					}
 				}
 				s.renderUI()
 			}),
@@ -213,10 +225,15 @@ func (s *CharacterSelectionScene) renderUI() {
 
 				character, err := s.createCharacter(name)
 				if err != nil {
-					fmt.Println("Failed to create character:", err)
-					return
+					log.Error("Failed to create character: %v", err)
+					if actionableErr, ok := err.(*ui.ActionableError); ok {
+						s.selectCharacterErr = actionableErr.Message
+					} else {
+						s.selectCharacterErr = "Failed to create character"
+					}
+				} else {
+					s.characters = append(s.characters, character)
 				}
-				s.characters = append(s.characters, character)
 				s.renderUI()
 			}),
 		)
@@ -258,13 +275,18 @@ func (s *CharacterSelectionScene) renderUI() {
 			widget.ButtonOpts.ClickedHandler(func(args *widget.ButtonClickedEventArgs) {
 				err := s.deleteCharacter(s.deletingCharacterID)
 				if err != nil {
-					fmt.Println("Failed to delete character:", err)
-					return
-				}
-				for i, c := range s.characters {
-					if c.ID == s.deletingCharacterID {
-						s.characters = append(s.characters[:i], s.characters[i+1:]...)
-						break
+					log.Error("Failed to delete character: %v", err)
+					if actionableErr, ok := err.(*ui.ActionableError); ok {
+						s.selectCharacterErr = actionableErr.Message
+					} else {
+						s.selectCharacterErr = "Failed to delete character"
+					}
+				} else {
+					for i, c := range s.characters {
+						if c.ID == s.deletingCharacterID {
+							s.characters = append(s.characters[:i], s.characters[i+1:]...)
+							break
+						}
 					}
 				}
 
@@ -311,6 +333,7 @@ func (s *CharacterSelectionScene) renderUI() {
 				}),
 			),
 		))
+		s.selectCharacterErr = ""
 	}
 
 	ui := &ebitenui.UI{

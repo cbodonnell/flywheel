@@ -156,6 +156,7 @@ func (s *MenuScene) renderUI() {
 				}),
 			),
 		))
+		s.loginErr = ""
 	}
 
 	// auto focus the email text input

@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/cbodonnell/flywheel/client/ui"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -95,6 +97,11 @@ func (m *NetworkManager) Start(token string, characterID int32) error {
 	}(ctx)
 
 	if err := m.login(token, characterID); err != nil {
+		if strings.Contains(err.Error(), "is already connected") {
+			return &ui.ActionableError{
+				Message: "You are already connected to the server",
+			}
+		}
 		return fmt.Errorf("failed to login: %v", err)
 	}
 

@@ -303,18 +303,24 @@ func (g *Game) loadCharacterSelection() error {
 	if err := g.SetScene(characterSelection); err != nil {
 		return fmt.Errorf("failed to set character selection scene: %v", err)
 	}
-	g.mode = GameModePlay
+	g.mode = GameModeMenu
 	return nil
 }
 
 func (g *Game) onSelectCharacter(characterID int32) error {
 	if err := g.refreshIDToken(); err != nil {
+		if actionableErr, ok := err.(*ui.ActionableError); ok {
+			return actionableErr
+		}
 		return fmt.Errorf("failed to refresh ID token: %v", err)
 	}
 
 	if err := g.networkManager.Start(g.auth.IDToken, characterID); err != nil {
 		if err := g.networkManager.Stop(); err != nil {
 			return fmt.Errorf("failed to stop network manager: %v", err)
+		}
+		if actionableErr, ok := err.(*ui.ActionableError); ok {
+			return actionableErr
 		}
 		return fmt.Errorf("failed to start network manager: %v", err)
 	}
@@ -328,6 +334,9 @@ func (g *Game) onSelectCharacter(characterID int32) error {
 
 func (g *Game) fetchCharacters() ([]*models.Character, error) {
 	if err := g.refreshIDToken(); err != nil {
+		if actionableErr, ok := err.(*ui.ActionableError); ok {
+			return nil, actionableErr
+		}
 		return nil, fmt.Errorf("failed to refresh ID token: %v", err)
 	}
 
@@ -346,7 +355,11 @@ func (g *Game) fetchCharacters() ([]*models.Character, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to fetch characters: status: %s, body: %s", resp.Status, string(b))
+		msg := string(b)
+		if len(msg) == 0 {
+			msg = resp.Status
+		}
+		return nil, &ui.ActionableError{Message: msg}
 	}
 
 	characters := make([]*models.Character, 0)
@@ -359,6 +372,9 @@ func (g *Game) fetchCharacters() ([]*models.Character, error) {
 
 func (g *Game) createCharacter(name string) (*models.Character, error) {
 	if err := g.refreshIDToken(); err != nil {
+		if actionableErr, ok := err.(*ui.ActionableError); ok {
+			return nil, actionableErr
+		}
 		return nil, fmt.Errorf("failed to refresh ID token: %v", err)
 	}
 
@@ -382,7 +398,11 @@ func (g *Game) createCharacter(name string) (*models.Character, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to create character: status: %s, body: %s", resp.Status, string(b))
+		msg := string(b)
+		if len(msg) == 0 {
+			msg = resp.Status
+		}
+		return nil, &ui.ActionableError{Message: msg}
 	}
 
 	character := &models.Character{}
@@ -395,6 +415,9 @@ func (g *Game) createCharacter(name string) (*models.Character, error) {
 
 func (g *Game) deleteCharacter(characterID int32) error {
 	if err := g.refreshIDToken(); err != nil {
+		if actionableErr, ok := err.(*ui.ActionableError); ok {
+			return actionableErr
+		}
 		return fmt.Errorf("failed to refresh ID token: %v", err)
 	}
 
@@ -413,7 +436,11 @@ func (g *Game) deleteCharacter(characterID int32) error {
 
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to delete character: status: %s, body: %s", resp.Status, string(b))
+		msg := string(b)
+		if len(msg) == 0 {
+			msg = resp.Status
+		}
+		return &ui.ActionableError{Message: msg}
 	}
 
 	return nil
