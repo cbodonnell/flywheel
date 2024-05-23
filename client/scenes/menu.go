@@ -5,6 +5,8 @@ import (
 
 	"github.com/cbodonnell/flywheel/client/fonts"
 	"github.com/cbodonnell/flywheel/client/objects"
+	"github.com/cbodonnell/flywheel/client/ui"
+	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
@@ -16,6 +18,8 @@ type MenuScene struct {
 
 	onLogin  func(email, password string) error
 	ui       *ebitenui.UI
+	email    string
+	password string
 	loginErr string
 }
 
@@ -83,7 +87,11 @@ func (s *MenuScene) renderUI() {
 			widget.CaretOpts.Size(fontFace, 2),
 		),
 		widget.TextInputOpts.Placeholder("Email"),
+		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
+			s.email = args.InputText
+		}),
 	)
+	emailTextInput.SetText(s.email)
 	rootContainer.AddChild(emailTextInput)
 
 	passwordTextInput := widget.NewTextInput(
@@ -111,7 +119,11 @@ func (s *MenuScene) renderUI() {
 		),
 		widget.TextInputOpts.Placeholder("Password"),
 		widget.TextInputOpts.Secure(true),
+		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
+			s.password = args.InputText
+		}),
 	)
+	passwordTextInput.SetText(s.password)
 	rootContainer.AddChild(passwordTextInput)
 
 	button := widget.NewButton(
@@ -156,7 +168,12 @@ func (s *MenuScene) renderUI() {
 			return
 		}
 		if err := s.onLogin(email, password); err != nil {
-			s.loginErr = err.Error()
+			log.Error("Failed to login: %v", err)
+			if actionableErr, ok := err.(*ui.ActionableError); ok {
+				s.loginErr = actionableErr.Message
+			} else {
+				s.loginErr = "Failed to login. Please try again."
+			}
 		}
 		s.renderUI()
 	}

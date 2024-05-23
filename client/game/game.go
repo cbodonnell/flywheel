@@ -13,6 +13,7 @@ import (
 	"github.com/cbodonnell/flywheel/client/input"
 	"github.com/cbodonnell/flywheel/client/network"
 	"github.com/cbodonnell/flywheel/client/scenes"
+	"github.com/cbodonnell/flywheel/client/ui"
 	authhandlers "github.com/cbodonnell/flywheel/pkg/auth/handlers"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/repositories/models"
@@ -154,6 +155,9 @@ func (g *Game) login(email, password string) error {
 	g.setEmailPassword(email, password)
 
 	if err := g.refreshIDToken(); err != nil {
+		if actionableErr, ok := err.(*ui.ActionableError); ok {
+			return actionableErr
+		}
 		return fmt.Errorf("failed to refresh ID token: %v", err)
 	}
 
@@ -193,6 +197,9 @@ func (g *Game) refreshIDToken() error {
 	log.Debug("Getting ID token with email/password")
 	err := g.getIDTokenWithEmailPassword()
 	if err != nil {
+		if actionableErr, ok := err.(*ui.ActionableError); ok {
+			return actionableErr
+		}
 		return fmt.Errorf("failed to get ID token: %v", err)
 	}
 
@@ -220,7 +227,11 @@ func (g *Game) getIDTokenWithEmailPassword() error {
 
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("failed to login: status: %s, body: %s", resp.Status, string(b))
+		msg := string(b)
+		if len(msg) == 0 {
+			msg = resp.Status
+		}
+		return &ui.ActionableError{Message: msg}
 	}
 
 	loginResponse := &authhandlers.LoginResponseBody{}
