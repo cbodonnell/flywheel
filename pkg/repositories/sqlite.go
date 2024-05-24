@@ -117,7 +117,7 @@ func (r *SQLiteRepository) CreateCharacter(ctx context.Context, userID string, n
 	q := `INSERT INTO characters (user_id, name) VALUES (?, ?);`
 	result, err := r.db.ExecContext(ctx, q, userID, name)
 	if err != nil {
-		if strings.Contains(err.Error(), "characters_name_unique") {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: characters.name") {
 			return nil, &ErrNameExists{}
 		}
 		return nil, fmt.Errorf("failed to insert character: %v", err)
