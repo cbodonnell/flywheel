@@ -133,7 +133,7 @@ func (r *PostgresRepository) CreateCharacter(ctx context.Context, userID string,
 	q := `INSERT INTO characters (user_id, name) VALUES ($1, $2) RETURNING id;`
 	var characterID int32
 	if err := r.conn.QueryRow(ctx, q, userID, name).Scan(&characterID); err != nil {
-		if strings.Contains(err.Error(), "characters_name_unique") {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint \"characters_name_unique\"") {
 			return nil, &ErrNameExists{}
 		}
 		return nil, fmt.Errorf("failed to insert character: %v", err)
