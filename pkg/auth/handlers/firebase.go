@@ -220,8 +220,11 @@ func (s *FirebaseAuthHandler) HandleLogin() func(w http.ResponseWriter, r *http.
 			}
 
 			switch errorResponse.Error.Message {
-			case ErrorInvalidEmail, ErrorInvalidLoginCredentials:
-				http.Error(w, string(errorResponse.Error.Message), http.StatusBadRequest)
+			case ErrorInvalidEmail:
+				http.Error(w, "Invalid email", http.StatusBadRequest)
+				return
+			case ErrorInvalidLoginCredentials:
+				http.Error(w, "Invalid credentials", http.StatusBadRequest)
 				return
 			}
 

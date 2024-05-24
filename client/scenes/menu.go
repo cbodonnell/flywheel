@@ -5,6 +5,8 @@ import (
 
 	"github.com/cbodonnell/flywheel/client/fonts"
 	"github.com/cbodonnell/flywheel/client/objects"
+	"github.com/cbodonnell/flywheel/client/ui"
+	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
@@ -14,21 +16,24 @@ import (
 type MenuScene struct {
 	*BaseScene
 
-	callbacks MenuSceneCallbacks
-	ui        *ebitenui.UI
+	onLogin  func(email, password string) error
+	ui       *ebitenui.UI
+	email    string
+	password string
+	loginErr string
 }
 
-type MenuSceneCallbacks struct {
+type MenuSceneOptions struct {
 	// OnLogin is called when the start game button is pressed.
-	OnLogin func(email, password string)
+	OnLogin func(email, password string) error
 }
 
 var _ Scene = &MenuScene{}
 
-func NewMenuScene(callbacks MenuSceneCallbacks) (Scene, error) {
+func NewMenuScene(opts MenuSceneOptions) (Scene, error) {
 	return &MenuScene{
 		BaseScene: NewBaseScene(objects.NewBaseObject("menu-root", nil)),
-		callbacks: callbacks,
+		onLogin:   opts.OnLogin,
 	}, nil
 }
 
@@ -82,7 +87,11 @@ func (s *MenuScene) renderUI() {
 			widget.CaretOpts.Size(fontFace, 2),
 		),
 		widget.TextInputOpts.Placeholder("Email"),
+		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
+			s.email = args.InputText
+		}),
 	)
+	emailTextInput.SetText(s.email)
 	rootContainer.AddChild(emailTextInput)
 
 	passwordTextInput := widget.NewTextInput(
@@ -110,7 +119,11 @@ func (s *MenuScene) renderUI() {
 		),
 		widget.TextInputOpts.Placeholder("Password"),
 		widget.TextInputOpts.Secure(true),
+		widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
+			s.password = args.InputText
+		}),
 	)
+	passwordTextInput.SetText(s.password)
 	rootContainer.AddChild(passwordTextInput)
 
 	button := widget.NewButton(
@@ -134,7 +147,20 @@ func (s *MenuScene) renderUI() {
 	)
 	rootContainer.AddChild(button)
 
+	if s.loginErr != "" {
+		rootContainer.AddChild(widget.NewText(
+			widget.TextOpts.Text(s.loginErr, fontFace, color.NRGBA{R: 255, G: 0, B: 0, A: 255}),
+			widget.TextOpts.WidgetOpts(
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+					Position: widget.RowLayoutPositionCenter,
+				}),
+			),
+		))
+		s.loginErr = ""
+	}
+
 	// auto focus the email text input
+	// TODO: fix duplicate focus issue on re-render
 	emailTextInput.Focus(true)
 
 	// register login handler with relevant widget events
@@ -143,7 +169,15 @@ func (s *MenuScene) renderUI() {
 		if email == "" || password == "" {
 			return
 		}
-		s.callbacks.OnLogin(email, password)
+		if err := s.onLogin(email, password); err != nil {
+			log.Error("Failed to login: %v", err)
+			if actionableErr, ok := err.(*ui.ActionableError); ok {
+				s.loginErr = actionableErr.Message
+			} else {
+				s.loginErr = "Failed to login. Please try again."
+			}
+		}
+		s.renderUI()
 	}
 	emailTextInput.SubmitEvent.AddHandler(loginHandler)
 	passwordTextInput.SubmitEvent.AddHandler(loginHandler)

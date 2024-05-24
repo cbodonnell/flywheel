@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/cbodonnell/flywheel/client/ui"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -33,6 +35,8 @@ type NetworkManager struct {
 	clientID        uint32
 	clientIDMutex   sync.Mutex
 	clientIDChan    <-chan uint32
+	loginErr        error
+	loginErrChan    <-chan error
 
 	isConnected     bool
 	serverTime      float64
@@ -52,9 +56,10 @@ type ServerSettings struct {
 // NewNetworkManager creates a new network manager.
 func NewNetworkManager(serverSettings ServerSettings, messageQueue queue.Queue) (*NetworkManager, error) {
 	clientIDChan := make(chan uint32)
+	loginErrChan := make(chan error)
 	serverTimeChan := make(chan *messages.ServerSyncTime)
 
-	tcpClient := NewTCPClient(fmt.Sprintf("%s:%d", serverSettings.Hostname, serverSettings.TCPPort), messageQueue, clientIDChan, serverTimeChan)
+	tcpClient := NewTCPClient(fmt.Sprintf("%s:%d", serverSettings.Hostname, serverSettings.TCPPort), messageQueue, clientIDChan, loginErrChan, serverTimeChan)
 	udpClient, err := NewUDPClient(fmt.Sprintf("%s:%d", serverSettings.Hostname, serverSettings.UDPPort), messageQueue)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create UDP client: %v", err)
@@ -68,6 +73,7 @@ func NewNetworkManager(serverSettings ServerSettings, messageQueue queue.Queue) 
 		udpClient:          udpClient,
 		udpClientErrChan:   make(chan error),
 		clientIDChan:       clientIDChan,
+		loginErrChan:       loginErrChan,
 		serverTimeChan:     serverTimeChan,
 	}, nil
 }
@@ -91,14 +97,12 @@ func (m *NetworkManager) Start(token string, characterID int32) error {
 	}(ctx)
 
 	if err := m.login(token, characterID); err != nil {
+		if strings.Contains(err.Error(), "is already connected") {
+			return &ui.ActionableError{
+				Message: "You are already connected to the server",
+			}
+		}
 		return fmt.Errorf("failed to login: %v", err)
-	}
-
-	select {
-	case <-time.After(10 * time.Second):
-		return fmt.Errorf("timed out waiting for client ID")
-	case m.clientID = <-m.clientIDChan:
-		log.Info("Connected to server with client ID %d", m.clientID)
 	}
 
 	if err := m.startSyncTime(ctx); err != nil {
@@ -143,6 +147,16 @@ func (m *NetworkManager) login(token string, characterID int32) error {
 	if err := m.SendReliableMessage(msg); err != nil {
 		return fmt.Errorf("failed to send login message: %v", err)
 	}
+
+	select {
+	case m.clientID = <-m.clientIDChan:
+		log.Info("Connected to server with client ID %d", m.clientID)
+	case m.loginErr = <-m.loginErrChan:
+		return fmt.Errorf("failed to login: %v", m.loginErr)
+	case <-time.After(10 * time.Second):
+		return fmt.Errorf("timed out waiting for login response")
+	}
+
 	return nil
 }
 

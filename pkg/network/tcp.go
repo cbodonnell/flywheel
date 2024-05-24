@@ -95,9 +95,17 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 			clientID, err := s.handleClientLogin(ctx, conn, message)
 			if err != nil {
 				log.Error("Failed to handle client login: %v", err)
+				if err := sendServerLoginFailure(conn, err.Error()); err != nil {
+					log.Error("Failed to send server login failure: %v", err)
+				}
 				continue
 			}
 			connectedClientID = clientID
+			log.Info("Client %d connected", connectedClientID)
+			if err := sendServerLoginSuccess(conn, clientID); err != nil {
+				log.Error("Failed to send server login success: %v", err)
+				continue
+			}
 		case messages.MessageTypeClientSyncTime:
 			if err := s.handleClientSyncTime(conn, message); err != nil {
 				log.Error("Failed to handle client sync time: %v", err)
@@ -108,6 +116,50 @@ func (s *TCPServer) handleTCPConnection(conn net.Conn) {
 			}
 		}
 	}
+}
+
+func sendServerLoginSuccess(conn net.Conn, clientID uint32) error {
+	serverLoginSuccess := &messages.ServerLoginSuccess{
+		ClientID: clientID,
+	}
+
+	payload, err := json.Marshal(serverLoginSuccess)
+	if err != nil {
+		return fmt.Errorf("failed to marshal server login success: %v", err)
+	}
+
+	msg := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerLoginSuccess,
+		Payload:  payload,
+	}
+	if err := WriteMessageToTCP(conn, msg); err != nil {
+		return fmt.Errorf("failed to send server login success: %v", err)
+	}
+
+	return nil
+}
+
+func sendServerLoginFailure(conn net.Conn, reason string) error {
+	serverLoginFailure := &messages.ServerLoginFailure{
+		Reason: reason,
+	}
+
+	payload, err := json.Marshal(serverLoginFailure)
+	if err != nil {
+		return fmt.Errorf("failed to marshal server login failure: %v", err)
+	}
+
+	msg := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerLoginFailure,
+		Payload:  payload,
+	}
+	if err := WriteMessageToTCP(conn, msg); err != nil {
+		return fmt.Errorf("failed to send server login failure: %v", err)
+	}
+
+	return nil
 }
 
 // handleClientLogin handles a client login message.
@@ -125,27 +177,6 @@ func (s *TCPServer) handleClientLogin(ctx context.Context, conn net.Conn, messag
 	clientID, err := s.ClientManager.ConnectClient(conn, token.UID, clientLogin.CharacterID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to connect client: %v", err)
-	}
-
-	log.Info("Client %d connected as %s", clientID, token.UID)
-
-	assignID := messages.ServerLoginSuccess{
-		ClientID: clientID,
-	}
-
-	payload, err := json.Marshal(assignID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to marshal server login success: %v", err)
-	}
-
-	// Send the client its ID
-	msg := &messages.Message{
-		ClientID: 0,
-		Type:     messages.MessageTypeServerLoginSuccess,
-		Payload:  payload,
-	}
-	if err := WriteMessageToTCP(conn, msg); err != nil {
-		return 0, fmt.Errorf("failed to send server login success: %v", err)
 	}
 
 	return clientID, nil

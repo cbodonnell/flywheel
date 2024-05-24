@@ -16,16 +16,18 @@ type TCPClient struct {
 	serverAddr     string
 	messageQueue   queue.Queue
 	clientIDChan   chan<- uint32
+	loginErrChan   chan<- error
 	serverTimeChan chan<- *messages.ServerSyncTime
 	conn           net.Conn
 }
 
 // NewTCPClient creates a new TCP client.
-func NewTCPClient(serverAddr string, messageQueue queue.Queue, clientIDChan chan<- uint32, serverTimeChan chan<- *messages.ServerSyncTime) *TCPClient {
+func NewTCPClient(serverAddr string, messageQueue queue.Queue, clientIDChan chan<- uint32, loginErrChan chan<- error, serverTimeChan chan<- *messages.ServerSyncTime) *TCPClient {
 	return &TCPClient{
 		serverAddr:     serverAddr,
 		messageQueue:   messageQueue,
 		clientIDChan:   clientIDChan,
+		loginErrChan:   loginErrChan,
 		serverTimeChan: serverTimeChan,
 	}
 }
@@ -71,6 +73,15 @@ func (c *TCPClient) HandleMessages(ctx context.Context) error {
 			}
 			// write the client ID back to the manager
 			c.clientIDChan <- assignID.ClientID
+		case messages.MessageTypeServerLoginFailure:
+			loginFailure := &messages.ServerLoginFailure{}
+			err := json.Unmarshal(msg.Payload, loginFailure)
+			if err != nil {
+				log.Error("Failed to deserialize server login failure message: %v", err)
+				continue
+			}
+			loginErr := fmt.Errorf("server login failure: %s", loginFailure.Reason)
+			c.loginErrChan <- loginErr
 		case messages.MessageTypeServerSyncTime:
 			serverSyncTime := &messages.ServerSyncTime{}
 			err := json.Unmarshal(msg.Payload, serverSyncTime)

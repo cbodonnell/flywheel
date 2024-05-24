@@ -8,7 +8,7 @@ import (
 // IsPositiveJustPressed returns a boolean value indicating whether the generic positive input is just pressed.
 // This is used to handle both keyboard and touch inputs.
 func IsPositiveJustPressed() bool {
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
 		return true
 	}
 	touchIDs := inpututil.AppendJustPressedTouchIDs(nil)
