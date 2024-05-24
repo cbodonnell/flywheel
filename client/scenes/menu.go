@@ -160,6 +160,7 @@ func (s *MenuScene) renderUI() {
 	}
 
 	// auto focus the email text input
+	// TODO: fix duplicate focus issue on re-render
 	emailTextInput.Focus(true)
 
 	// register login handler with relevant widget events
