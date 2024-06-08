@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -31,40 +32,45 @@ func NewServerMessageWorker(opts NewServerMessageWorkerOptions) *ServerMessageWo
 	}
 }
 
-func (w *ServerMessageWorker) Start() {
-	for msg := range w.serverMessageChan {
-		switch msg.Type {
-		case messages.MessageTypeServerPlayerConnect:
-			if err := w.handleServerPlayerConnect(msg); err != nil {
-				log.Error("Failed to handle server player connect message: %v", err)
+func (w *ServerMessageWorker) Start(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg := <-w.serverMessageChan:
+			switch msg.Type {
+			case messages.MessageTypeServerPlayerConnect:
+				if err := w.handleServerPlayerConnect(msg); err != nil {
+					log.Error("Failed to handle server player connect message: %v", err)
+				}
+			case messages.MessageTypeServerPlayerDisconnect:
+				if err := w.handleServerPlayerDisconnect(msg); err != nil {
+					log.Error("Failed to handle server player disconnect message: %v", err)
+				}
+			case messages.MessageTypeServerGameUpdate:
+				if err := w.handleServerGameUpdate(msg); err != nil {
+					log.Error("Failed to handle server game update message: %v", err)
+				}
+			case messages.MessageTypeServerNPCHit:
+				if err := w.handleServerNPCHit(msg); err != nil {
+					log.Error("Failed to handle server NPC hit message: %v", err)
+				}
+			case messages.MessageTypeServerNPCKill:
+				if err := w.handleServerNPCKill(msg); err != nil {
+					log.Error("Failed to handle server NPC kill message: %v", err)
+				}
+			case messages.MessageTypeServerPlayerHit:
+				if err := w.handleServerPlayerHit(msg); err != nil {
+					log.Error("Failed to handle server player hit message: %v", err)
+				}
+			case messages.MessageTypeServerPlayerKill:
+				if err := w.handleServerPlayerKill(msg); err != nil {
+					log.Error("Failed to handle server player kill message: %v", err)
+				}
+			default:
+				log.Error("Unknown server message type: %v", msg.Type)
+				continue
 			}
-		case messages.MessageTypeServerPlayerDisconnect:
-			if err := w.handleServerPlayerDisconnect(msg); err != nil {
-				log.Error("Failed to handle server player disconnect message: %v", err)
-			}
-		case messages.MessageTypeServerGameUpdate:
-			if err := w.handleServerGameUpdate(msg); err != nil {
-				log.Error("Failed to handle server game update message: %v", err)
-			}
-		case messages.MessageTypeServerNPCHit:
-			if err := w.handleServerNPCHit(msg); err != nil {
-				log.Error("Failed to handle server NPC hit message: %v", err)
-			}
-		case messages.MessageTypeServerNPCKill:
-			if err := w.handleServerNPCKill(msg); err != nil {
-				log.Error("Failed to handle server NPC kill message: %v", err)
-			}
-		case messages.MessageTypeServerPlayerHit:
-			if err := w.handleServerPlayerHit(msg); err != nil {
-				log.Error("Failed to handle server player hit message: %v", err)
-			}
-		case messages.MessageTypeServerPlayerKill:
-			if err := w.handleServerPlayerKill(msg); err != nil {
-				log.Error("Failed to handle server player kill message: %v", err)
-			}
-		default:
-			log.Error("Unknown server message type: %v", msg.Type)
-			continue
 		}
 	}
 }

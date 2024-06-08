@@ -35,16 +35,21 @@ func NewConnectionEventWorker(opts NewConnectionEventWorkerOptions) *ConnectionE
 	}
 }
 
-func (w *ConnectionEventWorker) Start() {
-	for event := range w.clientManager.GetConnectionEventChan() {
-		switch event.Type {
-		case network.ConnectionEventTypeConnect:
-			w.handleClientConnect(event)
-		case network.ConnectionEventTypeDisconnect:
-			w.handleClientDisconnect(event)
-		default:
-			log.Error("Unknown client event type: %v", event.Type)
-			continue
+func (w *ConnectionEventWorker) Start(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event := <-w.clientManager.GetConnectionEventChan():
+			switch event.Type {
+			case network.ConnectionEventTypeConnect:
+				w.handleClientConnect(event)
+			case network.ConnectionEventTypeDisconnect:
+				w.handleClientDisconnect(event)
+			default:
+				log.Error("Unknown client event type: %v", event.Type)
+				continue
+			}
 		}
 	}
 }

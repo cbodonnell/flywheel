@@ -128,7 +128,7 @@ func main() {
 		Repository:       repository,
 		ServerEventQueue: serverEventQueue,
 	})
-	go connectionEventWorker.Start()
+	go connectionEventWorker.Start(ctx)
 
 	savePlayerStateChannelSize := 100
 	savePlayerStateChan := make(chan workers.SavePlayerStateRequest, savePlayerStateChannelSize)
@@ -150,7 +150,7 @@ func main() {
 		ClientManager:     clientManager,
 		ServerMessageChan: serverMessageChan,
 	})
-	go serverMessageWorker.Start()
+	go serverMessageWorker.Start(ctx)
 
 	gameLoopInterval := 50 * time.Millisecond // 20 ticks per second
 	gameManager := game.NewGameManager(game.NewGameManagerOptions{
