@@ -87,6 +87,17 @@ func NewNPCState(id uint32, spawnPosition kinematic.Vector, wanderRangeMinX, wan
 	}
 }
 
+func (n *NPCState) Equals(other *NPCState) bool {
+	return n.Position.Equals(other.Position) &&
+		n.Velocity.Equals(other.Velocity) &&
+		n.IsOnGround == other.IsOnGround &&
+		n.IsAttacking == other.IsAttacking &&
+		n.Animation == other.Animation &&
+		n.AnimationFlip == other.AnimationFlip &&
+		n.AnimationSequence == other.AnimationSequence &&
+		n.Hitpoints == other.Hitpoints
+}
+
 func (n *NPCState) Copy() *NPCState {
 	return &NPCState{
 		Position:          n.Position,
@@ -111,6 +122,8 @@ func (n *NPCState) RespawnTime() float64 {
 // Update updates the NPC state based on the current state and the time passed
 // and returns whether the state has changed
 func (n *NPCState) Update(deltaTime float64) (changed bool) {
+	previousState := n.Copy()
+
 	// Respawn
 	if n.IsDead() {
 		if n.RespawnTime() <= 0 {
@@ -290,8 +303,7 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 		n.ResetAnimation = false
 	}
 
-	// TODO: return false if the update did not change the state
-	return true
+	return !n.Equals(previousState)
 }
 
 func (n *NPCState) TakeDamage(damage int16) {

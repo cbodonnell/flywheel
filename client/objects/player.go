@@ -276,7 +276,7 @@ func (o *Player) ReconcileState(state *gametypes.PlayerState) error {
 		ps := o.previousStates[i]
 		if ps.Timestamp == state.LastProcessedTimestamp {
 			foundPreviousState = true
-			if ps.State.NeedsReconciliation(state) {
+			if ps.NeedsReconciliation(state) {
 				// TODO: investigate reconciliation upon death and respawn
 				log.Warn("Reconciling player state at timestamp %d for %s", state.LastProcessedTimestamp, o.ID)
 				log.Warn("Client state: %v", ps.State)
@@ -310,4 +310,18 @@ func (o *Player) ReconcileState(state *gametypes.PlayerState) error {
 	}
 
 	return nil
+}
+
+// NeedsReconciliation returns true if the previous state needs to be reconciled with an authoritative state
+func (ps PreviousState) NeedsReconciliation(other *gametypes.PlayerState) bool {
+	if ps.State.Position.Equals(other.Position) &&
+		ps.State.Velocity.Equals(other.Velocity) &&
+		ps.State.IsOnGround == other.IsOnGround &&
+		ps.State.IsAttacking == other.IsAttacking &&
+		ps.State.Animation == other.Animation &&
+		ps.State.AnimationFlip == other.AnimationFlip &&
+		ps.State.AnimationSequence == other.AnimationSequence {
+		return false
+	}
+	return true
 }

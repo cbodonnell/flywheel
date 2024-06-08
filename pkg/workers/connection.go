@@ -48,7 +48,6 @@ func (w *ConnectionEventWorker) Start(ctx context.Context) {
 				w.handleClientDisconnect(event)
 			default:
 				log.Error("Unknown client event type: %v", event.Type)
-				continue
 			}
 		}
 	}

@@ -51,6 +51,14 @@ func (w *BroadcastMessageWorker) Start(ctx context.Context) {
 				if err := w.handleServerGameUpdate(msg); err != nil {
 					log.Error("Failed to handle server game update message: %v", err)
 				}
+			case messages.MessageTypeServerPlayerUpdate:
+				if err := w.handleServerPlayerUpdate(msg); err != nil {
+					log.Error("Failed to handle server player update message: %v", err)
+				}
+			case messages.MessageTypeServerNPCUpdate:
+				if err := w.handleServerNPCUpdate(msg); err != nil {
+					log.Error("Failed to handle server NPC update message: %v", err)
+				}
 			case messages.MessageTypeServerNPCHit:
 				if err := w.handleServerNPCHit(msg); err != nil {
 					log.Error("Failed to handle server NPC hit message: %v", err)
@@ -69,7 +77,6 @@ func (w *BroadcastMessageWorker) Start(ctx context.Context) {
 				}
 			default:
 				log.Error("Unknown server message type: %v", msg.Type)
-				continue
 			}
 		}
 	}
@@ -146,6 +153,72 @@ func (w *BroadcastMessageWorker) handleServerGameUpdate(msg BroadcastMessage) er
 		message := &messages.Message{
 			ClientID: 0,
 			Type:     messages.MessageTypeServerGameUpdate,
+			Payload:  payload,
+		}
+
+		if client.UDPAddress == nil {
+			log.Trace("Client %d does not have a UDP address", client.ID)
+			continue
+		}
+
+		err := network.WriteMessageToUDP(w.clientManager.GetUDPConn(), client.UDPAddress, message)
+		if err != nil {
+			log.Error("Failed to write message to UDP connection for client %d: %v", client.ID, err)
+			continue
+		}
+	}
+
+	return nil
+}
+
+func (w *BroadcastMessageWorker) handleServerPlayerUpdate(msg BroadcastMessage) error {
+	playerUpdate, ok := msg.Message.(*messages.ServerPlayerUpdate)
+	if !ok {
+		return fmt.Errorf("failed to cast server player update message")
+	}
+
+	payload, err := messages.SerializeServerPlayerUpdate(playerUpdate)
+	if err != nil {
+		return fmt.Errorf("failed to serialize player state: %v", err)
+	}
+
+	for _, client := range w.clientManager.GetClients() {
+		message := &messages.Message{
+			ClientID: 0,
+			Type:     messages.MessageTypeServerPlayerUpdate,
+			Payload:  payload,
+		}
+
+		if client.UDPAddress == nil {
+			log.Trace("Client %d does not have a UDP address", client.ID)
+			continue
+		}
+
+		err := network.WriteMessageToUDP(w.clientManager.GetUDPConn(), client.UDPAddress, message)
+		if err != nil {
+			log.Error("Failed to write message to UDP connection for client %d: %v", client.ID, err)
+			continue
+		}
+	}
+
+	return nil
+}
+
+func (w *BroadcastMessageWorker) handleServerNPCUpdate(msg BroadcastMessage) error {
+	npcUpdate, ok := msg.Message.(*messages.ServerNPCUpdate)
+	if !ok {
+		return fmt.Errorf("failed to cast server NPC update message")
+	}
+
+	payload, err := messages.SerializeServerNPCUpdate(npcUpdate)
+	if err != nil {
+		return fmt.Errorf("failed to serialize NPC state: %v", err)
+	}
+
+	for _, client := range w.clientManager.GetClients() {
+		message := &messages.Message{
+			ClientID: 0,
+			Type:     messages.MessageTypeServerNPCUpdate,
 			Payload:  payload,
 		}
 
