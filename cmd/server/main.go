@@ -13,7 +13,6 @@ import (
 	authhandlers "github.com/cbodonnell/flywheel/pkg/auth/handlers"
 	authproviders "github.com/cbodonnell/flywheel/pkg/auth/providers"
 	"github.com/cbodonnell/flywheel/pkg/game"
-	"github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/network"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -61,8 +60,8 @@ func main() {
 	authServer := auth.NewAuthServer(authServerOpts)
 	go authServer.Start()
 
-	clientManager := network.NewClientManager()
-	clientMessageQueue := queue.NewInMemoryQueue(10000)
+	connectionEventChan := make(chan network.ConnectionEvent, 100)
+	clientManager := network.NewClientManager(connectionEventChan)
 
 	firebaseProjectID := os.Getenv("FLYWHEEL_FIREBASE_PROJECT_ID")
 	if firebaseProjectID == "" {
@@ -73,6 +72,7 @@ func main() {
 		panic(fmt.Sprintf("Failed to create Firebase auth provider: %v", err))
 	}
 
+	clientMessageQueue := queue.NewInMemoryQueue(10000)
 	tcpServer := network.NewTCPServer(authProvider, clientManager, clientMessageQueue, *tcpPort)
 	udpServer := network.NewUDPServer(clientManager, clientMessageQueue, *udpPort)
 	go tcpServer.Start()
@@ -122,45 +122,34 @@ func main() {
 	go apiServer.Start()
 
 	serverEventQueue := queue.NewInMemoryQueue(1000)
-
 	connectionEventWorker := workers.NewConnectionEventWorker(workers.NewConnectionEventWorkerOptions{
-		ClientManager:    clientManager,
-		Repository:       repository,
-		ServerEventQueue: serverEventQueue,
+		ConnectionEventChan: connectionEventChan,
+		Repository:          repository,
+		ServerEventQueue:    serverEventQueue,
 	})
 	go connectionEventWorker.Start(ctx)
 
-	savePlayerStateChannelSize := 100
-	savePlayerStateChan := make(chan workers.SavePlayerStateRequest, savePlayerStateChannelSize)
-
-	gameState := types.NewGameState(game.NewCollisionSpace())
-	saveLoopInterval := 10 * time.Second
+	saveStateChan := make(chan workers.SaveStateRequest, 100)
 	saveGameStateWorker := workers.NewSaveGameStateWorker(workers.NewSaveGameStateWorkerOptions{
-		Repository:          repository,
-		SavePlayerStateChan: savePlayerStateChan,
-		GameState:           gameState, // TODO: only the game loop should have access to this
-		Interval:            saveLoopInterval,
+		Repository:    repository,
+		SaveStateChan: saveStateChan,
 	})
 	go saveGameStateWorker.Start(ctx)
 
-	serverMessageChannelSize := 100
-	serverMessageChan := make(chan workers.ServerMessage, serverMessageChannelSize)
-
+	serverMessageChan := make(chan workers.ServerMessage, 100)
 	serverMessageWorker := workers.NewServerMessageWorker(workers.NewServerMessageWorkerOptions{
 		ClientManager:     clientManager,
 		ServerMessageChan: serverMessageChan,
 	})
 	go serverMessageWorker.Start(ctx)
 
-	gameLoopInterval := 50 * time.Millisecond // 20 ticks per second
 	gameManager := game.NewGameManager(game.NewGameManagerOptions{
-		ClientMessageQueue:  clientMessageQueue,
-		ServerEventQueue:    serverEventQueue,
-		Repository:          repository,
-		GameState:           gameState,
-		SavePlayerStateChan: savePlayerStateChan,
-		ServerMessageChan:   serverMessageChan,
-		GameLoopInterval:    gameLoopInterval,
+		ClientMessageQueue: clientMessageQueue,
+		ServerEventQueue:   serverEventQueue,
+		SaveStateChan:      saveStateChan,
+		ServerMessageChan:  serverMessageChan,
+		GameLoopInterval:   50 * time.Millisecond, // 20 ticks per second
+		SaveStateInterval:  5 * time.Second,
 	})
 
 	log.Info("Starting game manager")
