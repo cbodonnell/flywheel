@@ -12,7 +12,6 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
-	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/workers"
 	"github.com/solarlune/resolv"
 )
@@ -21,7 +20,6 @@ type GameManager struct {
 	gameState          *types.GameState
 	clientMessageQueue queue.Queue
 	serverEventQueue   queue.Queue
-	repository         repositories.Repository
 	saveStateChan      chan<- workers.SaveStateRequest
 	serverMessageChan  chan<- workers.ServerMessage
 	gameLoopInterval   time.Duration
@@ -32,7 +30,6 @@ type GameManager struct {
 type NewGameManagerOptions struct {
 	ClientMessageQueue queue.Queue
 	ServerEventQueue   queue.Queue
-	Repository         repositories.Repository
 	SaveStateChan      chan<- workers.SaveStateRequest
 	ServerMessageChan  chan<- workers.ServerMessage
 	GameLoopInterval   time.Duration
@@ -44,7 +41,6 @@ func NewGameManager(opts NewGameManagerOptions) *GameManager {
 		gameState:          types.NewGameState(NewCollisionSpace()),
 		clientMessageQueue: opts.ClientMessageQueue,
 		serverEventQueue:   opts.ServerEventQueue,
-		repository:         opts.Repository,
 		saveStateChan:      opts.SaveStateChan,
 		serverMessageChan:  opts.ServerMessageChan,
 		gameLoopInterval:   opts.GameLoopInterval,

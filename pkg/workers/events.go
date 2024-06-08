@@ -13,15 +13,15 @@ import (
 )
 
 type ConnectionEventWorker struct {
-	clientManager    *network.ClientManager
-	repository       repositories.Repository
-	serverEventQueue queue.Queue
+	connectionEventChan <-chan network.ConnectionEvent
+	repository          repositories.Repository
+	serverEventQueue    queue.Queue
 }
 
 type NewConnectionEventWorkerOptions struct {
-	ClientManager    *network.ClientManager
-	Repository       repositories.Repository
-	ServerEventQueue queue.Queue
+	ConnectionEventChan <-chan network.ConnectionEvent
+	Repository          repositories.Repository
+	ServerEventQueue    queue.Queue
 }
 
 // NewConnectionEventWorker creates a new ConnectionEventWorker.
@@ -29,9 +29,9 @@ type NewConnectionEventWorkerOptions struct {
 // and writes server events to a queue for the game loop to process.
 func NewConnectionEventWorker(opts NewConnectionEventWorkerOptions) *ConnectionEventWorker {
 	return &ConnectionEventWorker{
-		clientManager:    opts.ClientManager,
-		repository:       opts.Repository,
-		serverEventQueue: opts.ServerEventQueue,
+		connectionEventChan: opts.ConnectionEventChan,
+		repository:          opts.Repository,
+		serverEventQueue:    opts.ServerEventQueue,
 	}
 }
 
@@ -40,7 +40,7 @@ func (w *ConnectionEventWorker) Start(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case event := <-w.clientManager.GetConnectionEventChan():
+		case event := <-w.connectionEventChan:
 			switch event.Type {
 			case network.ConnectionEventTypeConnect:
 				w.handleClientConnect(event)

@@ -49,21 +49,16 @@ type ClientManager struct {
 	clientsLock sync.RWMutex
 	// UDP connection for broadcasting to clients
 	udpConn             *net.UDPConn
-	connectionEventChan chan ConnectionEvent
+	connectionEventChan chan<- ConnectionEvent
 }
 
 // NewClientManager creates a new ClientManager
-func NewClientManager() *ClientManager {
+func NewClientManager(connectionEventChan chan<- ConnectionEvent) *ClientManager {
 	return &ClientManager{
 		clients:             make(map[uint32]*Client),
 		clientUIDs:          make(map[string]uint32),
-		connectionEventChan: make(chan ConnectionEvent, ConnectionEventChannelSize),
+		connectionEventChan: connectionEventChan,
 	}
-}
-
-// GetConnectionEventChan returns a one-way channel for receiving client events
-func (cm *ClientManager) GetConnectionEventChan() <-chan ConnectionEvent {
-	return cm.connectionEventChan
 }
 
 // SetUDPConn sets the UDP listener connection for all clients
