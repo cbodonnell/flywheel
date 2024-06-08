@@ -11,7 +11,6 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/kinematic"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
-	"github.com/cbodonnell/flywheel/pkg/network"
 	"github.com/cbodonnell/flywheel/pkg/queue"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/workers"
@@ -19,34 +18,34 @@ import (
 )
 
 type GameManager struct {
-	clientManager        *network.ClientManager
 	clientMessageQueue   queue.Queue
 	connectionEventQueue queue.Queue
 	repository           repositories.Repository
 	gameState            *types.GameState
 	savePlayerStateChan  chan<- workers.SavePlayerStateRequest
+	serverMessageChan    chan<- workers.ServerMessage
 	gameLoopInterval     time.Duration
 }
 
 // NewGameManagerOptions contains options for creating a new GameManager.
 type NewGameManagerOptions struct {
-	ClientManager        *network.ClientManager
 	ClientMessageQueue   queue.Queue
 	ConnectionEventQueue queue.Queue
 	Repository           repositories.Repository
 	GameState            *types.GameState
 	SavePlayerStateChan  chan<- workers.SavePlayerStateRequest
+	ServerMessageChan    chan<- workers.ServerMessage
 	GameLoopInterval     time.Duration
 }
 
 func NewGameManager(opts NewGameManagerOptions) *GameManager {
 	return &GameManager{
-		clientManager:        opts.ClientManager,
 		clientMessageQueue:   opts.ClientMessageQueue,
 		connectionEventQueue: opts.ConnectionEventQueue,
 		repository:           opts.Repository,
 		gameState:            opts.GameState,
 		savePlayerStateChan:  opts.SavePlayerStateChan,
+		serverMessageChan:    opts.ServerMessageChan,
 		gameLoopInterval:     opts.GameLoopInterval,
 	}
 }
@@ -153,28 +152,13 @@ func (gm *GameManager) handleConnectPlayerEvent(event *types.ConnectPlayerEvent)
 	// add the player object to the collision space
 	gm.gameState.CollisionSpace.Add(playerState.Object)
 
-	// send a message to connected clients to add the player to the game
 	playerConnect := &messages.ServerPlayerConnect{
 		ClientID:    event.ClientID,
 		PlayerState: PlayerStateUpdateFromState(playerState),
 	}
-	payload, err := json.Marshal(playerConnect)
-	if err != nil {
-		return fmt.Errorf("failed to marshal player state: %v", err)
-	}
-
-	for _, client := range gm.clientManager.GetClients() {
-		msg := &messages.Message{
-			ClientID: 0, // ClientID 0 means the message is from the server
-			Type:     messages.MessageTypeServerPlayerConnect,
-			Payload:  payload,
-		}
-
-		err := network.WriteMessageToTCP(client.TCPConn, msg)
-		if err != nil {
-			log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	gm.serverMessageChan <- workers.ServerMessage{
+		Type:    messages.MessageTypeServerPlayerConnect,
+		Message: playerConnect,
 	}
 
 	return nil
@@ -199,27 +183,12 @@ func (gm *GameManager) handleDisconnectPlayerEvent(event *types.DisconnectPlayer
 	// delete the player from the game state
 	delete(gm.gameState.Players, event.ClientID)
 
-	// send a message to connected clients to remove the player from the game
 	playerDisconnect := &messages.ServerPlayerDisconnect{
 		ClientID: event.ClientID,
 	}
-	payload, err := json.Marshal(playerDisconnect)
-	if err != nil {
-		return fmt.Errorf("failed to marshal player disconnect message: %v", err)
-	}
-
-	for _, client := range gm.clientManager.GetClients() {
-		msg := &messages.Message{
-			ClientID: 0, // ClientID 0 means the message is from the server
-			Type:     messages.MessageTypeServerPlayerDisconnect,
-			Payload:  payload,
-		}
-
-		err := network.WriteMessageToTCP(client.TCPConn, msg)
-		if err != nil {
-			log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	gm.serverMessageChan <- workers.ServerMessage{
+		Type:    messages.MessageTypeServerPlayerDisconnect,
+		Message: playerDisconnect,
 	}
 
 	return nil
@@ -351,24 +320,9 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 			PlayerID: clientID,
 			Damage:   damage,
 		}
-		payload, err := json.Marshal(npcHit)
-		if err != nil {
-			log.Error("Failed to marshal NPC hit message: %v", err)
-			continue
-		}
-
-		for _, client := range gm.clientManager.GetClients() {
-			msg := &messages.Message{
-				ClientID: 0, // ClientID 0 means the message is from the server
-				Type:     messages.MessageTypeServerNPCHit,
-				Payload:  payload,
-			}
-
-			err := network.WriteMessageToTCP(client.TCPConn, msg)
-			if err != nil {
-				log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-				continue
-			}
+		gm.serverMessageChan <- workers.ServerMessage{
+			Type:    messages.MessageTypeServerNPCHit,
+			Message: npcHit,
 		}
 
 		if !npcState.IsDead() {
@@ -386,24 +340,9 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 			NPCID:    npcID,
 			PlayerID: clientID,
 		}
-		payload, err = json.Marshal(npcKill)
-		if err != nil {
-			log.Error("Failed to marshal NPC kill message: %v", err)
-			continue
-		}
-
-		for _, client := range gm.clientManager.GetClients() {
-			msg := &messages.Message{
-				ClientID: 0, // ClientID 0 means the message is from the server
-				Type:     messages.MessageTypeServerNPCKill,
-				Payload:  payload,
-			}
-
-			err := network.WriteMessageToTCP(client.TCPConn, msg)
-			if err != nil {
-				log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-				continue
-			}
+		gm.serverMessageChan <- workers.ServerMessage{
+			Type:    messages.MessageTypeServerNPCKill,
+			Message: npcKill,
 		}
 	}
 }
@@ -482,24 +421,9 @@ func (gm *GameManager) checkNPCAttackHit(npcID uint32, npcState *types.NPCState)
 			NPCID:    npcID,
 			Damage:   damage,
 		}
-		payload, err := json.Marshal(playerHit)
-		if err != nil {
-			log.Error("Failed to marshal player hit message: %v", err)
-			continue
-		}
-
-		for _, client := range gm.clientManager.GetClients() {
-			msg := &messages.Message{
-				ClientID: 0, // ClientID 0 means the message is from the server
-				Type:     messages.MessageTypeServerPlayerHit,
-				Payload:  payload,
-			}
-
-			err := network.WriteMessageToTCP(client.TCPConn, msg)
-			if err != nil {
-				log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-				continue
-			}
+		gm.serverMessageChan <- workers.ServerMessage{
+			Type:    messages.MessageTypeServerPlayerHit,
+			Message: playerHit,
 		}
 
 		if !playerState.IsDead() {
@@ -511,24 +435,9 @@ func (gm *GameManager) checkNPCAttackHit(npcID uint32, npcState *types.NPCState)
 			PlayerID: playerID,
 			NPCID:    npcID,
 		}
-		payload, err = json.Marshal(playerKill)
-		if err != nil {
-			log.Error("Failed to marshal player kill message: %v", err)
-			continue
-		}
-
-		for _, client := range gm.clientManager.GetClients() {
-			msg := &messages.Message{
-				ClientID: 0, // ClientID 0 means the message is from the server
-				Type:     messages.MessageTypeServerPlayerKill,
-				Payload:  payload,
-			}
-
-			err := network.WriteMessageToTCP(client.TCPConn, msg)
-			if err != nil {
-				log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-				continue
-			}
+		gm.serverMessageChan <- workers.ServerMessage{
+			Type:    messages.MessageTypeServerPlayerKill,
+			Message: playerKill,
 		}
 	}
 }
@@ -552,32 +461,12 @@ func (gm *GameManager) checkNPCLineOfSight(npcState *types.NPCState) {
 
 // broadcastGameState sends the game state to connected clients.
 func (gm *GameManager) broadcastGameState() {
-	serverGameUpdate := ServerGameUpdateFromState(gm.gameState)
-	payload, err := messages.SerializeGameState(serverGameUpdate)
-	if err != nil {
-		log.Error("Failed to serialize game state: %v", err)
-		return
-	}
 	// TODO: this is not scalable for large numbers of clients.
 	// sending individual player and npc updates may be more efficient.
 	// TODO: player vs localPlayer updates should be handled differently
-
-	for _, client := range gm.clientManager.GetClients() {
-		message := &messages.Message{
-			ClientID: 0, // ClientID 0 means the message is from the server
-			Type:     messages.MessageTypeServerGameUpdate,
-			Payload:  payload,
-		}
-
-		if client.UDPAddress == nil {
-			log.Trace("Client %d does not have a UDP address", client.ID)
-			continue
-		}
-
-		err := network.WriteMessageToUDP(gm.clientManager.GetUDPConn(), client.UDPAddress, message)
-		if err != nil {
-			log.Error("Failed to write message to UDP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	serverGameUpdate := ServerGameUpdateFromState(gm.gameState)
+	gm.serverMessageChan <- workers.ServerMessage{
+		Type:    messages.MessageTypeServerGameUpdate,
+		Message: serverGameUpdate,
 	}
 }

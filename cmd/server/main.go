@@ -138,19 +138,28 @@ func main() {
 	saveGameStateWorker := workers.NewSaveGameStateWorker(workers.NewSaveGameStateWorkerOptions{
 		Repository:          repository,
 		SavePlayerStateChan: savePlayerStateChan,
-		GameState:           gameState,
+		GameState:           gameState, // TODO: only the game loop should have access to this
 		Interval:            saveLoopInterval,
 	})
 	go saveGameStateWorker.Start(ctx)
 
+	serverMessageChannelSize := 100
+	serverMessageChan := make(chan workers.ServerMessage, serverMessageChannelSize)
+
+	serverMessageWorker := workers.NewServerMessageWorker(workers.NewServerMessageWorkerOptions{
+		ClientManager:     clientManager,
+		ServerMessageChan: serverMessageChan,
+	})
+	go serverMessageWorker.Start()
+
 	gameLoopInterval := 50 * time.Millisecond // 20 ticks per second
 	gameManager := game.NewGameManager(game.NewGameManagerOptions{
-		ClientManager:        clientManager,
 		ClientMessageQueue:   clientMessageQueue,
 		ConnectionEventQueue: connectionEventQueue,
 		Repository:           repository,
 		GameState:            gameState,
 		SavePlayerStateChan:  savePlayerStateChan,
+		ServerMessageChan:    serverMessageChan,
 		GameLoopInterval:     gameLoopInterval,
 	})
 
