@@ -12,35 +12,35 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 )
 
-type ClientEventWorker struct {
-	clientManager        *network.ClientManager
-	repository           repositories.Repository
-	connectionEventQueue queue.Queue
+type ConnectionEventWorker struct {
+	clientManager    *network.ClientManager
+	repository       repositories.Repository
+	serverEventQueue queue.Queue
 }
 
-type NewClientEventWorkerOptions struct {
-	ClientManager        *network.ClientManager
-	Repository           repositories.Repository
-	ConnectionEventQueue queue.Queue
+type NewConnectionEventWorkerOptions struct {
+	ClientManager    *network.ClientManager
+	Repository       repositories.Repository
+	ServerEventQueue queue.Queue
 }
 
-// NewClientEventWorker creates a new ClientEventWorker.
+// NewConnectionEventWorker creates a new ConnectionEventWorker.
 // The worker processes client events like connect and disconnect
-// and writes connection events to a queue for the game loop to process.
-func NewClientEventWorker(opts NewClientEventWorkerOptions) *ClientEventWorker {
-	return &ClientEventWorker{
-		clientManager:        opts.ClientManager,
-		repository:           opts.Repository,
-		connectionEventQueue: opts.ConnectionEventQueue,
+// and writes server events to a queue for the game loop to process.
+func NewConnectionEventWorker(opts NewConnectionEventWorkerOptions) *ConnectionEventWorker {
+	return &ConnectionEventWorker{
+		clientManager:    opts.ClientManager,
+		repository:       opts.Repository,
+		serverEventQueue: opts.ServerEventQueue,
 	}
 }
 
-func (w *ClientEventWorker) Start() {
-	for event := range w.clientManager.GetClientEventChan() {
+func (w *ConnectionEventWorker) Start() {
+	for event := range w.clientManager.GetConnectionEventChan() {
 		switch event.Type {
-		case network.ClientEventTypeConnect:
+		case network.ConnectionEventTypeConnect:
 			w.handleClientConnect(event)
-		case network.ClientEventTypeDisconnect:
+		case network.ConnectionEventTypeDisconnect:
 			w.handleClientDisconnect(event)
 		default:
 			log.Error("Unknown client event type: %v", event.Type)
@@ -49,7 +49,7 @@ func (w *ClientEventWorker) Start() {
 	}
 }
 
-func (w *ClientEventWorker) handleClientConnect(event network.ClientEvent) {
+func (w *ConnectionEventWorker) handleClientConnect(event network.ConnectionEvent) {
 	data, ok := event.Data.(network.ClientConnectData)
 	if !ok {
 		log.Error("Failed to cast client connect data")
@@ -79,7 +79,7 @@ func (w *ClientEventWorker) handleClientConnect(event network.ClientEvent) {
 		hitpoints = gameconstants.PlayerHitpoints
 	}
 
-	if err := w.connectionEventQueue.Enqueue(&gametypes.ConnectPlayerEvent{
+	if err := w.serverEventQueue.Enqueue(&gametypes.ConnectPlayerEvent{
 		ClientID:           event.ClientID,
 		CharacterID:        character.ID,
 		CharacterName:      character.Name,
@@ -90,8 +90,8 @@ func (w *ClientEventWorker) handleClientConnect(event network.ClientEvent) {
 	}
 }
 
-func (w *ClientEventWorker) handleClientDisconnect(event network.ClientEvent) {
-	if err := w.connectionEventQueue.Enqueue(&gametypes.DisconnectPlayerEvent{
+func (w *ConnectionEventWorker) handleClientDisconnect(event network.ConnectionEvent) {
+	if err := w.serverEventQueue.Enqueue(&gametypes.DisconnectPlayerEvent{
 		ClientID: event.ClientID,
 	}); err != nil {
 		log.Error("Failed to enqueue disconnect player event: %v", err)

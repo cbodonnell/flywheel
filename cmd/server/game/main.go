@@ -81,14 +81,14 @@ func main() {
 	}
 	defer repository.Close(ctx)
 
-	connectionEventQueue := queue.NewInMemoryQueue(1000)
+	serverEventQueue := queue.NewInMemoryQueue(1000)
 
-	clientEventWorker := workers.NewClientEventWorker(workers.NewClientEventWorkerOptions{
-		ClientManager:        clientManager,
-		Repository:           repository,
-		ConnectionEventQueue: connectionEventQueue,
+	connectionEventWorker := workers.NewConnectionEventWorker(workers.NewConnectionEventWorkerOptions{
+		ClientManager:    clientManager,
+		Repository:       repository,
+		ServerEventQueue: serverEventQueue,
 	})
-	go clientEventWorker.Start()
+	go connectionEventWorker.Start()
 
 	savePlayerStateChannelSize := 100
 	savePlayerStateChan := make(chan workers.SavePlayerStateRequest, savePlayerStateChannelSize)
@@ -114,13 +114,13 @@ func main() {
 
 	gameLoopInterval := 50 * time.Millisecond // 20 ticks per second
 	gameManager := game.NewGameManager(game.NewGameManagerOptions{
-		ClientMessageQueue:   clientMessageQueue,
-		ConnectionEventQueue: connectionEventQueue,
-		Repository:           repository,
-		GameState:            gameState,
-		SavePlayerStateChan:  savePlayerStateChan,
-		ServerMessageChan:    serverMessageChan,
-		GameLoopInterval:     gameLoopInterval,
+		ClientMessageQueue:  clientMessageQueue,
+		ServerEventQueue:    serverEventQueue,
+		Repository:          repository,
+		GameState:           gameState,
+		SavePlayerStateChan: savePlayerStateChan,
+		ServerMessageChan:   serverMessageChan,
+		GameLoopInterval:    gameLoopInterval,
 	})
 
 	log.Info("Starting game manager")

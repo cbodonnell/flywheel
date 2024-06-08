@@ -18,35 +18,35 @@ import (
 )
 
 type GameManager struct {
-	clientMessageQueue   queue.Queue
-	connectionEventQueue queue.Queue
-	repository           repositories.Repository
-	gameState            *types.GameState
-	savePlayerStateChan  chan<- workers.SavePlayerStateRequest
-	serverMessageChan    chan<- workers.ServerMessage
-	gameLoopInterval     time.Duration
+	clientMessageQueue  queue.Queue
+	serverEventQueue    queue.Queue
+	repository          repositories.Repository
+	gameState           *types.GameState
+	savePlayerStateChan chan<- workers.SavePlayerStateRequest
+	serverMessageChan   chan<- workers.ServerMessage
+	gameLoopInterval    time.Duration
 }
 
 // NewGameManagerOptions contains options for creating a new GameManager.
 type NewGameManagerOptions struct {
-	ClientMessageQueue   queue.Queue
-	ConnectionEventQueue queue.Queue
-	Repository           repositories.Repository
-	GameState            *types.GameState
-	SavePlayerStateChan  chan<- workers.SavePlayerStateRequest
-	ServerMessageChan    chan<- workers.ServerMessage
-	GameLoopInterval     time.Duration
+	ClientMessageQueue  queue.Queue
+	ServerEventQueue    queue.Queue
+	Repository          repositories.Repository
+	GameState           *types.GameState
+	SavePlayerStateChan chan<- workers.SavePlayerStateRequest
+	ServerMessageChan   chan<- workers.ServerMessage
+	GameLoopInterval    time.Duration
 }
 
 func NewGameManager(opts NewGameManagerOptions) *GameManager {
 	return &GameManager{
-		clientMessageQueue:   opts.ClientMessageQueue,
-		connectionEventQueue: opts.ConnectionEventQueue,
-		repository:           opts.Repository,
-		gameState:            opts.GameState,
-		savePlayerStateChan:  opts.SavePlayerStateChan,
-		serverMessageChan:    opts.ServerMessageChan,
-		gameLoopInterval:     opts.GameLoopInterval,
+		clientMessageQueue:  opts.ClientMessageQueue,
+		serverEventQueue:    opts.ServerEventQueue,
+		repository:          opts.Repository,
+		gameState:           opts.GameState,
+		savePlayerStateChan: opts.SavePlayerStateChan,
+		serverMessageChan:   opts.ServerMessageChan,
+		gameLoopInterval:    opts.GameLoopInterval,
 	}
 }
 
@@ -112,7 +112,7 @@ func (gm *GameManager) initializeGameState(_ context.Context) error {
 // gameTick runs one iteration of the game loop.
 func (gm *GameManager) gameTick(_ context.Context, t time.Time) error {
 	gm.gameState.Timestamp = t.UnixMilli()
-	gm.processConnectionEvents()
+	gm.processServerEvents()
 	gm.processClientMessages()
 	gm.updateServerObjects(gm.gameLoopInterval.Seconds())
 	gm.broadcastGameState()
@@ -120,10 +120,10 @@ func (gm *GameManager) gameTick(_ context.Context, t time.Time) error {
 	return nil
 }
 
-// processConnectionEvents processes all pending connection events in the queue,
+// processServerEvents processes all pending connection events in the queue,
 // updates the game state, and notifies connected clients
-func (gm *GameManager) processConnectionEvents() {
-	pendingEvents, err := gm.connectionEventQueue.ReadAllMessages()
+func (gm *GameManager) processServerEvents() {
+	pendingEvents, err := gm.serverEventQueue.ReadAllMessages()
 	if err != nil {
 		log.Error("Failed to read connection events: %v", err)
 		return

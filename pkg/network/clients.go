@@ -10,8 +10,8 @@ import (
 const (
 	// ClientIDMaxRetries represents the maximum number of retries when generating a unique ID
 	ClientIDMaxRetries = 1024
-	// ClientEventChannelSize represents the size of the client event channel
-	ClientEventChannelSize = 1024
+	// ConnectionEventChannelSize represents the size of the client event channel
+	ConnectionEventChannelSize = 1024
 )
 
 // Client represents a connected client
@@ -22,19 +22,19 @@ type Client struct {
 	UserID     string
 }
 
-// ClientEvent represents an event that happened to a client
-type ClientEvent struct {
+// ConnectionEvent represents an event that happened to a client
+type ConnectionEvent struct {
 	ClientID uint32
-	Type     ClientEventType
+	Type     ConnectionEventType
 	Data     interface{}
 }
 
-// ClientEventType represents the type of a client event
-type ClientEventType int
+// ConnectionEventType represents the type of a client event
+type ConnectionEventType int
 
 const (
-	ClientEventTypeConnect ClientEventType = iota
-	ClientEventTypeDisconnect
+	ConnectionEventTypeConnect ConnectionEventType = iota
+	ConnectionEventTypeDisconnect
 )
 
 type ClientConnectData struct {
@@ -48,22 +48,22 @@ type ClientManager struct {
 	clientUIDs  map[string]uint32
 	clientsLock sync.RWMutex
 	// UDP connection for broadcasting to clients
-	udpConn         *net.UDPConn
-	clientEventChan chan ClientEvent
+	udpConn             *net.UDPConn
+	connectionEventChan chan ConnectionEvent
 }
 
 // NewClientManager creates a new ClientManager
 func NewClientManager() *ClientManager {
 	return &ClientManager{
-		clients:         make(map[uint32]*Client),
-		clientUIDs:      make(map[string]uint32),
-		clientEventChan: make(chan ClientEvent, ClientEventChannelSize),
+		clients:             make(map[uint32]*Client),
+		clientUIDs:          make(map[string]uint32),
+		connectionEventChan: make(chan ConnectionEvent, ConnectionEventChannelSize),
 	}
 }
 
-// GetClientEventChan returns a one-way channel for receiving client events
-func (cm *ClientManager) GetClientEventChan() <-chan ClientEvent {
-	return cm.clientEventChan
+// GetConnectionEventChan returns a one-way channel for receiving client events
+func (cm *ClientManager) GetConnectionEventChan() <-chan ConnectionEvent {
+	return cm.connectionEventChan
 }
 
 // SetUDPConn sets the UDP listener connection for all clients
@@ -122,15 +122,15 @@ func (cm *ClientManager) ConnectClient(tcpConn net.Conn, userID string, characte
 	cm.clients[clientID] = client
 	cm.clientUIDs[userID] = clientID
 
-	event := ClientEvent{
+	event := ConnectionEvent{
 		ClientID: clientID,
-		Type:     ClientEventTypeConnect,
+		Type:     ConnectionEventTypeConnect,
 		Data: ClientConnectData{
 			UserID:      userID,
 			CharacterID: characterID,
 		},
 	}
-	cm.clientEventChan <- event
+	cm.connectionEventChan <- event
 
 	return clientID, nil
 }
@@ -158,11 +158,11 @@ func (cm *ClientManager) DisconnectClient(clientID uint32) {
 		return
 	}
 
-	event := ClientEvent{
+	event := ConnectionEvent{
 		ClientID: client.ID,
-		Type:     ClientEventTypeDisconnect,
+		Type:     ConnectionEventTypeDisconnect,
 	}
-	cm.clientEventChan <- event
+	cm.connectionEventChan <- event
 
 	delete(cm.clientUIDs, client.UserID)
 	delete(cm.clients, clientID)
