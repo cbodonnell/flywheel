@@ -96,20 +96,20 @@ func main() {
 	})
 	go saveGameStateWorker.Start(ctx)
 
-	serverMessageChan := make(chan workers.ServerMessage, 100)
-	serverMessageWorker := workers.NewServerMessageWorker(workers.NewServerMessageWorkerOptions{
-		ClientManager:     clientManager,
-		ServerMessageChan: serverMessageChan,
+	broadcastMessageChan := make(chan workers.BroadcastMessage, 100)
+	broadcastMessageWorker := workers.NewBroadcastMessageWorker(workers.NewBroadcastMessageWorkerOptions{
+		ClientManager:        clientManager,
+		BroadcastMessageChan: broadcastMessageChan,
 	})
-	go serverMessageWorker.Start(ctx)
+	go broadcastMessageWorker.Start(ctx)
 
 	gameManager := game.NewGameManager(game.NewGameManagerOptions{
-		ClientMessageQueue: clientMessageQueue,
-		ServerEventQueue:   serverEventQueue,
-		SaveStateChan:      saveStateChan,
-		ServerMessageChan:  serverMessageChan,
-		GameLoopInterval:   50 * time.Millisecond, // 20 ticks per second
-		SaveStateInterval:  5 * time.Second,
+		ClientMessageQueue:   clientMessageQueue,
+		ServerEventQueue:     serverEventQueue,
+		SaveStateChan:        saveStateChan,
+		BroadcastMessageChan: broadcastMessageChan,
+		GameLoopInterval:     50 * time.Millisecond, // 20 ticks per second
+		SaveStateInterval:    5 * time.Second,
 	})
 
 	log.Info("Starting game manager")

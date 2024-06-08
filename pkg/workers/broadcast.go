@@ -10,34 +10,34 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/network"
 )
 
-type ServerMessageWorker struct {
-	clientManager     *network.ClientManager
-	serverMessageChan <-chan ServerMessage
+type BroadcastMessageWorker struct {
+	clientManager        *network.ClientManager
+	broadcastMessageChan <-chan BroadcastMessage
 }
 
-type ServerMessage struct {
+type BroadcastMessage struct {
 	Type    messages.MessageType
 	Message interface{}
 }
 
-type NewServerMessageWorkerOptions struct {
-	ClientManager     *network.ClientManager
-	ServerMessageChan <-chan ServerMessage
+type NewBroadcastMessageWorkerOptions struct {
+	ClientManager        *network.ClientManager
+	BroadcastMessageChan <-chan BroadcastMessage
 }
 
-func NewServerMessageWorker(opts NewServerMessageWorkerOptions) *ServerMessageWorker {
-	return &ServerMessageWorker{
-		clientManager:     opts.ClientManager,
-		serverMessageChan: opts.ServerMessageChan,
+func NewBroadcastMessageWorker(opts NewBroadcastMessageWorkerOptions) *BroadcastMessageWorker {
+	return &BroadcastMessageWorker{
+		clientManager:        opts.ClientManager,
+		broadcastMessageChan: opts.BroadcastMessageChan,
 	}
 }
 
-func (w *ServerMessageWorker) Start(ctx context.Context) {
+func (w *BroadcastMessageWorker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case msg := <-w.serverMessageChan:
+		case msg := <-w.broadcastMessageChan:
 			switch msg.Type {
 			case messages.MessageTypeServerPlayerConnect:
 				if err := w.handleServerPlayerConnect(msg); err != nil {
@@ -75,7 +75,7 @@ func (w *ServerMessageWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *ServerMessageWorker) handleServerPlayerConnect(msg ServerMessage) error {
+func (w *BroadcastMessageWorker) handleServerPlayerConnect(msg BroadcastMessage) error {
 	playerConnect, ok := msg.Message.(*messages.ServerPlayerConnect)
 	if !ok {
 		return fmt.Errorf("failed to cast server player connect message")
@@ -103,7 +103,7 @@ func (w *ServerMessageWorker) handleServerPlayerConnect(msg ServerMessage) error
 	return nil
 }
 
-func (w *ServerMessageWorker) handleServerPlayerDisconnect(msg ServerMessage) error {
+func (w *BroadcastMessageWorker) handleServerPlayerDisconnect(msg BroadcastMessage) error {
 	playerDisconnect, ok := msg.Message.(*messages.ServerPlayerDisconnect)
 	if !ok {
 		return fmt.Errorf("failed to cast server player disconnect message")
@@ -131,7 +131,7 @@ func (w *ServerMessageWorker) handleServerPlayerDisconnect(msg ServerMessage) er
 	return nil
 }
 
-func (w *ServerMessageWorker) handleServerGameUpdate(msg ServerMessage) error {
+func (w *BroadcastMessageWorker) handleServerGameUpdate(msg BroadcastMessage) error {
 	serverGameUpdate, ok := msg.Message.(*messages.ServerGameUpdate)
 	if !ok {
 		return fmt.Errorf("failed to cast server game update message")
@@ -164,7 +164,7 @@ func (w *ServerMessageWorker) handleServerGameUpdate(msg ServerMessage) error {
 	return nil
 }
 
-func (w *ServerMessageWorker) handleServerNPCHit(msg ServerMessage) error {
+func (w *BroadcastMessageWorker) handleServerNPCHit(msg BroadcastMessage) error {
 	npcHit, ok := msg.Message.(*messages.ServerNPCHit)
 	if !ok {
 		return fmt.Errorf("failed to cast server NPC hit message")
@@ -192,7 +192,7 @@ func (w *ServerMessageWorker) handleServerNPCHit(msg ServerMessage) error {
 	return nil
 }
 
-func (w *ServerMessageWorker) handleServerNPCKill(msg ServerMessage) error {
+func (w *BroadcastMessageWorker) handleServerNPCKill(msg BroadcastMessage) error {
 	npcKill, ok := msg.Message.(*messages.ServerNPCKill)
 	if !ok {
 		return fmt.Errorf("failed to cast server NPC kill message")
@@ -220,7 +220,7 @@ func (w *ServerMessageWorker) handleServerNPCKill(msg ServerMessage) error {
 	return nil
 }
 
-func (w *ServerMessageWorker) handleServerPlayerHit(msg ServerMessage) error {
+func (w *BroadcastMessageWorker) handleServerPlayerHit(msg BroadcastMessage) error {
 	playerHit, ok := msg.Message.(*messages.ServerPlayerHit)
 	if !ok {
 		return fmt.Errorf("failed to cast server player hit message")
@@ -248,7 +248,7 @@ func (w *ServerMessageWorker) handleServerPlayerHit(msg ServerMessage) error {
 	return nil
 }
 
-func (w *ServerMessageWorker) handleServerPlayerKill(msg ServerMessage) error {
+func (w *BroadcastMessageWorker) handleServerPlayerKill(msg BroadcastMessage) error {
 	playerKill, ok := msg.Message.(*messages.ServerPlayerKill)
 	if !ok {
 		return fmt.Errorf("failed to cast server player kill message")

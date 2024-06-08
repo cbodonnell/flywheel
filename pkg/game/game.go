@@ -17,34 +17,34 @@ import (
 )
 
 type GameManager struct {
-	gameState          *types.GameState
-	clientMessageQueue queue.Queue
-	serverEventQueue   queue.Queue
-	saveStateChan      chan<- workers.SaveStateRequest
-	serverMessageChan  chan<- workers.ServerMessage
-	gameLoopInterval   time.Duration
-	saveStateInterval  time.Duration
+	gameState            *types.GameState
+	clientMessageQueue   queue.Queue
+	serverEventQueue     queue.Queue
+	saveStateChan        chan<- workers.SaveStateRequest
+	broadcastMessageChan chan<- workers.BroadcastMessage
+	gameLoopInterval     time.Duration
+	saveStateInterval    time.Duration
 }
 
 // NewGameManagerOptions contains options for creating a new GameManager.
 type NewGameManagerOptions struct {
-	ClientMessageQueue queue.Queue
-	ServerEventQueue   queue.Queue
-	SaveStateChan      chan<- workers.SaveStateRequest
-	ServerMessageChan  chan<- workers.ServerMessage
-	GameLoopInterval   time.Duration
-	SaveStateInterval  time.Duration
+	ClientMessageQueue   queue.Queue
+	ServerEventQueue     queue.Queue
+	SaveStateChan        chan<- workers.SaveStateRequest
+	BroadcastMessageChan chan<- workers.BroadcastMessage
+	GameLoopInterval     time.Duration
+	SaveStateInterval    time.Duration
 }
 
 func NewGameManager(opts NewGameManagerOptions) *GameManager {
 	return &GameManager{
-		gameState:          types.NewGameState(NewCollisionSpace()),
-		clientMessageQueue: opts.ClientMessageQueue,
-		serverEventQueue:   opts.ServerEventQueue,
-		saveStateChan:      opts.SaveStateChan,
-		serverMessageChan:  opts.ServerMessageChan,
-		gameLoopInterval:   opts.GameLoopInterval,
-		saveStateInterval:  opts.SaveStateInterval,
+		gameState:            types.NewGameState(NewCollisionSpace()),
+		clientMessageQueue:   opts.ClientMessageQueue,
+		serverEventQueue:     opts.ServerEventQueue,
+		saveStateChan:        opts.SaveStateChan,
+		broadcastMessageChan: opts.BroadcastMessageChan,
+		gameLoopInterval:     opts.GameLoopInterval,
+		saveStateInterval:    opts.SaveStateInterval,
 	}
 }
 
@@ -164,7 +164,7 @@ func (gm *GameManager) handleConnectPlayerEvent(event *types.ConnectPlayerEvent)
 		ClientID:    event.ClientID,
 		PlayerState: PlayerStateUpdateFromState(playerState),
 	}
-	gm.serverMessageChan <- workers.ServerMessage{
+	gm.broadcastMessageChan <- workers.BroadcastMessage{
 		Type:    messages.MessageTypeServerPlayerConnect,
 		Message: playerConnect,
 	}
@@ -194,7 +194,7 @@ func (gm *GameManager) handleDisconnectPlayerEvent(event *types.DisconnectPlayer
 	playerDisconnect := &messages.ServerPlayerDisconnect{
 		ClientID: event.ClientID,
 	}
-	gm.serverMessageChan <- workers.ServerMessage{
+	gm.broadcastMessageChan <- workers.BroadcastMessage{
 		Type:    messages.MessageTypeServerPlayerDisconnect,
 		Message: playerDisconnect,
 	}
@@ -328,7 +328,7 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 			PlayerID: clientID,
 			Damage:   damage,
 		}
-		gm.serverMessageChan <- workers.ServerMessage{
+		gm.broadcastMessageChan <- workers.BroadcastMessage{
 			Type:    messages.MessageTypeServerNPCHit,
 			Message: npcHit,
 		}
@@ -348,7 +348,7 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 			NPCID:    npcID,
 			PlayerID: clientID,
 		}
-		gm.serverMessageChan <- workers.ServerMessage{
+		gm.broadcastMessageChan <- workers.BroadcastMessage{
 			Type:    messages.MessageTypeServerNPCKill,
 			Message: npcKill,
 		}
@@ -429,7 +429,7 @@ func (gm *GameManager) checkNPCAttackHit(npcID uint32, npcState *types.NPCState)
 			NPCID:    npcID,
 			Damage:   damage,
 		}
-		gm.serverMessageChan <- workers.ServerMessage{
+		gm.broadcastMessageChan <- workers.BroadcastMessage{
 			Type:    messages.MessageTypeServerPlayerHit,
 			Message: playerHit,
 		}
@@ -443,7 +443,7 @@ func (gm *GameManager) checkNPCAttackHit(npcID uint32, npcState *types.NPCState)
 			PlayerID: playerID,
 			NPCID:    npcID,
 		}
-		gm.serverMessageChan <- workers.ServerMessage{
+		gm.broadcastMessageChan <- workers.BroadcastMessage{
 			Type:    messages.MessageTypeServerPlayerKill,
 			Message: playerKill,
 		}
@@ -473,7 +473,7 @@ func (gm *GameManager) broadcastGameState() {
 	// sending individual player and npc updates may be more efficient.
 	// TODO: player vs localPlayer updates should be handled differently
 	serverGameUpdate := ServerGameUpdateFromState(gm.gameState)
-	gm.serverMessageChan <- workers.ServerMessage{
+	gm.broadcastMessageChan <- workers.BroadcastMessage{
 		Type:    messages.MessageTypeServerGameUpdate,
 		Message: serverGameUpdate,
 	}
