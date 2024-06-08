@@ -10,7 +10,6 @@ import (
 
 	authproviders "github.com/cbodonnell/flywheel/pkg/auth/providers"
 	"github.com/cbodonnell/flywheel/pkg/game"
-	"github.com/cbodonnell/flywheel/pkg/game/types"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/network"
 	"github.com/cbodonnell/flywheel/pkg/queue"
@@ -91,15 +90,11 @@ func main() {
 	go connectionEventWorker.Start(ctx)
 
 	savePlayerStateChannelSize := 100
-	savePlayerStateChan := make(chan workers.SavePlayerStateRequest, savePlayerStateChannelSize)
+	saveStateChan := make(chan workers.SaveStateRequest, savePlayerStateChannelSize)
 
-	gameState := types.NewGameState(game.NewCollisionSpace())
-	saveLoopInterval := 10 * time.Second
 	saveGameStateWorker := workers.NewSaveGameStateWorker(workers.NewSaveGameStateWorkerOptions{
-		Repository:          repository,
-		SavePlayerStateChan: savePlayerStateChan,
-		GameState:           gameState, // TODO: only the game loop should have access to this
-		Interval:            saveLoopInterval,
+		Repository:    repository,
+		SaveStateChan: saveStateChan,
 	})
 	go saveGameStateWorker.Start(ctx)
 
@@ -113,14 +108,15 @@ func main() {
 	go serverMessageWorker.Start(ctx)
 
 	gameLoopInterval := 50 * time.Millisecond // 20 ticks per second
+	saveStateInterval := 5 * time.Second
 	gameManager := game.NewGameManager(game.NewGameManagerOptions{
-		ClientMessageQueue:  clientMessageQueue,
-		ServerEventQueue:    serverEventQueue,
-		Repository:          repository,
-		GameState:           gameState,
-		SavePlayerStateChan: savePlayerStateChan,
-		ServerMessageChan:   serverMessageChan,
-		GameLoopInterval:    gameLoopInterval,
+		ClientMessageQueue: clientMessageQueue,
+		ServerEventQueue:   serverEventQueue,
+		Repository:         repository,
+		SaveStateChan:      saveStateChan,
+		ServerMessageChan:  serverMessageChan,
+		GameLoopInterval:   gameLoopInterval,
+		SaveStateInterval:  saveStateInterval,
 	})
 
 	log.Info("Starting game manager")

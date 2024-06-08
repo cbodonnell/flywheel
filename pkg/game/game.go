@@ -18,35 +18,37 @@ import (
 )
 
 type GameManager struct {
-	clientMessageQueue  queue.Queue
-	serverEventQueue    queue.Queue
-	repository          repositories.Repository
-	gameState           *types.GameState
-	savePlayerStateChan chan<- workers.SavePlayerStateRequest
-	serverMessageChan   chan<- workers.ServerMessage
-	gameLoopInterval    time.Duration
+	gameState          *types.GameState
+	clientMessageQueue queue.Queue
+	serverEventQueue   queue.Queue
+	repository         repositories.Repository
+	saveStateChan      chan<- workers.SaveStateRequest
+	serverMessageChan  chan<- workers.ServerMessage
+	gameLoopInterval   time.Duration
+	saveStateInterval  time.Duration
 }
 
 // NewGameManagerOptions contains options for creating a new GameManager.
 type NewGameManagerOptions struct {
-	ClientMessageQueue  queue.Queue
-	ServerEventQueue    queue.Queue
-	Repository          repositories.Repository
-	GameState           *types.GameState
-	SavePlayerStateChan chan<- workers.SavePlayerStateRequest
-	ServerMessageChan   chan<- workers.ServerMessage
-	GameLoopInterval    time.Duration
+	ClientMessageQueue queue.Queue
+	ServerEventQueue   queue.Queue
+	Repository         repositories.Repository
+	SaveStateChan      chan<- workers.SaveStateRequest
+	ServerMessageChan  chan<- workers.ServerMessage
+	GameLoopInterval   time.Duration
+	SaveStateInterval  time.Duration
 }
 
 func NewGameManager(opts NewGameManagerOptions) *GameManager {
 	return &GameManager{
-		clientMessageQueue:  opts.ClientMessageQueue,
-		serverEventQueue:    opts.ServerEventQueue,
-		repository:          opts.Repository,
-		gameState:           opts.GameState,
-		savePlayerStateChan: opts.SavePlayerStateChan,
-		serverMessageChan:   opts.ServerMessageChan,
-		gameLoopInterval:    opts.GameLoopInterval,
+		gameState:          types.NewGameState(NewCollisionSpace()),
+		clientMessageQueue: opts.ClientMessageQueue,
+		serverEventQueue:   opts.ServerEventQueue,
+		repository:         opts.Repository,
+		saveStateChan:      opts.SaveStateChan,
+		serverMessageChan:  opts.ServerMessageChan,
+		gameLoopInterval:   opts.GameLoopInterval,
+		saveStateInterval:  opts.SaveStateInterval,
 	}
 }
 
@@ -56,14 +58,17 @@ func (gm *GameManager) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize game state: %v", err)
 	}
 
-	ticker := time.NewTicker(gm.gameLoopInterval)
-	defer ticker.Stop()
+	gameTicker := time.NewTicker(gm.gameLoopInterval)
+	defer gameTicker.Stop()
+
+	saveTicker := time.NewTicker(gm.saveStateInterval)
+	defer saveTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case t := <-ticker.C:
+		case t := <-gameTicker.C:
 			err := gm.gameTick(ctx, t)
 			if err != nil {
 				log.Error("Failed to run game tick: %v", err)
@@ -71,6 +76,13 @@ func (gm *GameManager) Start(ctx context.Context) error {
 			// TODO: server metrics
 			// duration := time.Since(t)
 			// log.Trace("Game tick took %s (%.2f%% of tick rate)", duration, float64(duration)/float64(gm.gameLoopInterval)*100)
+		case <-saveTicker.C:
+			saveRequest := workers.SaveStateRequest{
+				Timestamp: gm.gameState.Timestamp,
+				Type:      workers.SaveStateRequestTypeGame,
+				State:     gm.gameState.Copy(),
+			}
+			gm.saveStateChan <- saveRequest
 		}
 	}
 }
@@ -166,12 +178,12 @@ func (gm *GameManager) handleConnectPlayerEvent(event *types.ConnectPlayerEvent)
 
 func (gm *GameManager) handleDisconnectPlayerEvent(event *types.DisconnectPlayerEvent) error {
 	// send a request to save the player state before deleting it
-	saveRequest := workers.SavePlayerStateRequest{
-		Timestamp:   gm.gameState.Timestamp,
-		CharacterID: gm.gameState.Players[event.ClientID].CharacterID,
-		PlayerState: gm.gameState.Players[event.ClientID],
+	saveRequest := workers.SaveStateRequest{
+		Timestamp: gm.gameState.Timestamp,
+		Type:      workers.SaveStateRequestTypePlayer,
+		State:     gm.gameState.Players[event.ClientID].Copy(),
 	}
-	gm.savePlayerStateChan <- saveRequest
+	gm.saveStateChan <- saveRequest
 	// remove the player object from the collision space
 	gm.gameState.CollisionSpace.Remove(gm.gameState.Players[event.ClientID].Object)
 	// npc follow target cleanup
