@@ -50,7 +50,7 @@ func (c *TCPClient) HandleMessages(ctx context.Context) error {
 		default:
 		}
 
-		msg, err := ReceiveTCPMessage(c.conn)
+		b, err := ReadFromTCP(c.conn)
 		if err != nil {
 			if _, ok := err.(*ErrConnectionClosedByServer); ok {
 				return err
@@ -58,52 +58,62 @@ func (c *TCPClient) HandleMessages(ctx context.Context) error {
 				log.Info("TCP connection closed by client")
 				return nil
 			}
-			log.Error("Failed to receive message from TCP connection: %v", err)
+			log.Error("Failed to read from TCP connection: %v", err)
 			continue
 		}
-		log.Trace("Received message from TCP server of type %s", msg.Type)
-
-		switch msg.Type {
-		case messages.MessageTypeServerLoginSuccess:
-			assignID := &messages.ServerLoginSuccess{}
-			err := json.Unmarshal(msg.Payload, assignID)
-			if err != nil {
-				log.Error("Failed to deserialize server assign ID message: %v", err)
-				continue
+		go func() {
+			if err := c.handleMessage(b); err != nil {
+				log.Error("Failed to handle message: %v", err)
 			}
-			// write the client ID back to the manager
-			c.clientIDChan <- assignID.ClientID
-		case messages.MessageTypeServerLoginFailure:
-			loginFailure := &messages.ServerLoginFailure{}
-			err := json.Unmarshal(msg.Payload, loginFailure)
-			if err != nil {
-				log.Error("Failed to deserialize server login failure message: %v", err)
-				continue
-			}
-			loginErr := fmt.Errorf("server login failure: %s", loginFailure.Reason)
-			c.loginErrChan <- loginErr
-		case messages.MessageTypeServerSyncTime:
-			serverSyncTime := &messages.ServerSyncTime{}
-			err := json.Unmarshal(msg.Payload, serverSyncTime)
-			if err != nil {
-				log.Error("Failed to deserialize server sync time message: %v", err)
-				continue
-			}
-			c.serverTimeChan <- serverSyncTime
-		case messages.MessageTypeServerPlayerConnect,
-			messages.MessageTypeServerPlayerDisconnect,
-			messages.MessageTypeServerNPCHit,
-			messages.MessageTypeServerNPCKill,
-			messages.MessageTypeServerPlayerHit,
-			messages.MessageTypeServerPlayerKill:
-			if err := c.messageQueue.Enqueue(msg); err != nil {
-				log.Error("Failed to enqueue message: %v", err)
-			}
-		default:
-			log.Warn("Received unexpected message type from TCP server: %s", msg.Type)
-			continue
-		}
+		}()
 	}
+}
+
+func (c *TCPClient) handleMessage(b []byte) error {
+	msg, err := messages.DeserializeMessage(b)
+	if err != nil {
+		return fmt.Errorf("failed to deserialize message: %v", err)
+	}
+	log.Trace("Received message from TCP server of type %s", msg.Type)
+
+	switch msg.Type {
+	case messages.MessageTypeServerLoginSuccess:
+		assignID := &messages.ServerLoginSuccess{}
+		err := json.Unmarshal(msg.Payload, assignID)
+		if err != nil {
+			return fmt.Errorf("failed to deserialize server login success message: %v", err)
+		}
+		// write the client ID back to the manager
+		c.clientIDChan <- assignID.ClientID
+	case messages.MessageTypeServerLoginFailure:
+		loginFailure := &messages.ServerLoginFailure{}
+		err := json.Unmarshal(msg.Payload, loginFailure)
+		if err != nil {
+			return fmt.Errorf("failed to deserialize server login failure message: %v", err)
+		}
+		loginErr := fmt.Errorf("server login failure: %s", loginFailure.Reason)
+		c.loginErrChan <- loginErr
+	case messages.MessageTypeServerSyncTime:
+		serverSyncTime := &messages.ServerSyncTime{}
+		err := json.Unmarshal(msg.Payload, serverSyncTime)
+		if err != nil {
+			return fmt.Errorf("failed to deserialize server sync time message: %v", err)
+		}
+		c.serverTimeChan <- serverSyncTime
+	case messages.MessageTypeServerPlayerConnect,
+		messages.MessageTypeServerPlayerDisconnect,
+		messages.MessageTypeServerNPCHit,
+		messages.MessageTypeServerNPCKill,
+		messages.MessageTypeServerPlayerHit,
+		messages.MessageTypeServerPlayerKill:
+		if err := c.messageQueue.Enqueue(msg); err != nil {
+			return fmt.Errorf("failed to enqueue message: %v", err)
+		}
+	default:
+		return fmt.Errorf("received unexpected message type from TCP server: %s", msg.Type)
+	}
+
+	return nil
 }
 
 // Close closes the TCP connection.
@@ -130,8 +140,8 @@ func (c *TCPClient) SendMessage(msg *messages.Message) error {
 	return nil
 }
 
-// ReceiveTCPMessage receives a message from the TCP server.
-func ReceiveTCPMessage(conn net.Conn) (*messages.Message, error) {
+// ReadFromTCP reads a buffer from a TCP connection
+func ReadFromTCP(conn net.Conn) ([]byte, error) {
 	buf := make([]byte, messages.UDPMessageBufferSize)
 	n, err := conn.Read(buf)
 	if err != nil {
@@ -144,10 +154,5 @@ func ReceiveTCPMessage(conn net.Conn) (*messages.Message, error) {
 		return nil, fmt.Errorf("failed to read message from TCP connection: %v", err)
 	}
 
-	msg, err := messages.DeserializeMessage(buf[:n])
-	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize message: %v", err)
-	}
-
-	return msg, nil
+	return buf[:n], nil
 }
