@@ -107,7 +107,13 @@ func NewGame(opts NewGameOptions) (ebiten.Game, error) {
 		gameAutomation: opts.GameAutomation,
 	}
 
-	if err := g.loadMenu(); err != nil {
+	isAutomated := false
+	if g.gameAutomation != nil {
+		isAutomated = true
+		g.setEmailPassword(g.gameAutomation.Email, g.gameAutomation.Password)
+	}
+
+	if err := g.loadMenu(isAutomated); err != nil {
 		return nil, fmt.Errorf("failed to load menu scene: %v", err)
 	}
 
@@ -129,16 +135,24 @@ func (g *Game) SetScene(scene scenes.Scene) error {
 	return nil
 }
 
-func (g *Game) loadMenu() error {
-	if g.gameAutomation != nil {
-		if err := g.login(g.gameAutomation.Email, g.gameAutomation.Password); err != nil {
-			return fmt.Errorf("failed to start game: %v", err)
-		}
+func (g *Game) loadMenu(isAutomated bool) error {
+	if err := g.login(); err == nil {
 		return nil
+	} else if isAutomated {
+		return fmt.Errorf("failed to login with automation: %v", err)
 	}
 
 	menuSceneOpts := scenes.MenuSceneOptions{
-		OnLogin: g.login,
+		OnLogin: func(email string, password string) error {
+			g.setEmailPassword(email, password)
+			if err := g.login(); err != nil {
+				if actionableErr, ok := err.(*ui.ActionableError); ok {
+					return actionableErr
+				}
+				return fmt.Errorf("failed to login: %v", err)
+			}
+			return nil
+		},
 	}
 	menu, err := scenes.NewMenuScene(menuSceneOpts)
 	if err != nil {
@@ -151,9 +165,7 @@ func (g *Game) loadMenu() error {
 	return nil
 }
 
-func (g *Game) login(email, password string) error {
-	g.setEmailPassword(email, password)
-
+func (g *Game) login() error {
 	if err := g.refreshIDToken(); err != nil {
 		if actionableErr, ok := err.(*ui.ActionableError); ok {
 			return actionableErr
@@ -546,13 +558,13 @@ func (g *Game) handleInput() error {
 		}
 	case GameModeOver:
 		if input.IsPositiveJustPressed() {
-			if err := g.loadMenu(); err != nil {
+			if err := g.loadMenu(false); err != nil {
 				return fmt.Errorf("failed to load menu scene: %v", err)
 			}
 		}
 	case GameModeNetworkError:
 		if input.IsPositiveJustPressed() {
-			if err := g.loadMenu(); err != nil {
+			if err := g.loadMenu(false); err != nil {
 				return fmt.Errorf("failed to load menu scene: %v", err)
 			}
 		}
