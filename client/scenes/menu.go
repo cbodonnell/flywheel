@@ -16,11 +16,12 @@ import (
 type MenuScene struct {
 	*BaseScene
 
-	onLogin  func(email, password string) error
-	ui       *ebitenui.UI
-	email    string
-	password string
-	loginErr string
+	onLogin        func(email, password string) error
+	ui             *ebitenui.UI
+	emailTextInput *widget.TextInput
+	email          string
+	password       string
+	loginErr       string
 }
 
 type MenuSceneOptions struct {
@@ -39,6 +40,7 @@ func NewMenuScene(opts MenuSceneOptions) (Scene, error) {
 
 func (s *MenuScene) Init() error {
 	s.renderUI()
+	s.emailTextInput.Focus(true)
 	return s.BaseScene.Init()
 }
 
@@ -159,10 +161,6 @@ func (s *MenuScene) renderUI() {
 		s.loginErr = ""
 	}
 
-	// auto focus the email text input
-	// TODO: fix duplicate focus issue on re-render
-	emailTextInput.Focus(true)
-
 	// register login handler with relevant widget events
 	loginHandler := func(args interface{}) {
 		email, password := emailTextInput.GetText(), passwordTextInput.GetText()
@@ -188,6 +186,7 @@ func (s *MenuScene) renderUI() {
 	}
 
 	s.ui = ui
+	s.emailTextInput = emailTextInput
 }
 
 func (s *MenuScene) Update() error {
