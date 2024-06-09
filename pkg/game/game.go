@@ -71,7 +71,7 @@ func (gm *GameManager) Start(ctx context.Context) error {
 			}
 			// TODO: server metrics
 			// duration := time.Since(t)
-			// log.Trace("Game tick took %s (%.2f%% of tick rate)", duration, float64(duration)/float64(gm.gameLoopInterval)*100)
+			// log.Debug("Game tick took %s (%.2f%% of tick rate)", duration, float64(duration)/float64(gm.gameLoopInterval)*100)
 		case <-saveTicker.C:
 			saveRequest := workers.SaveStateRequest{
 				Timestamp: gm.gameState.Timestamp,
