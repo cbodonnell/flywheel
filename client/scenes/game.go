@@ -42,7 +42,7 @@ type GameScene struct {
 	deletedObjects map[string]int64
 
 	serverPlayerUpdateBuffers map[uint32]*ServerPlayerUpdateBuffer
-	serverNPCUpdateBuffers    map[uint32]*NPCStateBuffer
+	serverNPCUpdateBuffers    map[uint32]*ServerNPCUpdateBuffer
 }
 
 type ServerPlayerUpdateBuffer struct {
@@ -50,7 +50,7 @@ type ServerPlayerUpdateBuffer struct {
 	Updates            []*messages.ServerPlayerUpdate
 }
 
-type NPCStateBuffer struct {
+type ServerNPCUpdateBuffer struct {
 	LastStateReceived int64
 	States            []*messages.ServerNPCUpdate
 }
@@ -67,7 +67,7 @@ func NewGameScene(networkManager *network.NetworkManager) (Scene, error) {
 		world:                     world,
 		deletedObjects:            make(map[string]int64),
 		serverPlayerUpdateBuffers: make(map[uint32]*ServerPlayerUpdateBuffer),
-		serverNPCUpdateBuffers:    make(map[uint32]*NPCStateBuffer),
+		serverNPCUpdateBuffers:    make(map[uint32]*ServerNPCUpdateBuffer),
 	}, nil
 }
 
@@ -210,7 +210,7 @@ func (g *GameScene) handleServerNPCUpdate(message *messages.Message) error {
 	}
 
 	if _, ok := g.serverNPCUpdateBuffers[serverNPCUpdate.NPCID]; !ok {
-		g.serverNPCUpdateBuffers[serverNPCUpdate.NPCID] = &NPCStateBuffer{
+		g.serverNPCUpdateBuffers[serverNPCUpdate.NPCID] = &ServerNPCUpdateBuffer{
 			LastStateReceived: serverNPCUpdate.Timestamp,
 			States:            []*messages.ServerNPCUpdate{serverNPCUpdate},
 		}
