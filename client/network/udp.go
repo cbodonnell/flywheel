@@ -49,7 +49,7 @@ func (c *UDPClient) HandleMessages(ctx context.Context) error {
 		default:
 		}
 
-		msg, err := ReceiveUDPMessage(c.conn)
+		b, err := ReadFromUDP(c.conn)
 		if err != nil {
 			if _, ok := err.(*ErrConnectionClosedByServer); ok {
 				return err
@@ -57,23 +57,36 @@ func (c *UDPClient) HandleMessages(ctx context.Context) error {
 				log.Info("UDP connection closed by client")
 				return nil
 			}
-			fmt.Printf("Failed to receive message from UDP connection: %v\n", err)
+			log.Error("Failed to read from UDP connection: %v", err)
 			continue
 		}
-		log.Trace("Received message from UDP server of type %s", msg.Type)
-
-		switch msg.Type {
-		case messages.MessageTypeServerPong:
-			log.Debug("Received server pong")
-		case messages.MessageTypeServerGameUpdate, messages.MessageTypeServerPlayerUpdate, messages.MessageTypeServerNPCUpdate:
-			if err := c.messageQueue.Enqueue(msg); err != nil {
-				log.Error("Failed to enqueue message: %v", err)
+		go func() {
+			if err := c.handleMessage(b); err != nil {
+				log.Error("Failed to handle message: %v", err)
 			}
-		default:
-			log.Warn("Received unexpected message type from UDP server: %s", msg.Type)
-		}
-
+		}()
 	}
+}
+
+func (c *UDPClient) handleMessage(b []byte) error {
+	msg, err := messages.DeserializeMessage(b)
+	if err != nil {
+		return fmt.Errorf("failed to deserialize message: %v", err)
+	}
+	log.Trace("Received message from UDP server of type %s", msg.Type)
+
+	switch msg.Type {
+	case messages.MessageTypeServerPong:
+		log.Debug("Received server pong")
+	case messages.MessageTypeServerGameUpdate, messages.MessageTypeServerPlayerUpdate, messages.MessageTypeServerNPCUpdate:
+		if err := c.messageQueue.Enqueue(msg); err != nil {
+			return fmt.Errorf("failed to enqueue message: %v", err)
+		}
+	default:
+		return fmt.Errorf("unknown message type: %v", msg.Type)
+	}
+
+	return nil
 }
 
 // Close closes the UDP connection.
@@ -100,8 +113,8 @@ func (c *UDPClient) SendMessage(msg *messages.Message) error {
 	return nil
 }
 
-// receiveMessages continuously receives messages from the UDP server.
-func ReceiveUDPMessage(conn *net.UDPConn) (*messages.Message, error) {
+// ReadFromUDP reads a buffer from a UDP connection
+func ReadFromUDP(conn *net.UDPConn) ([]byte, error) {
 	buf := make([]byte, messages.UDPMessageBufferSize)
 	n, _, err := conn.ReadFromUDP(buf)
 	if err != nil {
@@ -111,10 +124,5 @@ func ReceiveUDPMessage(conn *net.UDPConn) (*messages.Message, error) {
 		return nil, fmt.Errorf("failed to read message from UDP connection: %v", err)
 	}
 
-	msg, err := messages.DeserializeMessage(buf[:n])
-	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize message: %v", err)
-	}
-
-	return msg, nil
+	return buf[:n], nil
 }
