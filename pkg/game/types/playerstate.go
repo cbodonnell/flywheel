@@ -65,20 +65,17 @@ func NewPlayerState(characterID int32, name string, position kinematic.Vector, h
 	}
 }
 
-// NeedsReconciliation returns true if the player state needs to be reconciled with an authoritative state
-func (p *PlayerState) NeedsReconciliation(other *PlayerState) bool {
-	if p.Position.X == other.Position.X &&
-		p.Position.Y == other.Position.Y &&
-		p.Velocity.X == other.Velocity.X &&
-		p.Velocity.Y == other.Velocity.Y &&
+// Equals returns true if the player state is equal to another player state.
+// It only compares the fields that are serialized to the client.
+func (p *PlayerState) Equals(other *PlayerState) bool {
+	return p.Position.Equals(other.Position) &&
+		p.Velocity.Equals(other.Velocity) &&
 		p.IsOnGround == other.IsOnGround &&
 		p.IsAttacking == other.IsAttacking &&
 		p.Animation == other.Animation &&
 		p.AnimationFlip == other.AnimationFlip &&
-		p.AnimationSequence == other.AnimationSequence {
-		return false
-	}
-	return true
+		p.AnimationSequence == other.AnimationSequence &&
+		p.Hitpoints == other.Hitpoints
 }
 
 // Copy returns a copy of the player state with an empty object reference
@@ -105,6 +102,8 @@ func (p *PlayerState) Copy() *PlayerState {
 // ApplyInput updates the player's state based on the client's input
 // and returns whether the state has changed
 func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate) (changed bool) {
+	previousState := p.Copy()
+
 	p.LastProcessedTimestamp = clientPlayerUpdate.Timestamp
 
 	// Respawn
@@ -264,8 +263,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		p.ResetAnimation = false
 	}
 
-	// TODO: return false if the update did not change the state
-	return true
+	return !p.Equals(previousState)
 }
 
 // TakeDamage reduces the player's hitpoints by the given amount

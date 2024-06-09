@@ -57,6 +57,8 @@ func (w *SaveGameStateWorker) Start(ctx context.Context) {
 				if err := w.saveGameState(ctx, saveRequest); err != nil {
 					log.Error("Failed to save game state: %v", err)
 				}
+			default:
+				log.Error("Unknown save state request type: %v", saveRequest.Type)
 			}
 		}
 	}

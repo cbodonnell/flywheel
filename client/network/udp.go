@@ -65,7 +65,7 @@ func (c *UDPClient) HandleMessages(ctx context.Context) error {
 		switch msg.Type {
 		case messages.MessageTypeServerPong:
 			log.Debug("Received server pong")
-		case messages.MessageTypeServerGameUpdate:
+		case messages.MessageTypeServerGameUpdate, messages.MessageTypeServerPlayerUpdate, messages.MessageTypeServerNPCUpdate:
 			if err := c.messageQueue.Enqueue(msg); err != nil {
 				log.Error("Failed to enqueue message: %v", err)
 			}

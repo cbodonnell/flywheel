@@ -245,17 +245,27 @@ func (gm *GameManager) handleClientPlayerUpdate(message *messages.Message) error
 		return nil
 	}
 
+	playerStateChanged := false
+
 	// check for past updates that have not been processed and apply first
 	for _, pastUpdate := range clientPlayerUpdate.PastUpdates {
 		if playerState.LastProcessedTimestamp >= pastUpdate.Timestamp {
 			continue
 		}
 		log.Warn("Applying past update for client %d - Last processed: %d, past update: %d", message.ClientID, playerState.LastProcessedTimestamp, pastUpdate.Timestamp)
-		playerState.ApplyInput(pastUpdate)
+		if changed := playerState.ApplyInput(pastUpdate); changed {
+			playerStateChanged = true
+		}
 	}
 
 	// TODO: validate the update before applying it
-	playerState.ApplyInput(clientPlayerUpdate)
+	if changed := playerState.ApplyInput(clientPlayerUpdate); changed {
+		playerStateChanged = true
+	}
+
+	if playerStateChanged {
+		log.Trace("Player %d updated", message.ClientID)
+	}
 
 	gm.checkPlayerCollisions(message.ClientID, playerState)
 
@@ -369,7 +379,10 @@ func (gm *GameManager) updateServerObjects(deltaTime float64) {
 			gm.checkNPCLineOfSight(npcState)
 		}
 
-		npcState.Update(deltaTime)
+		npcStateChanged := npcState.Update(deltaTime)
+		if npcStateChanged {
+			log.Trace("NPC %d updated", npcID)
+		}
 	}
 }
 
@@ -469,12 +482,28 @@ func (gm *GameManager) checkNPCLineOfSight(npcState *types.NPCState) {
 
 // broadcastGameState sends the game state to connected clients.
 func (gm *GameManager) broadcastGameState() {
-	// TODO: this is not scalable for large numbers of clients.
-	// sending individual player and npc updates may be more efficient.
-	// TODO: player vs localPlayer updates should be handled differently
-	serverGameUpdate := ServerGameUpdateFromState(gm.gameState)
-	gm.broadcastMessageChan <- workers.BroadcastMessage{
-		Type:    messages.MessageTypeServerGameUpdate,
-		Message: serverGameUpdate,
+	for clientID, playerState := range gm.gameState.Players {
+		// TODO: player vs localPlayer updates should be handled differently
+		playerUpdate := &messages.ServerPlayerUpdate{
+			Timestamp:   gm.gameState.Timestamp,
+			ClientID:    clientID,
+			PlayerState: PlayerStateUpdateFromState(playerState),
+		}
+		gm.broadcastMessageChan <- workers.BroadcastMessage{
+			Type:    messages.MessageTypeServerPlayerUpdate,
+			Message: playerUpdate,
+		}
+	}
+
+	for npcID, npcState := range gm.gameState.NPCs {
+		npcUpdate := &messages.ServerNPCUpdate{
+			Timestamp: gm.gameState.Timestamp,
+			NPCID:     npcID,
+			NPCState:  NPCStateUpdateFromState(npcState),
+		}
+		gm.broadcastMessageChan <- workers.BroadcastMessage{
+			Type:    messages.MessageTypeServerNPCUpdate,
+			Message: npcUpdate,
+		}
 	}
 }

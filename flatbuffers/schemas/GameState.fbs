@@ -11,6 +11,18 @@ table PlayerStateKeyValue {
     value: PlayerState;
 }
 
+table ServerPlayerUpdate {
+    timestamp: int64;
+    client_id: uint32;
+    player_state: PlayerState;
+}
+
+table ServerNPCUpdate {
+    timestamp: int64;
+    npc_id: uint32;
+    npc_state: NPCState;
+}
+
 table PlayerState {
   last_processed_timestamp: int64;
   character_id: int32;

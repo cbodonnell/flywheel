@@ -40,10 +40,19 @@ type GameScene struct {
 	// deletedObjects is a map of deleted game objects indexed by a unique identifier
 	// and the timestamp of the deletion.
 	deletedObjects map[string]int64
-	// lastGameStateReceived is the timestamp of the last game state received from the server.
-	lastGameStateReceived int64
-	// gameStates is a buffer of game states received from the server.
-	gameStates []*gametypes.GameState
+
+	serverPlayerUpdateBuffers map[uint32]*ServerPlayerUpdateBuffer
+	serverNPCUpdateBuffers    map[uint32]*ServerNPCUpdateBuffer
+}
+
+type ServerPlayerUpdateBuffer struct {
+	LastUpdateReceived int64
+	Updates            []*messages.ServerPlayerUpdate
+}
+
+type ServerNPCUpdateBuffer struct {
+	LastStateReceived int64
+	States            []*messages.ServerNPCUpdate
 }
 
 var _ Scene = &GameScene{}
@@ -52,11 +61,13 @@ func NewGameScene(networkManager *network.NetworkManager) (Scene, error) {
 	collisionSpace := game.NewCollisionSpace()
 	world := ebiten.NewImage(collisionSpace.Width()*collisionSpace.CellWidth, collisionSpace.Height()*collisionSpace.CellHeight)
 	return &GameScene{
-		BaseScene:      NewBaseScene(objects.NewSortedZIndexObject("game-root")),
-		networkManager: networkManager,
-		collisionSpace: game.NewCollisionSpace(),
-		world:          world,
-		deletedObjects: make(map[string]int64),
+		BaseScene:                 NewBaseScene(objects.NewSortedZIndexObject("game-root")),
+		networkManager:            networkManager,
+		collisionSpace:            game.NewCollisionSpace(),
+		world:                     world,
+		deletedObjects:            make(map[string]int64),
+		serverPlayerUpdateBuffers: make(map[uint32]*ServerPlayerUpdateBuffer),
+		serverNPCUpdateBuffers:    make(map[uint32]*ServerNPCUpdateBuffer),
 	}, nil
 }
 
@@ -65,8 +76,8 @@ func (g *GameScene) Update() error {
 		return fmt.Errorf("failed to process pending server messages: %v", err)
 	}
 
-	if err := g.updateGameState(); err != nil {
-		return fmt.Errorf("failed to update game state: %v", err)
+	if err := g.updateObjectStates(); err != nil {
+		return fmt.Errorf("failed to update object states: %v", err)
 	}
 
 	if err := g.BaseScene.Update(); err != nil {
@@ -94,9 +105,13 @@ func (g *GameScene) processPendingServerMessages() error {
 		}
 
 		switch message.Type {
-		case messages.MessageTypeServerGameUpdate:
-			if err := g.handleServerGameUpdate(message); err != nil {
-				log.Error("Failed to handle server game update: %v", err)
+		case messages.MessageTypeServerPlayerUpdate:
+			if err := g.handleServerPlayerUpdate(message); err != nil {
+				log.Error("Failed to handle server player update: %v", err)
+			}
+		case messages.MessageTypeServerNPCUpdate:
+			if err := g.handleServerNPCUpdate(message); err != nil {
+				log.Error("Failed to handle server NPC update: %v", err)
 			}
 		case messages.MessageTypeServerPlayerConnect:
 			if err := g.handleServerPlayerConnect(message); err != nil {
@@ -130,42 +145,6 @@ func (g *GameScene) processPendingServerMessages() error {
 	return nil
 }
 
-func (g *GameScene) handleServerGameUpdate(message *messages.Message) error {
-	serverGameUpdate, err := messages.DeserializeGameState(message.Payload)
-	if err != nil {
-		return fmt.Errorf("failed to deserialize game state: %v", err)
-	}
-	gameState := game.GameStateFromServerUpdate(serverGameUpdate)
-
-	if gameState.Timestamp < g.lastGameStateReceived {
-		log.Warn("Received outdated game state: %d < %d", gameState.Timestamp, g.lastGameStateReceived)
-		return nil
-	}
-	g.lastGameStateReceived = gameState.Timestamp
-	g.gameStates = append(g.gameStates, gameState)
-
-	if err := g.reconcileLocalPlayerState(gameState); err != nil {
-		log.Warn("Failed to reconcile local player state: %v", err)
-		return nil
-	}
-
-	return nil
-}
-
-func (g *GameScene) reconcileLocalPlayerState(gameState *gametypes.GameState) error {
-	playerState := gameState.Players[g.networkManager.ClientID()]
-	if playerState == nil {
-		return nil
-	}
-
-	localPlayer, err := g.getLocalPlayer()
-	if err != nil {
-		return fmt.Errorf("failed to get local player: %v", err)
-	}
-
-	return localPlayer.ReconcileState(playerState)
-}
-
 func (g *GameScene) getLocalPlayer() (*objects.Player, error) {
 	if !g.networkManager.IsConnected() {
 		return nil, nil
@@ -180,6 +159,73 @@ func (g *GameScene) getLocalPlayer() (*objects.Player, error) {
 		return nil, fmt.Errorf("failed to cast game object %s to *objects.Player", id)
 	}
 	return playerObject, nil
+}
+
+func (g *GameScene) handleServerPlayerUpdate(message *messages.Message) error {
+	serverPlayerUpdate, err := messages.DeserializeServerPlayerUpdate(message.Payload)
+	if err != nil {
+		return fmt.Errorf("failed to deserialize player update: %v", err)
+	}
+
+	if _, ok := g.serverPlayerUpdateBuffers[serverPlayerUpdate.ClientID]; !ok {
+		g.serverPlayerUpdateBuffers[serverPlayerUpdate.ClientID] = &ServerPlayerUpdateBuffer{
+			LastUpdateReceived: serverPlayerUpdate.Timestamp,
+			Updates:            []*messages.ServerPlayerUpdate{serverPlayerUpdate},
+		}
+		return nil
+	}
+
+	serverPlayerUpdateBuffer := g.serverPlayerUpdateBuffers[serverPlayerUpdate.ClientID]
+	if serverPlayerUpdate.Timestamp < serverPlayerUpdateBuffer.LastUpdateReceived {
+		log.Warn("Received outdated player state: %d < %d", serverPlayerUpdate.Timestamp, serverPlayerUpdateBuffer.LastUpdateReceived)
+		return nil
+	}
+	serverPlayerUpdateBuffer.LastUpdateReceived = serverPlayerUpdate.Timestamp
+	serverPlayerUpdateBuffer.Updates = append(serverPlayerUpdateBuffer.Updates, serverPlayerUpdate)
+
+	if serverPlayerUpdate.ClientID != g.networkManager.ClientID() {
+		return nil
+	}
+
+	localPlayer, err := g.getLocalPlayer()
+	if err != nil {
+		return fmt.Errorf("failed to get local player: %v", err)
+	}
+	if localPlayer == nil {
+		return nil
+	}
+
+	playerState := game.PlayerStateFromServerUpdate(serverPlayerUpdate.PlayerState)
+	if err := localPlayer.ReconcileState(playerState); err != nil {
+		return fmt.Errorf("failed to reconcile local player state: %v", err)
+	}
+
+	return nil
+}
+
+func (g *GameScene) handleServerNPCUpdate(message *messages.Message) error {
+	serverNPCUpdate, err := messages.DeserializeServerNPCUpdate(message.Payload)
+	if err != nil {
+		return fmt.Errorf("failed to deserialize NPC update: %v", err)
+	}
+
+	if _, ok := g.serverNPCUpdateBuffers[serverNPCUpdate.NPCID]; !ok {
+		g.serverNPCUpdateBuffers[serverNPCUpdate.NPCID] = &ServerNPCUpdateBuffer{
+			LastStateReceived: serverNPCUpdate.Timestamp,
+			States:            []*messages.ServerNPCUpdate{serverNPCUpdate},
+		}
+		return nil
+	}
+
+	serverNPCUpdateBuffer := g.serverNPCUpdateBuffers[serverNPCUpdate.NPCID]
+	if serverNPCUpdate.Timestamp < serverNPCUpdateBuffer.LastStateReceived {
+		log.Warn("Received outdated NPC state: %d < %d", serverNPCUpdate.Timestamp, serverNPCUpdateBuffer.LastStateReceived)
+		return nil
+	}
+	serverNPCUpdateBuffer.LastStateReceived = serverNPCUpdate.Timestamp
+	serverNPCUpdateBuffer.States = append(serverNPCUpdateBuffer.States, serverNPCUpdate)
+
+	return nil
 }
 
 func (g *GameScene) handleServerPlayerConnect(message *messages.Message) error {
@@ -231,6 +277,9 @@ func (g *GameScene) handleServerPlayerDisconnect(message *messages.Message) erro
 		return fmt.Errorf("failed to remove player object: %v", err)
 	}
 	g.deletedObjects[id] = time.Now().UnixMilli()
+
+	// remove the player from the server update buffer
+	delete(g.serverPlayerUpdateBuffers, playerDisconnect.ClientID)
 
 	return nil
 }
@@ -331,101 +380,137 @@ func (g *GameScene) handleServerPlayerKill(message *messages.Message) error {
 	return nil
 }
 
-func (g *GameScene) updateGameState() error {
-	if len(g.gameStates) < 2 {
-		return nil
-	}
-
+func (g *GameScene) updateObjectStates() error {
 	serverTime, _ := g.networkManager.ServerTime()
 	renderTime := int64(math.Round(serverTime)) - InterpolationOffset
 
-	for len(g.gameStates) > 2 && g.gameStates[2].Timestamp < renderTime {
-		g.gameStates = g.gameStates[1:]
+	for clientID, serverPlayerUpdateBuffer := range g.serverPlayerUpdateBuffers {
+		if len(serverPlayerUpdateBuffer.Updates) < 2 {
+			continue
+		}
+
+		for len(serverPlayerUpdateBuffer.Updates) > 2 && serverPlayerUpdateBuffer.Updates[2].Timestamp < renderTime {
+			serverPlayerUpdateBuffer.Updates = serverPlayerUpdateBuffer.Updates[1:]
+		}
+
+		if len(serverPlayerUpdateBuffer.Updates) > 2 {
+			// we have a future state to interpolate to
+			from := serverPlayerUpdateBuffer.Updates[1]
+			to := serverPlayerUpdateBuffer.Updates[2]
+			interpolationFactor := float64(renderTime-from.Timestamp) / float64(to.Timestamp-from.Timestamp)
+			fromState := game.PlayerStateFromServerUpdate(from.PlayerState)
+			toState := game.PlayerStateFromServerUpdate(to.PlayerState)
+			if err := g.interpolatePlayerState(clientID, fromState, toState, interpolationFactor); err != nil {
+				log.Warn("Failed to interpolate player state: %v", err)
+				continue
+			}
+		} else {
+			// we don't have a future state, so we need to extrapolate from the last state
+			from := serverPlayerUpdateBuffer.Updates[0]
+			to := serverPlayerUpdateBuffer.Updates[1]
+			extrapolationFactor := float64(renderTime-to.Timestamp) / float64(to.Timestamp-from.Timestamp)
+			fromState := game.PlayerStateFromServerUpdate(from.PlayerState)
+			toState := game.PlayerStateFromServerUpdate(to.PlayerState)
+			if err := g.extrapolatePlayerState(clientID, fromState, toState, extrapolationFactor); err != nil {
+				log.Warn("Failed to extrapolate player state: %v", err)
+				continue
+			}
+		}
 	}
 
-	if len(g.gameStates) > 2 {
-		// we have a future state to interpolate to
-		if err := g.interpolateState(g.gameStates[1], g.gameStates[2], renderTime); err != nil {
-			return fmt.Errorf("failed to interpolate game state: %v", err)
+	for npcID, serverNPCUpdateBuffer := range g.serverNPCUpdateBuffers {
+		if len(serverNPCUpdateBuffer.States) < 2 {
+			continue
 		}
-	} else {
-		// we don't have a future state, so we need to extrapolate from the last state
-		if err := g.extrapolateState(g.gameStates[0], g.gameStates[1], renderTime); err != nil {
-			return fmt.Errorf("failed to extrapolate game state: %v", err)
+
+		for len(serverNPCUpdateBuffer.States) > 2 && serverNPCUpdateBuffer.States[2].Timestamp < renderTime {
+			serverNPCUpdateBuffer.States = serverNPCUpdateBuffer.States[1:]
+		}
+
+		if len(serverNPCUpdateBuffer.States) > 2 {
+			// we have a future state to interpolate to
+			from := serverNPCUpdateBuffer.States[1]
+			to := serverNPCUpdateBuffer.States[2]
+			interpolationFactor := float64(renderTime-from.Timestamp) / float64(to.Timestamp-from.Timestamp)
+			fromState := game.NPCStateFromServerUpdate(from.NPCState)
+			toState := game.NPCStateFromServerUpdate(to.NPCState)
+			if err := g.interpolateNPCState(npcID, fromState, toState, interpolationFactor); err != nil {
+				log.Warn("Failed to interpolate NPC state: %v", err)
+				continue
+			}
+		} else {
+			// we don't have a future state, so we need to extrapolate from the last state
+			from := serverNPCUpdateBuffer.States[0]
+			to := serverNPCUpdateBuffer.States[1]
+			extrapolationFactor := float64(renderTime-to.Timestamp) / float64(to.Timestamp-from.Timestamp)
+			fromState := game.NPCStateFromServerUpdate(from.NPCState)
+			toState := game.NPCStateFromServerUpdate(to.NPCState)
+			if err := g.extrapolateNPCState(npcID, fromState, toState, extrapolationFactor); err != nil {
+				log.Warn("Failed to extrapolate NPC state: %v", err)
+				continue
+			}
 		}
 	}
 
 	return nil
 }
 
-// interpolateState interpolates the game state between two states given a render time
-// that is between the two states.
-func (g *GameScene) interpolateState(from *gametypes.GameState, to *gametypes.GameState, renderTime int64) error {
-	interpolationFactor := float64(renderTime-from.Timestamp) / float64(to.Timestamp-from.Timestamp)
-	for clientID, playerState := range to.Players {
-		id := fmt.Sprintf("player-%d", clientID)
-		obj := g.GetRoot().GetChild(id)
-		if obj == nil {
-			// TODO: handle edge case where the client misses the disconnect message, but receives some updates with the player still in the game
-			if _, ok := g.deletedObjects[id]; ok {
-				log.Debug("Player object for client %d was recently deleted, not instancing as part of update", clientID)
-				continue
-			}
-			log.Debug("Adding new player object for client %d", clientID)
-			playerObject, err := objects.NewPlayer(id, g.networkManager, playerState)
-			if err != nil {
-				return fmt.Errorf("failed to create new player object: %v", err)
-			}
-			g.collisionSpace.Add(playerObject.State.Object)
-			if err := g.GetRoot().AddChild(id, playerObject); err != nil {
-				return fmt.Errorf("failed to add player object: %v", err)
-			}
-		} else {
-			if clientID == g.networkManager.ClientID() {
-				continue
-			}
-			playerObject, ok := obj.(*objects.Player)
-			if !ok {
-				return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
-			}
-			if _, ok := from.Players[clientID]; !ok {
-				continue
-			}
-			previousPlayerState := from.Players[clientID]
-			playerObject.InterpolateState(previousPlayerState, playerState, interpolationFactor)
+func (g *GameScene) interpolatePlayerState(clientID uint32, from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) error {
+	id := fmt.Sprintf("player-%d", clientID)
+	obj := g.GetRoot().GetChild(id)
+	if obj == nil {
+		// TODO: handle edge case where the client misses the disconnect message, but receives some updates with the player still in the game
+		if _, ok := g.deletedObjects[id]; ok {
+			log.Debug("Player object for client %d was recently deleted, not instancing as part of update", clientID)
+			return nil
 		}
+		log.Debug("Adding new player object for client %d", clientID)
+		playerObject, err := objects.NewPlayer(id, g.networkManager, to)
+		if err != nil {
+			return fmt.Errorf("failed to create new player object: %v", err)
+		}
+		g.collisionSpace.Add(playerObject.State.Object)
+		if err := g.GetRoot().AddChild(id, playerObject); err != nil {
+			return fmt.Errorf("failed to add player object: %v", err)
+		}
+	} else {
+		if clientID == g.networkManager.ClientID() {
+			return nil
+		}
+		playerObject, ok := obj.(*objects.Player)
+		if !ok {
+			return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
+		}
+		playerObject.InterpolateState(from, to, factor)
 	}
 
-	for npcID, npcState := range to.NPCs {
-		if _, ok := from.NPCs[npcID]; !ok {
-			continue
-		}
-		previousNPCState := from.NPCs[npcID]
+	return nil
+}
 
-		id := fmt.Sprintf("npc-%d", npcID)
-		obj := g.GetRoot().GetChild(id)
-		if obj == nil {
-			// TODO: handle edge case where the client misses the despawn message, but receives some updates with the npc still in the game
-			if _, ok := g.deletedObjects[id]; ok {
-				log.Debug("NPC object with id %d was recently deleted, not instancing as part of update", npcID)
-				continue
-			}
-			log.Debug("Adding new npc object with id %d", npcID)
-			npcObject, err := objects.NewNPC(id, npcState)
-			if err != nil {
-				return fmt.Errorf("failed to create new player object: %v", err)
-			}
-			// we don't need to add NPCs to the client's collision space
-			if err := g.GetRoot().AddChild(id, npcObject); err != nil {
-				return fmt.Errorf("failed to add npc object: %v", err)
-			}
-		} else {
-			npcObject, ok := obj.(*objects.NPC)
-			if !ok {
-				return fmt.Errorf("failed to cast game object %s to *objects.NPC", id)
-			}
-			npcObject.InterpolateState(previousNPCState, npcState, interpolationFactor)
+func (g *GameScene) interpolateNPCState(npcID uint32, from *gametypes.NPCState, to *gametypes.NPCState, factor float64) error {
+	id := fmt.Sprintf("npc-%d", npcID)
+	obj := g.GetRoot().GetChild(id)
+	if obj == nil {
+		// TODO: handle edge case where the client misses the despawn message, but receives some updates with the npc still in the game
+		if _, ok := g.deletedObjects[id]; ok {
+			log.Debug("NPC object with id %d was recently deleted, not instancing as part of update", npcID)
+			return nil
 		}
+		log.Debug("Adding new npc object with id %d", npcID)
+		npcObject, err := objects.NewNPC(id, to)
+		if err != nil {
+			return fmt.Errorf("failed to create new player object: %v", err)
+		}
+		// we don't need to add NPCs to the client's collision space
+		if err := g.GetRoot().AddChild(id, npcObject); err != nil {
+			return fmt.Errorf("failed to add npc object: %v", err)
+		}
+	} else {
+		npcObject, ok := obj.(*objects.NPC)
+		if !ok {
+			return fmt.Errorf("failed to cast game object %s to *objects.NPC", id)
+		}
+		npcObject.InterpolateState(from, to, factor)
 	}
 
 	return nil
@@ -433,46 +518,36 @@ func (g *GameScene) interpolateState(from *gametypes.GameState, to *gametypes.Ga
 
 // extrapolateState extrapolates the game state based on the last two states.
 // This is used when we don't have a future state to interpolate to.
-func (g *GameScene) extrapolateState(from *gametypes.GameState, to *gametypes.GameState, renderTime int64) error {
-	extrapolationFactor := float64(renderTime-to.Timestamp) / float64(to.Timestamp-from.Timestamp)
-	for clientID, playerState := range to.Players {
-		id := fmt.Sprintf("player-%d", clientID)
-		obj := g.GetRoot().GetChild(id)
-		if obj == nil {
-			log.Debug("Player object for client %d not found, not instancing since we're extrapolating", clientID)
-		} else {
-			if clientID == g.networkManager.ClientID() {
-				continue
-			}
-			playerObject, ok := obj.(*objects.Player)
-			if !ok {
-				return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
-			}
-			if _, ok := from.Players[clientID]; !ok {
-				continue
-			}
-			previousPlayerState := from.Players[clientID]
-			playerObject.ExtrapolateState(previousPlayerState, playerState, extrapolationFactor)
+func (g *GameScene) extrapolatePlayerState(clientID uint32, from *gametypes.PlayerState, to *gametypes.PlayerState, factor float64) error {
+	id := fmt.Sprintf("player-%d", clientID)
+	obj := g.GetRoot().GetChild(id)
+	if obj == nil {
+		log.Debug("Player object for client %d not found, not instancing since we're extrapolating", clientID)
+	} else {
+		if clientID == g.networkManager.ClientID() {
+			return nil
 		}
+		playerObject, ok := obj.(*objects.Player)
+		if !ok {
+			return fmt.Errorf("failed to cast game object %s to *objects.Player", id)
+		}
+		playerObject.ExtrapolateState(from, to, factor)
 	}
 
-	for npcID, npcState := range to.NPCs {
-		if _, ok := from.NPCs[npcID]; !ok {
-			continue
-		}
-		previousNPCState := from.NPCs[npcID]
+	return nil
+}
 
-		id := fmt.Sprintf("npc-%d", npcID)
-		obj := g.GetRoot().GetChild(id)
-		if obj == nil {
-			log.Debug("NPC object with id %d not found, not instancing since we're extrapolating", npcID)
-		} else {
-			npcObject, ok := obj.(*objects.NPC)
-			if !ok {
-				return fmt.Errorf("failed to cast game object %s to *objects.NPC", id)
-			}
-			npcObject.ExtrapolateState(previousNPCState, npcState, extrapolationFactor)
+func (g *GameScene) extrapolateNPCState(npcID uint32, from *gametypes.NPCState, to *gametypes.NPCState, factor float64) error {
+	id := fmt.Sprintf("npc-%d", npcID)
+	obj := g.GetRoot().GetChild(id)
+	if obj == nil {
+		log.Debug("NPC object with id %d not found, not instancing since we're extrapolating", npcID)
+	} else {
+		npcObject, ok := obj.(*objects.NPC)
+		if !ok {
+			return fmt.Errorf("failed to cast game object %s to *objects.NPC", id)
 		}
+		npcObject.ExtrapolateState(from, to, factor)
 	}
 
 	return nil
