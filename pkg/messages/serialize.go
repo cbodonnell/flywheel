@@ -18,7 +18,7 @@ func SerializeMessage(m *Message) ([]byte, error) {
 	}
 
 	compressed := bytes.NewBuffer(nil)
-	compWriter, err := zstd.NewWriter(compressed)
+	compWriter, err := zstd.NewWriter(compressed, zstd.WithEncoderLevel(zstd.SpeedFastest))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create zstd writer: %v", err)
 	}
