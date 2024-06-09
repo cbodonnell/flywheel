@@ -181,7 +181,6 @@ func (m *NetworkManager) startSyncTime(ctx context.Context) error {
 	return nil
 }
 
-// TODO: investigate non-negligible ping times locally
 func (m *NetworkManager) syncTime() error {
 	clientSyncTime := &messages.ClientSyncTime{
 		Timestamp: time.Now().UnixMilli(),
