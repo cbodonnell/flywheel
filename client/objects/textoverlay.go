@@ -25,7 +25,7 @@ func NewTextOverlayObject(id string, text string) GameObject {
 
 func (o *TextOverlayObject) Draw(screen *ebiten.Image) {
 	t := strings.ToUpper(o.text)
-	f := fonts.TTFNormalFont
+	f := fonts.TTFLargeFont
 	bounds, _ := font.BoundString(f, t)
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(float64(screen.Bounds().Dx())/2-float64(bounds.Max.X>>6)/2, float64(screen.Bounds().Dy())/2-float64(bounds.Max.Y>>6)/2)
