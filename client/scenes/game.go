@@ -577,12 +577,19 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 }
 
 func (g *GameScene) drawWorld() {
+	// Draw the world background
 	vector.DrawFilledRect(g.world, 0, 0, float32(g.world.Bounds().Dx()), float32(g.world.Bounds().Dy()), color.RGBA{0x87, 0xce, 0xeb, 0xff}, false)
 
 	for _, obj := range g.collisionSpace.Objects() {
 		if obj.HasTags(gametypes.CollisionSpaceTagLevel) {
 			levelColor := color.RGBA{0x80, 0x80, 0x80, 0xff} // Gray
 			vector.DrawFilledRect(g.world, float32(obj.Position.X), float32(g.world.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
+		} else if obj.HasTags(gametypes.CollisionSpaceTagPlatform) {
+			platformColor := color.RGBA{0xff, 0xa5, 0x00, 0xff} // Orange
+			vector.DrawFilledRect(g.world, float32(obj.Position.X), float32(g.world.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X), float32(obj.Size.Y), platformColor, false)
+		} else if obj.HasTags(gametypes.CollisionSpaceTagLadder) {
+			ladderColor := color.RGBA{0x00, 0x80, 0x00, 0xff} // Green
+			vector.DrawFilledRect(g.world, float32(obj.Position.X), float32(g.world.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X), float32(obj.Size.Y), ladderColor, false)
 		}
 	}
 

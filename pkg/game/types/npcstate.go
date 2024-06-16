@@ -232,7 +232,7 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	}
 
 	// Check for collisions
-	if collision := n.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
+	if collision := n.Object.Check(dx, 0, CollisionSpaceTagLevel, CollisionSpaceTagPlatform); collision != nil {
 		dx = collision.ContactWithObject(collision.Objects[0]).X
 		vx = 0
 	}
@@ -252,7 +252,7 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 
 	// Check for collisions
 	isOnGround := false
-	if collision := n.Object.Check(0, dy, CollisionSpaceTagLevel); collision != nil {
+	if collision := n.Object.Check(0, dy, CollisionSpaceTagLevel, CollisionSpaceTagPlatform); collision != nil {
 		dy = collision.ContactWithObject(collision.Objects[0]).Y
 		vy = 0
 		isOnGround = true
@@ -402,7 +402,7 @@ func (n *NPCState) UpdateFollowing() {
 	// check if the npc has a direct line of sight to the player
 	lineOfSight := resolv.NewLine(n.Position.X+constants.NPCWidth/2, n.Position.Y+constants.NPCHeight/2, n.FollowTarget.Position.X+constants.PlayerWidth/2, n.FollowTarget.Position.Y+constants.PlayerHeight/2)
 	for _, obj := range n.Object.Space.Objects() {
-		if !obj.HasTags(CollisionSpaceTagLevel) {
+		if !obj.HasTags(CollisionSpaceTagLevel) && !obj.HasTags(CollisionSpaceTagPlatform) {
 			continue
 		}
 		if contact := lineOfSight.Intersection(0, 0, obj.Shape); contact != nil {

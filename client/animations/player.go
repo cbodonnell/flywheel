@@ -108,6 +108,40 @@ func NewPlayerJumpAnimation() *Animation {
 	})
 }
 
+func NewPlayerLadderIdleAnimation() *Animation {
+	return NewAnimation(NewAnimationOptions{
+		Image:       ebiten.NewImageFromImage(swordsmanIdleSpritesheet), // TODO: ladder idle spritesheet
+		FrameOX:     0,
+		FrameOY:     0,
+		FrameWidth:  128,
+		FrameHeight: 128,
+		FrameCount:  8,
+		FrameSpeed:  8,
+		ScaleX:      1.0,
+		ScaleY:      1.0,
+		ShiftX:      -32,
+		ShiftY:      0,
+		IsLooping:   true,
+	})
+}
+
+func NewPlayerLadderClimbAnimation() *Animation {
+	return NewAnimation(NewAnimationOptions{
+		Image:       ebiten.NewImageFromImage(swordsmanIdleSpritesheet), // TODO: ladder climb spritesheet
+		FrameOX:     0,
+		FrameOY:     0,
+		FrameWidth:  128,
+		FrameHeight: 128,
+		FrameCount:  8,
+		FrameSpeed:  8,
+		ScaleX:      1.0,
+		ScaleY:      1.0,
+		ShiftX:      -32,
+		ShiftY:      0,
+		IsLooping:   true,
+	})
+}
+
 func NewPlayerFallAnimation() *Animation {
 	return NewAnimation(NewAnimationOptions{
 		Image:       ebiten.NewImageFromImage(swordsmanJumpSpritesheet),

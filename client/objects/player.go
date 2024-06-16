@@ -77,14 +77,16 @@ func NewPlayer(id string, networkManager *network.NetworkManager, state *gametyp
 		// debug:          true,
 		State: state,
 		animations: map[gametypes.PlayerAnimation]*animations.Animation{
-			gametypes.PlayerAnimationIdle:    animations.NewPlayerIdleAnimation(),
-			gametypes.PlayerAnimationRun:     animations.NewPlayerRunAnimation(),
-			gametypes.PlayerAnimationJump:    animations.NewPlayerJumpAnimation(),
-			gametypes.PlayerAnimationFall:    animations.NewPlayerFallAnimation(),
-			gametypes.PlayerAnimationAttack1: animations.NewPlayerAttack1Animation(),
-			gametypes.PlayerAnimationAttack2: animations.NewPlayerAttack2Animation(),
-			gametypes.PlayerAnimationAttack3: animations.NewPlayerAttack3Animation(),
-			gametypes.PlayerAnimationDead:    animations.NewPlayerDeadAnimation(),
+			gametypes.PlayerAnimationIdle:        animations.NewPlayerIdleAnimation(),
+			gametypes.PlayerAnimationRun:         animations.NewPlayerRunAnimation(),
+			gametypes.PlayerAnimationJump:        animations.NewPlayerJumpAnimation(),
+			gametypes.PlayerAnimationLadderIdle:  animations.NewPlayerLadderIdleAnimation(),
+			gametypes.PlayerAnimationLadderClimb: animations.NewPlayerLadderClimbAnimation(),
+			gametypes.PlayerAnimationFall:        animations.NewPlayerFallAnimation(),
+			gametypes.PlayerAnimationAttack1:     animations.NewPlayerAttack1Animation(),
+			gametypes.PlayerAnimationAttack2:     animations.NewPlayerAttack2Animation(),
+			gametypes.PlayerAnimationAttack3:     animations.NewPlayerAttack3Animation(),
+			gametypes.PlayerAnimationDead:        animations.NewPlayerDeadAnimation(),
 		},
 	}, nil
 }
@@ -109,9 +111,9 @@ func (o *Player) Update() error {
 	upPressed := input.IsUpPressed()
 	downPressed := input.IsDownPressed()
 	if upPressed && !downPressed {
-		inputY = -1.0
-	} else if downPressed && !upPressed {
 		inputY = 1.0
+	} else if downPressed && !upPressed {
+		inputY = -1.0
 	}
 
 	inputJump := input.IsJumpJustPressed()

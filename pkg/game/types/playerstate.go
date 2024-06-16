@@ -8,23 +8,27 @@ import (
 )
 
 type PlayerState struct {
-	LastProcessedTimestamp int64
-	CharacterID            int32
-	Name                   string
-	Position               kinematic.Vector
-	Velocity               kinematic.Vector
-	Object                 *resolv.Object
-	IsOnGround             bool
-	IsAttacking            bool
-	CurrentAttack          PlayerAttack
-	AttackTimeLeft         float64
-	IsAttackHitting        bool
-	DidAttackHit           bool
-	Animation              PlayerAnimation
-	AnimationFlip          bool
-	AnimationSequence      uint8
-	ResetAnimation         bool
-	Hitpoints              int16
+	LastProcessedTimestamp   int64
+	CharacterID              int32
+	Name                     string
+	Position                 kinematic.Vector
+	Velocity                 kinematic.Vector
+	Object                   *resolv.Object
+	IsOnGround               bool
+	IsOnLadder               bool
+	LadderPosition           *kinematic.Vector
+	DismountedLadderPosition *kinematic.Vector
+	IsAttacking              bool
+	CurrentAttack            PlayerAttack
+	AttackTimeLeft           float64
+	IsAttackHitting          bool
+	DidAttackHit             bool
+	Animation                PlayerAnimation
+	// TODO: change to a more generic flip property that represents the direction of the player
+	AnimationFlip     bool
+	AnimationSequence uint8
+	ResetAnimation    bool
+	Hitpoints         int16
 }
 
 type PlayerAttack uint8
@@ -41,6 +45,8 @@ const (
 	PlayerAnimationIdle PlayerAnimation = iota
 	PlayerAnimationRun
 	PlayerAnimationJump
+	PlayerAnimationLadderIdle
+	PlayerAnimationLadderClimb
 	PlayerAnimationFall
 	PlayerAnimationAttack1
 	PlayerAnimationAttack2
@@ -111,7 +117,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		p.Respawn(kinematic.NewVector(constants.PlayerStartingX, constants.PlayerStartingY))
 	}
 
-	// Attack - TODO: roll this into some kind of attack manager
+	// Attack logic (unchanged)
 	if p.IsAttacking {
 		beforeIsAttacking := p.IsAttacking
 
@@ -148,7 +154,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		}
 	}
 
-	if !p.IsAttacking && !p.IsDead() {
+	if !p.IsAttacking && !p.IsDead() && !p.IsOnLadder {
 		switch {
 		case clientPlayerUpdate.InputAttack1:
 			p.IsAttacking = true
@@ -165,56 +171,88 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		}
 	}
 
-	// Movement
-
+	// Movement logic
 	// X-axis
-	var dx, vx float64
-	if !p.IsAttacking && !p.IsDead() {
-		dx = kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
-		vx = kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
-	} else if !p.IsOnGround {
-		// keep moving in the direction of the attack
-		dx = kinematic.Displacement(p.Velocity.X, clientPlayerUpdate.DeltaTime, 0)
-		vx = kinematic.FinalVelocity(p.Velocity.X, clientPlayerUpdate.DeltaTime, 0)
-	}
+	if p.IsOnLadder {
+		// Ladder movement
+		p.Position.X = p.LadderPosition.X - constants.PlayerWidth/2 + float64(constants.CellWidth)/2
+		p.Velocity.X = 0
+		p.Object.Position.X = p.Position.X
+		p.Object.Update()
+	} else {
+		var dx, vx float64
+		if !p.IsAttacking && !p.IsDead() {
+			dx = kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+			vx = kinematic.FinalVelocity(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
+		} else if !p.IsOnGround {
+			// keep moving in the direction of the attack
+			dx = kinematic.Displacement(p.Velocity.X, clientPlayerUpdate.DeltaTime, 0)
+			vx = kinematic.FinalVelocity(p.Velocity.X, clientPlayerUpdate.DeltaTime, 0)
+		}
 
-	// Check for collisions
-	if collision := p.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
-		dx = collision.ContactWithCell(collision.Cells[0]).X
-		vx = 0
-	}
+		// Check for collisions
+		if collision := p.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
+			dx = collision.ContactWithCell(collision.Cells[0]).X
+			vx = 0
+		}
 
-	// Update player state in the X-axis
-	p.Position.X += dx
-	p.Velocity.X = vx
-	p.Object.Position.X = p.Position.X
-	p.Object.Update()
+		// Update player state in the X-axis
+		p.Position.X += dx
+		p.Velocity.X = vx
+		p.Object.Position.X = p.Position.X
+		p.Object.Update()
+	}
 
 	// Y-axis
-	// Apply input
-	vy := p.Velocity.Y
-	if !p.IsAttacking && !p.IsDead() && p.IsOnGround && clientPlayerUpdate.InputJump {
-		vy = constants.PlayerJumpSpeed
+	// Ladder interaction
+	if p.IsOnLadder {
+		vy := 0.0
+		if clientPlayerUpdate.InputY < 0 {
+			vy = -constants.PlayerLadderClimbSpeed
+		} else if clientPlayerUpdate.InputY > 0 {
+			vy = constants.PlayerLadderClimbSpeed
+		}
+		dy := kinematic.Displacement(vy, clientPlayerUpdate.DeltaTime, 0)
+
+		// Update player state in the Y-axis
+		p.Position.Y += dy
+		p.Velocity.Y = vy
+		p.Object.Position.Y = p.Position.Y
+		p.Object.Update()
+	} else {
+		vy := p.Velocity.Y
+		if !p.IsAttacking && !p.IsDead() && p.IsOnGround && clientPlayerUpdate.InputJump {
+			vy = constants.PlayerJumpSpeed
+		}
+
+		// Apply gravity
+		dy := kinematic.Displacement(vy, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
+		vy = kinematic.FinalVelocity(vy, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
+
+		// TODO: platforms should be able to be jumped through from below
+		// Check for collisions
+		isOnGround := false
+		if collision := p.Object.Check(0, dy, CollisionSpaceTagLevel); collision != nil {
+			if dy < 0 {
+				isOnGround = true
+			}
+			dy = collision.ContactWithCell(collision.Cells[0]).Y
+			vy = 0
+		} else if collision := p.Object.Check(0, dy, CollisionSpaceTagPlatform); collision != nil {
+			if dy < 0 && p.Position.Y >= collision.Objects[0].Position.Y+float64(constants.CellHeight) {
+				dy = collision.ContactWithCell(collision.Cells[0]).Y
+				vy = 0
+				isOnGround = true
+			}
+		}
+
+		// Update player state in the Y-axis
+		p.Position.Y += dy
+		p.Velocity.Y = vy
+		p.Object.Position.Y = p.Position.Y
+		p.Object.Update()
+		p.IsOnGround = isOnGround
 	}
-
-	// Apply gravity
-	dy := kinematic.Displacement(vy, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
-	vy = kinematic.FinalVelocity(vy, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
-
-	// Check for collisions
-	isOnGround := false
-	if collision := p.Object.Check(0, dy, CollisionSpaceTagLevel); collision != nil {
-		dy = collision.ContactWithCell(collision.Cells[0]).Y
-		vy = 0
-		isOnGround = true
-	}
-
-	// Update player state in the Y-axis
-	p.Position.Y += dy
-	p.Velocity.Y = vy
-	p.Object.Position.Y = p.Position.Y
-	p.Object.Update()
-	p.IsOnGround = isOnGround
 
 	// Update the player animation
 	if !p.IsAttacking && !p.IsDead() {
@@ -222,6 +260,42 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 			p.AnimationFlip = false
 		} else if clientPlayerUpdate.InputX < 0 {
 			p.AnimationFlip = true
+		}
+	}
+
+	// Check if the player is on a ladder
+	if p.IsOnLadder {
+		if p.IsDead() {
+			p.IsOnLadder = false
+			p.DismountedLadderPosition = nil
+			p.LadderPosition = nil
+		} else if collision := p.Object.Check(0, 0, CollisionSpaceTagLadder); collision == nil {
+			p.IsOnLadder = false
+			p.DismountedLadderPosition = nil
+			p.LadderPosition = nil
+		} else if clientPlayerUpdate.InputX != 0 && clientPlayerUpdate.InputJump {
+			p.IsOnLadder = false
+			p.DismountedLadderPosition = p.LadderPosition
+			p.LadderPosition = nil
+		}
+	} else if !p.IsAttacking && !p.IsDead() {
+		if clientPlayerUpdate.InputY != 0 {
+			if collision := p.Object.Check(0, clientPlayerUpdate.InputY, CollisionSpaceTagLadder); collision != nil {
+				ladderPosition := &kinematic.Vector{
+					X: collision.Objects[0].Position.X,
+					Y: collision.Objects[0].Position.Y,
+				}
+				isLastLadder := p.DismountedLadderPosition != nil && p.DismountedLadderPosition.Equals(*ladderPosition)
+				isFacingLadder := p.AnimationFlip && (p.Position.X+constants.PlayerWidth/2) > (ladderPosition.X+float64(constants.CellWidth)/2) ||
+					!p.AnimationFlip && (p.Position.X+constants.PlayerWidth/2) < (ladderPosition.X+float64(constants.CellWidth)/2)
+				if !isLastLadder || isFacingLadder {
+					p.IsOnLadder = true
+					p.LadderPosition = &kinematic.Vector{
+						X: collision.Objects[0].Position.X,
+						Y: collision.Objects[0].Position.Y,
+					}
+				}
+			}
 		}
 	}
 
@@ -241,17 +315,25 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		if p.IsDead() {
 			p.Animation = PlayerAnimationDead
 		} else {
-			if p.IsOnGround {
-				if p.Velocity.X != 0 {
-					p.Animation = PlayerAnimationRun
+			if p.IsOnLadder {
+				if clientPlayerUpdate.InputY != 0 {
+					p.Animation = PlayerAnimationLadderClimb
 				} else {
-					p.Animation = PlayerAnimationIdle
+					p.Animation = PlayerAnimationLadderIdle
 				}
 			} else {
-				if vy < 0 {
-					p.Animation = PlayerAnimationFall
+				if p.IsOnGround {
+					if p.Velocity.X != 0 {
+						p.Animation = PlayerAnimationRun
+					} else {
+						p.Animation = PlayerAnimationIdle
+					}
 				} else {
-					p.Animation = PlayerAnimationJump
+					if p.Velocity.Y < 0 {
+						p.Animation = PlayerAnimationFall
+					} else {
+						p.Animation = PlayerAnimationJump
+					}
 				}
 			}
 		}
