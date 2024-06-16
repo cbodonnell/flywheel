@@ -377,10 +377,6 @@ func (s *CharacterSelectionScene) renderUI() {
 			widget.WindowOpts.TitleBar(titleContainer, 48),
 			widget.WindowOpts.Modal(),
 			widget.WindowOpts.CloseMode(widget.CLICK_OUT),
-			// widget.WindowOpts.Draggable(),
-			// widget.WindowOpts.Resizeable(),
-			// widget.WindowOpts.MinSize(500, 100),
-			// widget.WindowOpts.MaxSize(300, 300),
 			widget.WindowOpts.ClosedHandler(func(args *widget.WindowClosedEventArgs) {
 				s.isDeletingCharacter = false
 				s.renderUI()
