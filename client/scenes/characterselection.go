@@ -115,12 +115,6 @@ func (s *CharacterSelectionScene) renderUI() {
 	rootContainer.AddChild(headerText)
 
 	for _, character := range s.characters {
-		// buttonContainer := widget.NewContainer(
-		// 	widget.ContainerOpts.Layout(widget.NewRowLayout(
-		// 		widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-		// 		widget.RowLayoutOpts.Spacing(20),
-		// 	)),
-		// )
 		buttonContainer := widget.NewContainer(
 			widget.ContainerOpts.WidgetOpts(
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{
