@@ -160,6 +160,16 @@ func (r *PostgresRepository) DeleteCharacter(ctx context.Context, userID string,
 	return nil
 }
 
+func (r *PostgresRepository) NameExists(ctx context.Context, name string) (bool, error) {
+	q := `SELECT EXISTS(SELECT 1 FROM characters WHERE LOWER(name) = LOWER($1));`
+	var exists bool
+	if err := r.conn.QueryRow(ctx, q, name).Scan(&exists); err != nil {
+		return false, fmt.Errorf("failed to query name: %v", err)
+	}
+
+	return exists, nil
+}
+
 func (r *PostgresRepository) SaveGameState(ctx context.Context, gameState *gametypes.GameState) error {
 	tx, err := r.conn.Begin(ctx)
 	if err != nil {

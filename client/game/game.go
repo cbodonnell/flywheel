@@ -61,7 +61,7 @@ const (
 type GameMode int
 
 const (
-	GameModeMenu GameMode = iota
+	GameModeAuth GameMode = iota
 	GameModePlay
 	GameModeOver
 	GameModeNetworkError
@@ -69,8 +69,8 @@ const (
 
 func (m GameMode) String() string {
 	switch m {
-	case GameModeMenu:
-		return "Menu"
+	case GameModeAuth:
+		return "Auth"
 	case GameModePlay:
 		return "Play"
 	case GameModeOver:
@@ -107,8 +107,14 @@ func NewGame(opts NewGameOptions) (ebiten.Game, error) {
 		gameAutomation: opts.GameAutomation,
 	}
 
-	if err := g.loadMenu(); err != nil {
-		return nil, fmt.Errorf("failed to load menu scene: %v", err)
+	isAutomated := false
+	if g.gameAutomation != nil {
+		isAutomated = true
+		g.setEmailPassword(g.gameAutomation.Email, g.gameAutomation.Password)
+	}
+
+	if err := g.loadAuth(isAutomated); err != nil {
+		return nil, fmt.Errorf("failed to load auth scene: %v", err)
 	}
 
 	return g, nil
@@ -129,31 +135,47 @@ func (g *Game) SetScene(scene scenes.Scene) error {
 	return nil
 }
 
-func (g *Game) loadMenu() error {
-	if g.gameAutomation != nil {
-		if err := g.login(g.gameAutomation.Email, g.gameAutomation.Password); err != nil {
-			return fmt.Errorf("failed to start game: %v", err)
-		}
+func (g *Game) loadAuth(isAutomated bool) error {
+	if err := g.login(); err == nil {
 		return nil
+	} else if isAutomated {
+		return fmt.Errorf("failed to login with automation: %v", err)
 	}
 
-	menuSceneOpts := scenes.MenuSceneOptions{
-		OnLogin: g.login,
+	authSceneOpts := scenes.AuthSceneOptions{
+		OnLogin: func(email string, password string) error {
+			g.setEmailPassword(email, password)
+			if err := g.login(); err != nil {
+				if actionableErr, ok := err.(*ui.ActionableError); ok {
+					return actionableErr
+				}
+				return fmt.Errorf("failed to login: %v", err)
+			}
+			return nil
+		},
+		OnRegister: func(email string, password string) error {
+			g.setEmailPassword(email, password)
+			if err := g.register(); err != nil {
+				if actionableErr, ok := err.(*ui.ActionableError); ok {
+					return actionableErr
+				}
+				return fmt.Errorf("failed to register: %v", err)
+			}
+			return nil
+		},
 	}
-	menu, err := scenes.NewMenuScene(menuSceneOpts)
+	auth, err := scenes.NewAuthScene(authSceneOpts)
 	if err != nil {
-		return fmt.Errorf("failed to create menu scene: %v", err)
+		return fmt.Errorf("failed to create auth scene: %v", err)
 	}
-	if err := g.SetScene(menu); err != nil {
-		return fmt.Errorf("failed to set menu scene: %v", err)
+	if err := g.SetScene(auth); err != nil {
+		return fmt.Errorf("failed to set auth scene: %v", err)
 	}
-	g.mode = GameModeMenu
+	g.mode = GameModeAuth
 	return nil
 }
 
-func (g *Game) login(email, password string) error {
-	g.setEmailPassword(email, password)
-
+func (g *Game) login() error {
 	if err := g.refreshIDToken(); err != nil {
 		if actionableErr, ok := err.(*ui.ActionableError); ok {
 			return actionableErr
@@ -164,6 +186,65 @@ func (g *Game) login(email, password string) error {
 	if err := g.loadCharacterSelection(); err != nil {
 		return fmt.Errorf("failed to load character selection scene: %v", err)
 	}
+
+	return nil
+}
+
+func (g *Game) register() error {
+	if err := g.registerWithEmailPassword(); err != nil {
+		if actionableErr, ok := err.(*ui.ActionableError); ok {
+			return actionableErr
+		}
+		return fmt.Errorf("failed to refresh ID token: %v", err)
+	}
+
+	if err := g.loadCharacterSelection(); err != nil {
+		return fmt.Errorf("failed to load character selection scene: %v", err)
+	}
+
+	return nil
+}
+
+func (g *Game) registerWithEmailPassword() error {
+	values := url.Values{}
+	values.Set("email", g.auth.Email)
+	values.Set("password", g.auth.Password)
+	requestBody := strings.NewReader(values.Encode())
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/register", g.auth.URL), requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to create register request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := http.DefaultClient
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send register request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		msg := string(b)
+		if len(msg) == 0 {
+			msg = resp.Status
+		}
+		return &ui.ActionableError{Message: msg}
+	}
+
+	registerResponse := &authhandlers.RegisterResponseBody{}
+	if err := json.NewDecoder(resp.Body).Decode(registerResponse); err != nil {
+		return fmt.Errorf("failed to decode register response: %v", err)
+	}
+
+	g.auth.IDToken = registerResponse.IDToken
+	expiresIn, err := strconv.Atoi(registerResponse.ExpiresIn)
+	if err != nil {
+		return fmt.Errorf("failed to parse expires in: %v", err)
+	}
+	g.auth.IDTokenExp = time.Now().Add(time.Duration(expiresIn) * time.Second)
+	g.auth.RefreshToken = registerResponse.RefreshToken
 
 	return nil
 }
@@ -303,7 +384,7 @@ func (g *Game) loadCharacterSelection() error {
 	if err := g.SetScene(characterSelection); err != nil {
 		return fmt.Errorf("failed to set character selection scene: %v", err)
 	}
-	g.mode = GameModeMenu
+	g.mode = GameModeAuth
 	return nil
 }
 
@@ -535,7 +616,7 @@ func (g *Game) checkNetworkManagerErrors() error {
 
 func (g *Game) handleInput() error {
 	switch g.mode {
-	case GameModeMenu:
+	case GameModeAuth:
 		// no input handling here
 	case GameModePlay:
 		if input.IsNegativeJustPressed() {
@@ -546,14 +627,14 @@ func (g *Game) handleInput() error {
 		}
 	case GameModeOver:
 		if input.IsPositiveJustPressed() {
-			if err := g.loadMenu(); err != nil {
-				return fmt.Errorf("failed to load menu scene: %v", err)
+			if err := g.loadAuth(false); err != nil {
+				return fmt.Errorf("failed to load auth scene: %v", err)
 			}
 		}
 	case GameModeNetworkError:
 		if input.IsPositiveJustPressed() {
-			if err := g.loadMenu(); err != nil {
-				return fmt.Errorf("failed to load menu scene: %v", err)
+			if err := g.loadAuth(false); err != nil {
+				return fmt.Errorf("failed to load auth scene: %v", err)
 			}
 		}
 	}

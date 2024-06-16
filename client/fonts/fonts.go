@@ -14,6 +14,7 @@ func init() {
 	}
 }
 
+var TTFLargeFont font.Face
 var TTFNormalFont font.Face
 var TTFSmallFont font.Face
 var TTFTinyFont font.Face
@@ -24,6 +25,12 @@ func loadFonts() error {
 	if err != nil {
 		return fmt.Errorf("failed to parse font: %v", err)
 	}
+
+	TTFLargeFont = truetype.NewFace(ttfFont, &truetype.Options{
+		Size:    32,
+		DPI:     dpi,
+		Hinting: font.HintingFull,
+	})
 
 	TTFNormalFont = truetype.NewFace(ttfFont, &truetype.Options{
 		Size:    24,

@@ -9,7 +9,6 @@ import (
 )
 
 type NPCState struct {
-	// TODO: assess public/private fields
 	ID                uint32
 	SpawnPosition     kinematic.Vector
 	SpawnFlip         bool

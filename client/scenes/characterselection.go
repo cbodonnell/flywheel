@@ -1,6 +1,8 @@
 package scenes
 
 import (
+	"fmt"
+	"image"
 	"image/color"
 
 	"github.com/cbodonnell/flywheel/client/fonts"
@@ -9,7 +11,7 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/repositories/models"
 	"github.com/ebitenui/ebitenui"
-	"github.com/ebitenui/ebitenui/image"
+	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -72,40 +74,69 @@ func (s *CharacterSelectionScene) Init() error {
 
 func (s *CharacterSelectionScene) renderUI() {
 	neutralButtonImage := &widget.ButtonImage{
-		Idle:    image.NewNineSliceColor(color.NRGBA{R: 170, G: 170, B: 180, A: 255}),
-		Hover:   image.NewNineSliceColor(color.NRGBA{R: 135, G: 135, B: 150, A: 255}),
-		Pressed: image.NewNineSliceColor(color.NRGBA{R: 100, G: 100, B: 120, A: 255}),
+		Idle:    eimage.NewNineSliceColor(color.NRGBA{R: 170, G: 170, B: 180, A: 255}),
+		Hover:   eimage.NewNineSliceColor(color.NRGBA{R: 135, G: 135, B: 150, A: 255}),
+		Pressed: eimage.NewNineSliceColor(color.NRGBA{R: 100, G: 100, B: 120, A: 255}),
 	}
 	positiveButtonImage := &widget.ButtonImage{
-		Idle:    image.NewNineSliceColor(color.NRGBA{R: 80, G: 170, B: 80, A: 255}), // Green color
-		Hover:   image.NewNineSliceColor(color.NRGBA{R: 65, G: 135, B: 65, A: 255}), // Darker green for hover
-		Pressed: image.NewNineSliceColor(color.NRGBA{R: 50, G: 100, B: 50, A: 255}), // Even darker green for pressed
+		Idle:    eimage.NewNineSliceColor(color.NRGBA{R: 80, G: 170, B: 80, A: 255}), // Green color
+		Hover:   eimage.NewNineSliceColor(color.NRGBA{R: 65, G: 135, B: 65, A: 255}), // Darker green for hover
+		Pressed: eimage.NewNineSliceColor(color.NRGBA{R: 50, G: 100, B: 50, A: 255}), // Even darker green for pressed
 	}
 	negativeButtonImage := &widget.ButtonImage{
-		Idle:    image.NewNineSliceColor(color.NRGBA{R: 170, G: 80, B: 80, A: 255}), // Red color
-		Hover:   image.NewNineSliceColor(color.NRGBA{R: 135, G: 65, B: 65, A: 255}), // Darker red for hover
-		Pressed: image.NewNineSliceColor(color.NRGBA{R: 100, G: 50, B: 50, A: 255}), // Even darker red for pressed
+		Idle:    eimage.NewNineSliceColor(color.NRGBA{R: 170, G: 80, B: 80, A: 255}), // Red color
+		Hover:   eimage.NewNineSliceColor(color.NRGBA{R: 135, G: 65, B: 65, A: 255}), // Darker red for hover
+		Pressed: eimage.NewNineSliceColor(color.NRGBA{R: 100, G: 50, B: 50, A: 255}), // Even darker red for pressed
 	}
 
-	fontFace := fonts.TTFNormalFont
+	largeFontFace := fonts.TTFLargeFont
+	normalFontFace := fonts.TTFNormalFont
 
 	rootContainer := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(20),
 			widget.RowLayoutOpts.Padding(widget.Insets{
-				Top:    150,
-				Left:   120,
-				Right:  120,
+				Top:    100,
+				Left:   80,
+				Right:  80,
 				Bottom: 90,
 			}))),
 	)
 
+	headerText := widget.NewText(
+		widget.TextOpts.Text("Select a Character", largeFontFace, color.NRGBA{254, 255, 255, 255}),
+		widget.TextOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+				Position: widget.RowLayoutPositionCenter,
+			}),
+		),
+	)
+	rootContainer.AddChild(headerText)
+
 	for _, character := range s.characters {
+		// buttonContainer := widget.NewContainer(
+		// 	widget.ContainerOpts.Layout(widget.NewRowLayout(
+		// 		widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+		// 		widget.RowLayoutOpts.Spacing(20),
+		// 	)),
+		// )
 		buttonContainer := widget.NewContainer(
-			widget.ContainerOpts.Layout(widget.NewRowLayout(
-				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(20),
+			widget.ContainerOpts.WidgetOpts(
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+					Stretch: true,
+				}),
+			),
+			widget.ContainerOpts.Layout(widget.NewGridLayout(
+				widget.GridLayoutOpts.Columns(2),
+				widget.GridLayoutOpts.Padding(widget.Insets{
+					Top:    0,
+					Left:   0,
+					Right:  0,
+					Bottom: 0,
+				}),
+				widget.GridLayoutOpts.Spacing(20, 0),
+				widget.GridLayoutOpts.Stretch([]bool{true, false}, []bool{true}),
 			)),
 		)
 
@@ -117,13 +148,13 @@ func (s *CharacterSelectionScene) renderUI() {
 				}),
 			),
 			widget.ButtonOpts.Image(neutralButtonImage),
-			widget.ButtonOpts.Text(character.Name, fontFace, &widget.ButtonTextColor{
+			widget.ButtonOpts.Text(character.Name, normalFontFace, &widget.ButtonTextColor{
 				Idle:     color.NRGBA{254, 255, 255, 255},
 				Disabled: color.NRGBA{R: 200, G: 200, B: 200, A: 255},
 			}),
 			widget.ButtonOpts.TextPadding(widget.Insets{
-				Left:   30,
-				Right:  30,
+				Left:   15,
+				Right:  15,
 				Top:    5,
 				Bottom: 5,
 			}),
@@ -149,13 +180,13 @@ func (s *CharacterSelectionScene) renderUI() {
 				}),
 			),
 			widget.ButtonOpts.Image(negativeButtonImage),
-			widget.ButtonOpts.Text("Delete", fontFace, &widget.ButtonTextColor{
+			widget.ButtonOpts.Text("X", normalFontFace, &widget.ButtonTextColor{
 				Idle:     color.NRGBA{254, 255, 255, 255},
 				Disabled: color.NRGBA{R: 200, G: 200, B: 200, A: 255},
 			}),
 			widget.ButtonOpts.TextPadding(widget.Insets{
-				Left:   30,
-				Right:  30,
+				Left:   15,
+				Right:  15,
 				Top:    5,
 				Bottom: 5,
 			}),
@@ -181,10 +212,10 @@ func (s *CharacterSelectionScene) renderUI() {
 			),
 			widget.TextInputOpts.MobileInputMode("text"),
 			widget.TextInputOpts.Image(&widget.TextInputImage{
-				Idle:     image.NewNineSliceColor(color.NRGBA{R: 100, G: 100, B: 100, A: 255}),
-				Disabled: image.NewNineSliceColor(color.NRGBA{R: 100, G: 100, B: 100, A: 255}),
+				Idle:     eimage.NewNineSliceColor(color.NRGBA{R: 100, G: 100, B: 100, A: 255}),
+				Disabled: eimage.NewNineSliceColor(color.NRGBA{R: 100, G: 100, B: 100, A: 255}),
 			}),
-			widget.TextInputOpts.Face(fontFace),
+			widget.TextInputOpts.Face(normalFontFace),
 			widget.TextInputOpts.Color(&widget.TextInputColor{
 				Idle:          color.NRGBA{254, 255, 255, 255},
 				Disabled:      color.NRGBA{R: 200, G: 200, B: 200, A: 255},
@@ -193,7 +224,7 @@ func (s *CharacterSelectionScene) renderUI() {
 			}),
 			widget.TextInputOpts.Padding(widget.NewInsetsSimple(5)),
 			widget.TextInputOpts.CaretOpts(
-				widget.CaretOpts.Size(fontFace, 2),
+				widget.CaretOpts.Size(normalFontFace, 2),
 			),
 			widget.TextInputOpts.Placeholder("New Character"),
 		)
@@ -207,13 +238,13 @@ func (s *CharacterSelectionScene) renderUI() {
 				}),
 			),
 			widget.ButtonOpts.Image(positiveButtonImage),
-			widget.ButtonOpts.Text("Create", fontFace, &widget.ButtonTextColor{
+			widget.ButtonOpts.Text("Create", normalFontFace, &widget.ButtonTextColor{
 				Idle:     color.NRGBA{254, 255, 255, 255},
 				Disabled: color.NRGBA{R: 200, G: 200, B: 200, A: 255},
 			}),
 			widget.ButtonOpts.TextPadding(widget.Insets{
-				Left:   30,
-				Right:  30,
+				Left:   15,
+				Right:  15,
 				Top:    5,
 				Bottom: 5,
 			}),
@@ -241,34 +272,85 @@ func (s *CharacterSelectionScene) renderUI() {
 		rootContainer.AddChild(createButton)
 	}
 
+	if s.selectCharacterErr != "" {
+		rootContainer.AddChild(widget.NewText(
+			widget.TextOpts.Text(s.selectCharacterErr, normalFontFace, color.NRGBA{R: 255, G: 0, B: 0, A: 255}),
+			widget.TextOpts.WidgetOpts(
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+					Position: widget.RowLayoutPositionCenter,
+				}),
+			),
+		))
+		s.selectCharacterErr = ""
+	}
+
+	ebitenUI := &ebitenui.UI{
+		Container: rootContainer,
+	}
+
 	if s.isDeletingCharacter {
+		windowContainer := widget.NewContainer(
+			widget.ContainerOpts.BackgroundImage(eimage.NewNineSliceColor(color.NRGBA{100, 100, 100, 255})),
+			widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		)
+
 		deleteConfirmationContainer := widget.NewContainer(
-			widget.ContainerOpts.Layout(widget.NewRowLayout(
-				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(20),
+			widget.ContainerOpts.Layout(widget.NewGridLayout(
+				widget.GridLayoutOpts.Columns(1),
+				widget.GridLayoutOpts.Padding(widget.Insets{
+					Top:    0,
+					Left:   0,
+					Right:  0,
+					Bottom: 0,
+				}),
+				widget.GridLayoutOpts.Spacing(20, 0),
+				widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
 			)),
+			widget.ContainerOpts.WidgetOpts(
+				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+					VerticalPosition:   widget.AnchorLayoutPositionCenter,
+					HorizontalPosition: widget.AnchorLayoutPositionCenter,
+					StretchHorizontal:  true,
+					StretchVertical:    true,
+				}),
+			),
 		)
 
 		deleteConfirmationText := widget.NewText(
-			widget.TextOpts.Text("Are you sure?", fontFace, color.NRGBA{254, 255, 255, 255}),
+			widget.TextOpts.Text("Are you sure?", normalFontFace, color.NRGBA{254, 255, 255, 255}),
+			widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter),
 		)
 		deleteConfirmationContainer.AddChild(deleteConfirmationText)
 
+		deleteConfirmationButtonContainer := widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewGridLayout(
+				widget.GridLayoutOpts.Columns(2),
+				widget.GridLayoutOpts.Stretch([]bool{true, true}, []bool{true}),
+				widget.GridLayoutOpts.Spacing(15, 0),
+				widget.GridLayoutOpts.Padding(widget.Insets{
+					// Top:    15,
+					Left:   15,
+					Right:  15,
+					Bottom: 15,
+				}),
+			)),
+		)
+
 		deleteConfirmationYesButton := widget.NewButton(
 			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-					HorizontalPosition: widget.AnchorLayoutPositionCenter,
-					VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				widget.WidgetOpts.LayoutData(widget.GridLayoutData{
+					HorizontalPosition: widget.GridLayoutPositionCenter,
+					VerticalPosition:   widget.GridLayoutPositionCenter,
 				}),
 			),
 			widget.ButtonOpts.Image(negativeButtonImage),
-			widget.ButtonOpts.Text("Yes", fontFace, &widget.ButtonTextColor{
+			widget.ButtonOpts.Text("Yes", normalFontFace, &widget.ButtonTextColor{
 				Idle:     color.NRGBA{254, 255, 255, 255},
 				Disabled: color.NRGBA{R: 200, G: 200, B: 200, A: 255},
 			}),
 			widget.ButtonOpts.TextPadding(widget.Insets{
-				Left:   30,
-				Right:  30,
+				Left:   15,
+				Right:  15,
 				Top:    5,
 				Bottom: 5,
 			}),
@@ -294,23 +376,22 @@ func (s *CharacterSelectionScene) renderUI() {
 				s.renderUI()
 			}),
 		)
-		deleteConfirmationContainer.AddChild(deleteConfirmationYesButton)
+		deleteConfirmationButtonContainer.AddChild(deleteConfirmationYesButton)
 
 		deleteConfirmationNoButton := widget.NewButton(
 			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-					HorizontalPosition: widget.AnchorLayoutPositionCenter,
-					VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+					Position: widget.RowLayoutPositionCenter,
 				}),
 			),
 			widget.ButtonOpts.Image(neutralButtonImage),
-			widget.ButtonOpts.Text("No", fontFace, &widget.ButtonTextColor{
+			widget.ButtonOpts.Text("No", normalFontFace, &widget.ButtonTextColor{
 				Idle:     color.NRGBA{254, 255, 255, 255},
 				Disabled: color.NRGBA{R: 200, G: 200, B: 200, A: 255},
 			}),
 			widget.ButtonOpts.TextPadding(widget.Insets{
-				Left:   30,
-				Right:  30,
+				Left:   15,
+				Right:  15,
 				Top:    5,
 				Bottom: 5,
 			}),
@@ -319,28 +400,52 @@ func (s *CharacterSelectionScene) renderUI() {
 				s.renderUI()
 			}),
 		)
-		deleteConfirmationContainer.AddChild(deleteConfirmationNoButton)
+		deleteConfirmationButtonContainer.AddChild(deleteConfirmationNoButton)
 
-		rootContainer.AddChild(deleteConfirmationContainer)
-	}
+		deleteConfirmationContainer.AddChild(deleteConfirmationButtonContainer)
 
-	if s.selectCharacterErr != "" {
-		rootContainer.AddChild(widget.NewText(
-			widget.TextOpts.Text(s.selectCharacterErr, fontFace, color.NRGBA{R: 255, G: 0, B: 0, A: 255}),
-			widget.TextOpts.WidgetOpts(
-				widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-					Position: widget.RowLayoutPositionCenter,
-				}),
-			),
+		windowContainer.AddChild(deleteConfirmationContainer)
+
+		deletingCharacterName := ""
+		for _, character := range s.characters {
+			if character.ID == s.deletingCharacterID {
+				deletingCharacterName = character.Name
+				break
+			}
+		}
+
+		titleContainer := widget.NewContainer(
+			widget.ContainerOpts.BackgroundImage(eimage.NewNineSliceColor(color.NRGBA{150, 150, 150, 255})),
+			widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		)
+		titleContainer.AddChild(widget.NewText(
+			widget.TextOpts.Text(fmt.Sprintf("Delete %s", deletingCharacterName), normalFontFace, color.NRGBA{254, 255, 255, 255}),
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionCenter,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			})),
 		))
-		s.selectCharacterErr = ""
+
+		window := widget.NewWindow(
+			widget.WindowOpts.Contents(windowContainer),
+			widget.WindowOpts.TitleBar(titleContainer, 48),
+			widget.WindowOpts.Modal(),
+			widget.WindowOpts.MinSize(480, 180),
+			widget.WindowOpts.CloseMode(widget.CLICK_OUT),
+			widget.WindowOpts.ClosedHandler(func(args *widget.WindowClosedEventArgs) {
+				s.isDeletingCharacter = false
+				s.renderUI()
+			}),
+		)
+
+		x, y := window.Contents.PreferredSize()
+		r := image.Rect(0, 0, x, y)
+		r = r.Add(image.Point{X: 80, Y: 160})
+		window.SetLocation(r)
+		ebitenUI.AddWindow(window)
 	}
 
-	ui := &ebitenui.UI{
-		Container: rootContainer,
-	}
-
-	s.ui = ui
+	s.ui = ebitenUI
 }
 
 func (s *CharacterSelectionScene) Update() error {

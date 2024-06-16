@@ -47,6 +47,7 @@ const (
 	ErrorTokenExpired            ErrorResponseMessage = "TOKEN_EXPIRED"
 	ErrorInvalidIDToken          ErrorResponseMessage = "INVALID_ID_TOKEN"
 	ErrorUserNotFound            ErrorResponseMessage = "USER_NOT_FOUND"
+	ErrorWeakPassword            ErrorResponseMessage = "WEAK_PASSWORD : Password should be at least 6 characters"
 )
 
 // RegisterRequestBody is the request body for the register endpoint
@@ -73,11 +74,11 @@ func (s *FirebaseAuthHandler) HandleRegister() func(w http.ResponseWriter, r *ht
 		password := r.FormValue("password")
 
 		if email == "" {
-			http.Error(w, "missing email", http.StatusBadRequest)
+			http.Error(w, "Missing email", http.StatusBadRequest)
 			return
 		}
 		if password == "" {
-			http.Error(w, "missing password", http.StatusBadRequest)
+			http.Error(w, "Missing password", http.StatusBadRequest)
 			return
 		}
 
@@ -121,13 +122,25 @@ func (s *FirebaseAuthHandler) HandleRegister() func(w http.ResponseWriter, r *ht
 			}
 
 			switch errorResponse.Error.Message {
-			case ErrorEmailExists, ErrorOperationNotAllowed, ErrorTooManyAttempts:
-				http.Error(w, "too many attempts, try again later", http.StatusBadRequest)
+			case ErrorInvalidEmail:
+				http.Error(w, "Invalid email", http.StatusBadRequest)
+				return
+			case ErrorWeakPassword:
+				http.Error(w, "Password should be at least 6 characters", http.StatusBadRequest)
+				return
+			case ErrorEmailExists:
+				http.Error(w, "Email already exists", http.StatusBadRequest)
+				return
+			case ErrorOperationNotAllowed:
+				http.Error(w, "Operation not allowed", http.StatusBadRequest)
+				return
+			case ErrorTooManyAttempts:
+				http.Error(w, "Too many attempts, try again later", http.StatusBadRequest)
 				return
 			}
 
 			log.Error("unhandled error response message: %s", errorResponse.Error.Message)
-			http.Error(w, "failed to register", http.StatusInternalServerError)
+			http.Error(w, "Failed to register", http.StatusInternalServerError)
 			return
 		}
 
@@ -172,11 +185,11 @@ func (s *FirebaseAuthHandler) HandleLogin() func(w http.ResponseWriter, r *http.
 		password := r.FormValue("password")
 
 		if email == "" {
-			http.Error(w, "missing email", http.StatusBadRequest)
+			http.Error(w, "Missing email", http.StatusBadRequest)
 			return
 		}
 		if password == "" {
-			http.Error(w, "missing password", http.StatusBadRequest)
+			http.Error(w, "Missing password", http.StatusBadRequest)
 			return
 		}
 
@@ -229,7 +242,7 @@ func (s *FirebaseAuthHandler) HandleLogin() func(w http.ResponseWriter, r *http.
 			}
 
 			log.Error("unhandled error response message: %s", errorResponse.Error.Message)
-			http.Error(w, "failed to login", http.StatusInternalServerError)
+			http.Error(w, "Failed to login", http.StatusInternalServerError)
 			return
 		}
 
@@ -272,7 +285,7 @@ func (s *FirebaseAuthHandler) HandleRefresh() func(w http.ResponseWriter, r *htt
 		refreshToken := r.FormValue("refreshToken")
 
 		if refreshToken == "" {
-			http.Error(w, "missing refreshToken", http.StatusBadRequest)
+			http.Error(w, "Missing refresh token", http.StatusBadRequest)
 			return
 		}
 
@@ -316,12 +329,12 @@ func (s *FirebaseAuthHandler) HandleRefresh() func(w http.ResponseWriter, r *htt
 
 			switch errorResponse.Error.Message {
 			case ErrorTokenExpired:
-				http.Error(w, string(errorResponse.Error.Message), http.StatusBadRequest)
+				http.Error(w, "Token expired", http.StatusBadRequest)
 				return
 			}
 
 			log.Error("unhandled error response message: %s", errorResponse.Error.Message)
-			http.Error(w, "failed to refresh", http.StatusInternalServerError)
+			http.Error(w, "Failed to refresh", http.StatusInternalServerError)
 			return
 		}
 
@@ -353,7 +366,7 @@ func (s *FirebaseAuthHandler) HandleDelete() func(w http.ResponseWriter, r *http
 		idToken := r.FormValue("idToken")
 
 		if idToken == "" {
-			http.Error(w, "missing idToken", http.StatusBadRequest)
+			http.Error(w, "Missing ID token", http.StatusBadRequest)
 			return
 		}
 
@@ -395,13 +408,15 @@ func (s *FirebaseAuthHandler) HandleDelete() func(w http.ResponseWriter, r *http
 			}
 
 			switch errorResponse.Error.Message {
-			case ErrorInvalidIDToken, ErrorUserNotFound:
-				http.Error(w, string(errorResponse.Error.Message), http.StatusBadRequest)
+			case ErrorInvalidIDToken:
+				http.Error(w, "Invalid ID token", http.StatusBadRequest)
+			case ErrorUserNotFound:
+				http.Error(w, "User not found", http.StatusBadRequest)
 				return
 			}
 
 			log.Error("unhandled error response message: %s", errorResponse.Error.Message)
-			http.Error(w, "failed to delete", http.StatusInternalServerError)
+			http.Error(w, "Failed to delete", http.StatusInternalServerError)
 			return
 		}
 
