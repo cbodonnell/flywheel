@@ -47,6 +47,7 @@ const (
 	ErrorTokenExpired            ErrorResponseMessage = "TOKEN_EXPIRED"
 	ErrorInvalidIDToken          ErrorResponseMessage = "INVALID_ID_TOKEN"
 	ErrorUserNotFound            ErrorResponseMessage = "USER_NOT_FOUND"
+	ErrorWeakPassword            ErrorResponseMessage = "WEAK_PASSWORD : Password should be at least 6 characters"
 )
 
 // RegisterRequestBody is the request body for the register endpoint
@@ -121,6 +122,12 @@ func (s *FirebaseAuthHandler) HandleRegister() func(w http.ResponseWriter, r *ht
 			}
 
 			switch errorResponse.Error.Message {
+			case ErrorInvalidEmail:
+				http.Error(w, "Invalid email", http.StatusBadRequest)
+				return
+			case ErrorWeakPassword:
+				http.Error(w, "Password should be at least 6 characters", http.StatusBadRequest)
+				return
 			case ErrorEmailExists:
 				http.Error(w, "Email already exists", http.StatusBadRequest)
 				return

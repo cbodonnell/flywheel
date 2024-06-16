@@ -270,10 +270,10 @@ func (s *CharacterSelectionScene) renderUI() {
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 				widget.RowLayoutOpts.Spacing(20),
 				widget.RowLayoutOpts.Padding(widget.Insets{
-					Top:    48,
+					Top:    36,
 					Left:   24,
 					Right:  24,
-					Bottom: 96,
+					Bottom: 72,
 				}),
 			)),
 		)
@@ -379,7 +379,7 @@ func (s *CharacterSelectionScene) renderUI() {
 			widget.WindowOpts.CloseMode(widget.CLICK_OUT),
 			// widget.WindowOpts.Draggable(),
 			// widget.WindowOpts.Resizeable(),
-			widget.WindowOpts.MinSize(200, 100),
+			// widget.WindowOpts.MinSize(500, 100),
 			// widget.WindowOpts.MaxSize(300, 300),
 			widget.WindowOpts.ClosedHandler(func(args *widget.WindowClosedEventArgs) {
 				s.isDeletingCharacter = false
@@ -389,7 +389,7 @@ func (s *CharacterSelectionScene) renderUI() {
 
 		x, y := window.Contents.PreferredSize()
 		r := image.Rect(0, 0, x, y)
-		r = r.Add(image.Point{X: 100, Y: 140})
+		r = r.Add(image.Point{X: 135, Y: 140})
 		window.SetLocation(r)
 		ebitenUI.AddWindow(window)
 	}

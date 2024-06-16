@@ -266,19 +266,19 @@ func (s *AuthScene) renderUI() {
 		if s.isRegistering {
 			email, password, confirmPassword := emailTextInput.GetText(), passwordTextInput.GetText(), confirmPasswordTextInput.GetText()
 			if email == "" {
-				s.errMsg = "Email is required."
+				s.errMsg = "Email is required"
 				return
 			}
 			if password == "" {
-				s.errMsg = "Password is required."
+				s.errMsg = "Password is required"
 				return
 			}
 			if confirmPassword == "" {
-				s.errMsg = "Confirm password is required."
+				s.errMsg = "Confirm password is required"
 				return
 			}
 			if password != confirmPassword {
-				s.errMsg = "Passwords do not match."
+				s.errMsg = "Passwords do not match"
 				return
 			}
 			if err := s.onRegister(email, password); err != nil {
@@ -286,17 +286,17 @@ func (s *AuthScene) renderUI() {
 				if actionableErr, ok := err.(*ui.ActionableError); ok {
 					s.errMsg = actionableErr.Message
 				} else {
-					s.errMsg = "Failed to register. Please try again."
+					s.errMsg = "Failed to register"
 				}
 			}
 		} else {
 			email, password := emailTextInput.GetText(), passwordTextInput.GetText()
 			if email == "" {
-				s.errMsg = "Email is required."
+				s.errMsg = "Email is required"
 				return
 			}
 			if password == "" {
-				s.errMsg = "Password is required."
+				s.errMsg = "Password is required"
 				return
 			}
 			if err := s.onLogin(email, password); err != nil {
@@ -304,7 +304,7 @@ func (s *AuthScene) renderUI() {
 				if actionableErr, ok := err.(*ui.ActionableError); ok {
 					s.errMsg = actionableErr.Message
 				} else {
-					s.errMsg = "Failed to login. Please try again."
+					s.errMsg = "Failed to login"
 				}
 			}
 		}
