@@ -62,6 +62,7 @@ func (s *AuthScene) renderUI() {
 		Pressed: image.NewNineSliceColor(color.NRGBA{R: 0, G: 0, B: 0, A: 0}),
 	}
 
+	largeFontFace := fonts.TTFLargeFont
 	normalFontFace := fonts.TTFNormalFont
 
 	rootContainer := widget.NewContainer(
@@ -69,12 +70,27 @@ func (s *AuthScene) renderUI() {
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(20),
 			widget.RowLayoutOpts.Padding(widget.Insets{
-				Top:    150,
+				Top:    100,
 				Left:   120,
 				Right:  120,
 				Bottom: 90,
 			}))),
 	)
+
+	headerTextValue := "Login"
+	if s.isRegistering {
+		headerTextValue = "Register"
+	}
+
+	headerText := widget.NewText(
+		widget.TextOpts.Text(headerTextValue, largeFontFace, color.NRGBA{254, 255, 255, 255}),
+		widget.TextOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+				Position: widget.RowLayoutPositionCenter,
+			}),
+		),
+	)
+	rootContainer.AddChild(headerText)
 
 	emailTextInput := widget.NewTextInput(
 		widget.TextInputOpts.WidgetOpts(

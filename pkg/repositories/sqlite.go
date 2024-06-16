@@ -153,6 +153,16 @@ func (r *SQLiteRepository) DeleteCharacter(ctx context.Context, userID string, c
 	return nil
 }
 
+func (r *SQLiteRepository) NameExists(ctx context.Context, name string) (bool, error) {
+	q := `SELECT EXISTS(SELECT 1 FROM characters WHERE LOWER(name) = LOWER(?));`
+	var exists bool
+	if err := r.db.QueryRowContext(ctx, q, name).Scan(&exists); err != nil {
+		return false, fmt.Errorf("failed to query name: %v", err)
+	}
+
+	return exists, nil
+}
+
 func (r *SQLiteRepository) SaveGameState(ctx context.Context, gameState *gametypes.GameState) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {

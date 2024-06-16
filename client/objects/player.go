@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"image/color"
-	"strings"
 	"time"
 
 	"github.com/cbodonnell/flywheel/client/animations"
@@ -177,7 +176,7 @@ func (o *Player) Draw(screen *ebiten.Image) {
 	o.lastDrawnAnimationSequence = o.State.AnimationSequence
 
 	// Draw Name
-	t := strings.ToUpper(o.State.Name)
+	t := o.State.Name
 	f := fonts.TTFSmallFont
 	bounds, _ := font.BoundString(f, t)
 	op := &ebiten.DrawImageOptions{}

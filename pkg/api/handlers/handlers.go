@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/cbodonnell/flywheel/pkg/api/middleware"
@@ -48,6 +49,24 @@ func HandleCreateCharacter(repository repositories.Repository) http.HandlerFunc 
 
 		if len(name) < 1 || len(name) > 16 {
 			http.Error(w, "Name must be between 1 and 16 characters", http.StatusBadRequest)
+			return
+		}
+
+		nameRegex := regexp.MustCompile(`^[a-zA-Z0-9 ]+$`)
+		if !nameRegex.MatchString(name) {
+			http.Error(w, "Name cannot contain special characters", http.StatusBadRequest)
+			return
+		}
+
+		nameExists, err := repository.NameExists(r.Context(), name)
+		if err != nil {
+			log.Error("failed to check if name exists: %v", err)
+			http.Error(w, "Failed to check if name exists", http.StatusInternalServerError)
+			return
+		}
+
+		if nameExists {
+			http.Error(w, "Name already exists", http.StatusBadRequest)
 			return
 		}
 
