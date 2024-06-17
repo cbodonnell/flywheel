@@ -289,18 +289,23 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	} else if !p.IsAttacking && !p.IsDead() {
 		if clientPlayerUpdate.InputY != 0 {
 			if collision := p.Object.Check(0, clientPlayerUpdate.InputY, CollisionSpaceTagLadder); collision != nil {
-				ladderPosition := &kinematic.Vector{
-					X: collision.Objects[0].Position.X,
-					Y: collision.Objects[0].Position.Y,
-				}
-				isLastLadder := p.DismountedLadderPosition != nil && p.DismountedLadderPosition.Equals(*ladderPosition)
-				isFacingLadder := p.AnimationFlip && (p.Position.X+constants.PlayerWidth/2) > (ladderPosition.X+float64(constants.CellWidth)/2) ||
-					!p.AnimationFlip && (p.Position.X+constants.PlayerWidth/2) < (ladderPosition.X+float64(constants.CellWidth)/2)
-				if !isLastLadder || isFacingLadder {
-					p.IsOnLadder = true
-					p.LadderPosition = &kinematic.Vector{
+				// check if the center of the player is intersecting the ladder
+				playerCenter := p.Position.X + constants.PlayerWidth/2
+				ladderCenter := collision.Objects[0].Position.X + float64(constants.CellWidth)/2
+				if playerCenter > ladderCenter-float64(constants.CellWidth)/2 && playerCenter < ladderCenter+float64(constants.CellWidth)/2 {
+					ladderPosition := &kinematic.Vector{
 						X: collision.Objects[0].Position.X,
 						Y: collision.Objects[0].Position.Y,
+					}
+					isLastLadder := p.DismountedLadderPosition != nil && p.DismountedLadderPosition.Equals(*ladderPosition)
+					isFacingLadder := p.AnimationFlip && (p.Position.X+constants.PlayerWidth/2) > (ladderPosition.X+float64(constants.CellWidth)/2) ||
+						!p.AnimationFlip && (p.Position.X+constants.PlayerWidth/2) < (ladderPosition.X+float64(constants.CellWidth)/2)
+					if !isLastLadder || isFacingLadder {
+						p.IsOnLadder = true
+						p.LadderPosition = &kinematic.Vector{
+							X: collision.Objects[0].Position.X,
+							Y: collision.Objects[0].Position.Y,
+						}
 					}
 				}
 			}
