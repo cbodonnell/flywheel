@@ -77,6 +77,7 @@ func (p *PlayerState) Equals(other *PlayerState) bool {
 	return p.Position.Equals(other.Position) &&
 		p.Velocity.Equals(other.Velocity) &&
 		p.IsOnGround == other.IsOnGround &&
+		p.IsOnLadder == other.IsOnLadder &&
 		p.IsAttacking == other.IsAttacking &&
 		p.Animation == other.Animation &&
 		p.AnimationFlip == other.AnimationFlip &&
@@ -93,6 +94,7 @@ func (p *PlayerState) Copy() *PlayerState {
 		Position:               p.Position,
 		Velocity:               p.Velocity,
 		IsOnGround:             p.IsOnGround,
+		IsOnLadder:             p.IsOnLadder,
 		IsAttacking:            p.IsAttacking,
 		CurrentAttack:          p.CurrentAttack,
 		AttackTimeLeft:         p.AttackTimeLeft,
@@ -172,14 +174,17 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	}
 
 	// Movement logic
+	isDismountingLadder := clientPlayerUpdate.InputX != 0 && clientPlayerUpdate.InputJump
+
 	// X-axis
-	if p.IsOnLadder {
+	if p.IsOnLadder && !isDismountingLadder {
 		// Ladder movement
 		p.Position.X = p.LadderPosition.X - constants.PlayerWidth/2 + float64(constants.CellWidth)/2
 		p.Velocity.X = 0
 		p.Object.Position.X = p.Position.X
 		p.Object.Update()
 	} else {
+		// Normal movement
 		var dx, vx float64
 		if !p.IsAttacking && !p.IsDead() {
 			dx = kinematic.Displacement(clientPlayerUpdate.InputX*constants.PlayerSpeed, clientPlayerUpdate.DeltaTime, 0)
@@ -204,8 +209,8 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	}
 
 	// Y-axis
-	// Ladder interaction
-	if p.IsOnLadder {
+	if p.IsOnLadder && !isDismountingLadder {
+		// Ladder movement
 		vy := 0.0
 		if clientPlayerUpdate.InputY < 0 {
 			vy = -constants.PlayerLadderClimbSpeed
@@ -214,22 +219,25 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		}
 		dy := kinematic.Displacement(vy, clientPlayerUpdate.DeltaTime, 0)
 
-		// Update player state in the Y-axis
 		p.Position.Y += dy
 		p.Velocity.Y = vy
 		p.Object.Position.Y = p.Position.Y
 		p.Object.Update()
 	} else {
+		// Normal movement
 		vy := p.Velocity.Y
-		if !p.IsAttacking && !p.IsDead() && p.IsOnGround && clientPlayerUpdate.InputJump {
-			vy = constants.PlayerJumpSpeed
+		if !p.IsAttacking && !p.IsDead() {
+			if p.IsOnLadder && isDismountingLadder {
+				vy = constants.PlayerJumpSpeed / 2
+			} else if p.IsOnGround && clientPlayerUpdate.InputJump {
+				vy = constants.PlayerJumpSpeed
+			}
 		}
 
 		// Apply gravity
 		dy := kinematic.Displacement(vy, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
 		vy = kinematic.FinalVelocity(vy, clientPlayerUpdate.DeltaTime, kinematic.Gravity*constants.PlayerGravityMultiplier)
 
-		// TODO: platforms should be able to be jumped through from below
 		// Check for collisions
 		isOnGround := false
 		if collision := p.Object.Check(0, dy, CollisionSpaceTagLevel); collision != nil {
@@ -263,7 +271,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 		}
 	}
 
-	// Check if the player is on a ladder
+	// TODO: move into a ladder update function
 	if p.IsOnLadder {
 		if p.IsDead() {
 			p.IsOnLadder = false
@@ -273,7 +281,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 			p.IsOnLadder = false
 			p.DismountedLadderPosition = nil
 			p.LadderPosition = nil
-		} else if clientPlayerUpdate.InputX != 0 && clientPlayerUpdate.InputJump {
+		} else if isDismountingLadder {
 			p.IsOnLadder = false
 			p.DismountedLadderPosition = p.LadderPosition
 			p.LadderPosition = nil

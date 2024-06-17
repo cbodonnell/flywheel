@@ -155,6 +155,8 @@ type PlayerStateUpdate struct {
 	Velocity kinematic.Vector `json:"velocity"`
 	// IsOnGround is a flag indicating whether the player is on the ground
 	IsOnGround bool `json:"isOnGround"`
+	// IsOnLadder is a flag indicating whether the player is on a ladder
+	IsOnLadder bool `json:"isOnLadder"`
 	// IsAttacking is a flag indicating whether the player is attacking
 	IsAttacking bool `json:"isAttacking"`
 	// Animation is the current animation of the player

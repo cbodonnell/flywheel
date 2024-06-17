@@ -37,12 +37,19 @@ type GameScene struct {
 	collisionSpace *resolv.Space
 	// world is the world image.
 	world *ebiten.Image
+	// CameraViewport is the current viewport.
+	CameraViewport *CameraViewport
 	// deletedObjects is a map of deleted game objects indexed by a unique identifier
 	// and the timestamp of the deletion.
 	deletedObjects map[string]int64
 
 	serverPlayerUpdateBuffers map[uint32]*ServerPlayerUpdateBuffer
 	serverNPCUpdateBuffers    map[uint32]*ServerNPCUpdateBuffer
+}
+
+type CameraViewport struct {
+	X int
+	Y int
 }
 
 type ServerPlayerUpdateBuffer struct {
@@ -597,13 +604,15 @@ func (g *GameScene) drawWorld() {
 }
 
 func (g *GameScene) drawViewport(screen *ebiten.Image, player *objects.Player, zoom float64) {
-	// calculate the viewport center based on the player position
+	// calculate the viewport center based on the player position and the viewport center
 	vx, vy := int(player.State.Position.X+constants.PlayerWidth/2), g.world.Bounds().Dy()-int(player.State.Position.Y)-int(constants.PlayerHeight/2)
+	g.CameraViewport = &CameraViewport{X: vx, Y: vy}
+	// TODO: smooth the camera movement
 
 	// calculate the viewport bounds based on the zoom level
 	zoomFactor := 1.0 / (zoom * 2)
-	minX, maxX := float64(vx)-float64(screen.Bounds().Dx())*zoomFactor, float64(vx)+float64(screen.Bounds().Dx())*zoomFactor
-	minY, maxY := float64(vy)-float64(screen.Bounds().Dy())*zoomFactor, float64(vy)+float64(screen.Bounds().Dy())*zoomFactor
+	minX, maxX := float64(g.CameraViewport.X)-float64(screen.Bounds().Dx())*zoomFactor, float64(g.CameraViewport.X)+float64(screen.Bounds().Dx())*zoomFactor
+	minY, maxY := float64(g.CameraViewport.Y)-float64(screen.Bounds().Dy())*zoomFactor, float64(g.CameraViewport.Y)+float64(screen.Bounds().Dy())*zoomFactor
 
 	// clamp the viewport to the world bounds
 	if minX < 0 {
