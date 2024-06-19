@@ -116,7 +116,7 @@ func (p *PlayerState) ApplyInput(clientPlayerUpdate *messages.ClientPlayerUpdate
 	p.UpdateAttack(clientPlayerUpdate)
 	p.UpdateXPosition(clientPlayerUpdate)
 	p.UpdateYPosition(clientPlayerUpdate)
-	p.UpdateFlip(clientPlayerUpdate)
+	p.UpdateFlipH(clientPlayerUpdate)
 	p.UpdateLadderState(clientPlayerUpdate)
 	p.UpdateAnimation()
 	return !p.Equals(previousState)
@@ -281,8 +281,8 @@ func (p *PlayerState) UpdateYPosition(clientPlayerUpdate *messages.ClientPlayerU
 	p.IsOnGround = isOnGround
 }
 
-// UpdateFlip updates the player's flip state based on the client's input
-func (p *PlayerState) UpdateFlip(clientPlayerUpdate *messages.ClientPlayerUpdate) {
+// UpdateFlipH updates the player's flip state based on the client's input
+func (p *PlayerState) UpdateFlipH(clientPlayerUpdate *messages.ClientPlayerUpdate) {
 	if p.IsAttacking || p.IsDead() {
 		return
 	}
