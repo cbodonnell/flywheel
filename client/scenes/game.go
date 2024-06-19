@@ -648,6 +648,7 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 }
 
 func (g *GameScene) drawViewport(screen *ebiten.Image, player *objects.Player, zoom float64) {
+	// TODO: test out camera smoothing
 	// calculate the viewport center based on the player position and the viewport center
 	vx, vy := int(player.State.Position.X+constants.PlayerWidth/2), g.world.Bounds().Dy()-int(player.State.Position.Y)-int(constants.PlayerHeight/2)
 	g.cameraViewport = &CameraViewport{X: vx, Y: vy}
