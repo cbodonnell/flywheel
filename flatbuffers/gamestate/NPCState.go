@@ -67,7 +67,7 @@ func (rcv *NPCState) Velocity(obj *Velocity) *Velocity {
 	return nil
 }
 
-func (rcv *NPCState) IsOnGround() bool {
+func (rcv *NPCState) FlipH() bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(8))
 	if o != 0 {
 		return rcv._tab.GetBool(o + rcv._tab.Pos)
@@ -75,12 +75,24 @@ func (rcv *NPCState) IsOnGround() bool {
 	return false
 }
 
-func (rcv *NPCState) MutateIsOnGround(n bool) bool {
+func (rcv *NPCState) MutateFlipH(n bool) bool {
 	return rcv._tab.MutateBoolSlot(8, n)
 }
 
-func (rcv *NPCState) Animation() byte {
+func (rcv *NPCState) IsOnGround() bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(10))
+	if o != 0 {
+		return rcv._tab.GetBool(o + rcv._tab.Pos)
+	}
+	return false
+}
+
+func (rcv *NPCState) MutateIsOnGround(n bool) bool {
+	return rcv._tab.MutateBoolSlot(10, n)
+}
+
+func (rcv *NPCState) Animation() byte {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
 	if o != 0 {
 		return rcv._tab.GetByte(o + rcv._tab.Pos)
 	}
@@ -88,19 +100,7 @@ func (rcv *NPCState) Animation() byte {
 }
 
 func (rcv *NPCState) MutateAnimation(n byte) bool {
-	return rcv._tab.MutateByteSlot(10, n)
-}
-
-func (rcv *NPCState) FlipH() bool {
-	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
-	if o != 0 {
-		return rcv._tab.GetBool(o + rcv._tab.Pos)
-	}
-	return false
-}
-
-func (rcv *NPCState) MutateFlipH(n bool) bool {
-	return rcv._tab.MutateBoolSlot(12, n)
+	return rcv._tab.MutateByteSlot(12, n)
 }
 
 func (rcv *NPCState) AnimationSequence() byte {
@@ -136,14 +136,14 @@ func NPCStateAddPosition(builder *flatbuffers.Builder, position flatbuffers.UOff
 func NPCStateAddVelocity(builder *flatbuffers.Builder, velocity flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(1, flatbuffers.UOffsetT(velocity), 0)
 }
+func NPCStateAddFlipH(builder *flatbuffers.Builder, flipH bool) {
+	builder.PrependBoolSlot(2, flipH, false)
+}
 func NPCStateAddIsOnGround(builder *flatbuffers.Builder, isOnGround bool) {
-	builder.PrependBoolSlot(2, isOnGround, false)
+	builder.PrependBoolSlot(3, isOnGround, false)
 }
 func NPCStateAddAnimation(builder *flatbuffers.Builder, animation byte) {
-	builder.PrependByteSlot(3, animation, 0)
-}
-func NPCStateAddFlipH(builder *flatbuffers.Builder, flipH bool) {
-	builder.PrependBoolSlot(4, flipH, false)
+	builder.PrependByteSlot(4, animation, 0)
 }
 func NPCStateAddAnimationSequence(builder *flatbuffers.Builder, animationSequence byte) {
 	builder.PrependByteSlot(5, animationSequence, 0)

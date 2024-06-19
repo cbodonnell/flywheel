@@ -29,11 +29,11 @@ table PlayerState {
   name: string;
   position: Position;
   velocity: Velocity;
+  flip_h: bool;
   is_on_ground: bool;
   is_on_ladder: bool;
   is_attacking: bool;
   animation: uint8;
-  flip_h: bool;
   animation_sequence: uint8;
   hitpoints: int16;
 }
@@ -56,9 +56,9 @@ table NPCStateKeyValue {
 table NPCState {
   position: Position;
   velocity: Velocity;
+  flip_h: bool;
   is_on_ground: bool;
   animation: uint8;
-  flip_h: bool;
   animation_sequence: uint8;
   hitpoints: int16;
 }
