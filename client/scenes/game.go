@@ -595,8 +595,8 @@ func (g *GameScene) drawWorld() {
 			platformColor := color.RGBA{0xff, 0xa5, 0x00, 0xff} // Orange
 			vector.DrawFilledRect(g.world, float32(obj.Position.X), float32(g.world.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X), float32(obj.Size.Y), platformColor, false)
 		} else if obj.HasTags(gametypes.CollisionSpaceTagLadder) {
-			ladderColor := color.RGBA{0x00, 0x80, 0x00, 0xff} // Green
-			vector.DrawFilledRect(g.world, float32(obj.Position.X), float32(g.world.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X), float32(obj.Size.Y), ladderColor, false)
+			ladderColor := color.RGBA{0x8b, 0x45, 0x13, 0xff} // Brown
+			vector.DrawFilledRect(g.world, float32(obj.Position.X+obj.Size.X/4), float32(g.world.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X/2), float32(obj.Size.Y), ladderColor, false)
 		}
 	}
 
