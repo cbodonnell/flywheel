@@ -67,9 +67,11 @@ func (w *ConnectionEventWorker) handleClientConnect(event network.ConnectionEven
 	}
 
 	var position kinematic.Vector
+	var flipH bool
 	var hitpoints int16
 	if lastKnownState, err := w.repository.LoadPlayerState(context.Background(), character.ID); err == nil {
 		position = lastKnownState.Position
+		flipH = lastKnownState.FlipH
 		hitpoints = lastKnownState.Hitpoints
 	} else {
 		if !repositories.IsNotFound(err) {
@@ -88,6 +90,7 @@ func (w *ConnectionEventWorker) handleClientConnect(event network.ConnectionEven
 		CharacterID:        character.ID,
 		CharacterName:      character.Name,
 		CharacterPosition:  position,
+		CharacterFlipH:     flipH,
 		CharacterHitpoints: hitpoints,
 	}); err != nil {
 		log.Error("Failed to enqueue connect player event: %v", err)

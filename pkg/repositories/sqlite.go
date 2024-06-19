@@ -171,10 +171,10 @@ func (r *SQLiteRepository) SaveGameState(ctx context.Context, gameState *gametyp
 
 	for _, playerState := range gameState.Players {
 		q := `
-		INSERT OR REPLACE INTO players (character_id, timestamp, x, y, hitpoints)
-		VALUES (?, ?, ?, ?, ?);
+		INSERT OR REPLACE INTO players (character_id, timestamp, x, y, flipH, hitpoints)
+		VALUES (?, ?, ?, ?, ?, ?);
 		`
-		_, err = tx.ExecContext(ctx, q, playerState.CharacterID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y, playerState.Hitpoints)
+		_, err = tx.ExecContext(ctx, q, playerState.CharacterID, gameState.Timestamp, playerState.Position.X, playerState.Position.Y, playerState.FlipH, playerState.Hitpoints)
 		if err != nil {
 			return fmt.Errorf("failed to insert player: %v", err)
 		}
@@ -189,10 +189,10 @@ func (r *SQLiteRepository) SaveGameState(ctx context.Context, gameState *gametyp
 
 func (r *SQLiteRepository) SavePlayerState(ctx context.Context, timestamp int64, characterID int32, playerState *gametypes.PlayerState) error {
 	q := `
-	INSERT OR REPLACE INTO players (character_id, timestamp, x, y, hitpoints)
-	VALUES (?, ?, ?, ?, ?);
+	INSERT OR REPLACE INTO players (character_id, timestamp, x, y, flipH, hitpoints)
+	VALUES (?, ?, ?, ?, ?, ?);
 	`
-	_, err := r.db.ExecContext(ctx, q, characterID, timestamp, playerState.Position.X, playerState.Position.Y, playerState.Hitpoints)
+	_, err := r.db.ExecContext(ctx, q, characterID, timestamp, playerState.Position.X, playerState.Position.Y, playerState.FlipH, playerState.Hitpoints)
 	if err != nil {
 		return fmt.Errorf("failed to insert player: %v", err)
 	}
@@ -202,12 +202,13 @@ func (r *SQLiteRepository) SavePlayerState(ctx context.Context, timestamp int64,
 
 func (r *SQLiteRepository) LoadPlayerState(ctx context.Context, characterID int32) (*gametypes.PlayerState, error) {
 	q := `
-	SELECT x, y, hitpoints FROM players WHERE character_id = $1;
+	SELECT x, y, flipH, hitpoints FROM players WHERE character_id = $1;
 	`
 	var x float64
 	var y float64
+	var flipH bool
 	var hitpoints int16
-	if err := r.db.QueryRowContext(ctx, q, characterID).Scan(&x, &y, &hitpoints); err != nil {
+	if err := r.db.QueryRowContext(ctx, q, characterID).Scan(&x, &y, &flipH, &hitpoints); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, &ErrNotFound{}
 		}
@@ -220,6 +221,7 @@ func (r *SQLiteRepository) LoadPlayerState(ctx context.Context, characterID int3
 			X: x,
 			Y: y,
 		},
+		FlipH:     flipH,
 		Hitpoints: hitpoints,
 	}, nil
 }

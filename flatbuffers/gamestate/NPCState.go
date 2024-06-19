@@ -91,7 +91,7 @@ func (rcv *NPCState) MutateAnimation(n byte) bool {
 	return rcv._tab.MutateByteSlot(10, n)
 }
 
-func (rcv *NPCState) AnimationFlip() bool {
+func (rcv *NPCState) FlipH() bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(12))
 	if o != 0 {
 		return rcv._tab.GetBool(o + rcv._tab.Pos)
@@ -99,7 +99,7 @@ func (rcv *NPCState) AnimationFlip() bool {
 	return false
 }
 
-func (rcv *NPCState) MutateAnimationFlip(n bool) bool {
+func (rcv *NPCState) MutateFlipH(n bool) bool {
 	return rcv._tab.MutateBoolSlot(12, n)
 }
 
@@ -142,8 +142,8 @@ func NPCStateAddIsOnGround(builder *flatbuffers.Builder, isOnGround bool) {
 func NPCStateAddAnimation(builder *flatbuffers.Builder, animation byte) {
 	builder.PrependByteSlot(3, animation, 0)
 }
-func NPCStateAddAnimationFlip(builder *flatbuffers.Builder, animationFlip bool) {
-	builder.PrependBoolSlot(4, animationFlip, false)
+func NPCStateAddFlipH(builder *flatbuffers.Builder, flipH bool) {
+	builder.PrependBoolSlot(4, flipH, false)
 }
 func NPCStateAddAnimationSequence(builder *flatbuffers.Builder, animationSequence byte) {
 	builder.PrependByteSlot(5, animationSequence, 0)

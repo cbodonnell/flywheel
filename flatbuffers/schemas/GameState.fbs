@@ -33,7 +33,7 @@ table PlayerState {
   is_on_ladder: bool;
   is_attacking: bool;
   animation: uint8;
-  animation_flip: bool;
+  flip_h: bool;
   animation_sequence: uint8;
   hitpoints: int16;
 }
@@ -58,7 +58,7 @@ table NPCState {
   velocity: Velocity;
   is_on_ground: bool;
   animation: uint8;
-  animation_flip: bool;
+  flip_h: bool;
   animation_sequence: uint8;
   hitpoints: int16;
 }

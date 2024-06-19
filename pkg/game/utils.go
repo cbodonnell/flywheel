@@ -48,10 +48,10 @@ func PlayerStateUpdateFromState(state *types.PlayerState) *messages.PlayerStateU
 		Name:                   state.Name,
 		Position:               state.Position,
 		Velocity:               state.Velocity,
+		FlipH:                  state.FlipH,
 		IsOnGround:             state.IsOnGround,
 		IsAttacking:            state.IsAttacking,
 		Animation:              uint8(state.Animation),
-		AnimationFlip:          state.AnimationFlip,
 		AnimationSequence:      state.AnimationSequence,
 		Hitpoints:              state.Hitpoints,
 	}
@@ -64,10 +64,10 @@ func PlayerStateFromServerUpdate(update *messages.PlayerStateUpdate) *types.Play
 		Name:                   update.Name,
 		Position:               update.Position,
 		Velocity:               update.Velocity,
+		FlipH:                  update.FlipH,
 		IsOnGround:             update.IsOnGround,
 		IsAttacking:            update.IsAttacking,
 		Animation:              types.PlayerAnimation(update.Animation),
-		AnimationFlip:          update.AnimationFlip,
 		AnimationSequence:      update.AnimationSequence,
 		Hitpoints:              update.Hitpoints,
 	}
@@ -77,9 +77,9 @@ func NPCStateUpdateFromState(state *types.NPCState) *messages.NPCStateUpdate {
 	return &messages.NPCStateUpdate{
 		Position:          state.Position,
 		Velocity:          state.Velocity,
+		FlipH:             state.FlipH,
 		IsOnGround:        state.IsOnGround,
 		Animation:         uint8(state.Animation),
-		AnimationFlip:     state.AnimationFlip,
 		AnimationSequence: state.AnimationSequence,
 		Hitpoints:         state.Hitpoints,
 	}
@@ -89,9 +89,9 @@ func NPCStateFromServerUpdate(update *messages.NPCStateUpdate) *types.NPCState {
 	return &types.NPCState{
 		Position:          update.Position,
 		Velocity:          update.Velocity,
+		FlipH:             update.FlipH,
 		IsOnGround:        update.IsOnGround,
 		Animation:         types.NPCAnimation(update.Animation),
-		AnimationFlip:     update.AnimationFlip,
 		AnimationSequence: update.AnimationSequence,
 		Hitpoints:         update.Hitpoints,
 	}

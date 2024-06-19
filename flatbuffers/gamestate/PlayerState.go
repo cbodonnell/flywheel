@@ -147,7 +147,7 @@ func (rcv *PlayerState) MutateAnimation(n byte) bool {
 	return rcv._tab.MutateByteSlot(20, n)
 }
 
-func (rcv *PlayerState) AnimationFlip() bool {
+func (rcv *PlayerState) FlipH() bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(22))
 	if o != 0 {
 		return rcv._tab.GetBool(o + rcv._tab.Pos)
@@ -155,7 +155,7 @@ func (rcv *PlayerState) AnimationFlip() bool {
 	return false
 }
 
-func (rcv *PlayerState) MutateAnimationFlip(n bool) bool {
+func (rcv *PlayerState) MutateFlipH(n bool) bool {
 	return rcv._tab.MutateBoolSlot(22, n)
 }
 
@@ -213,8 +213,8 @@ func PlayerStateAddIsAttacking(builder *flatbuffers.Builder, isAttacking bool) {
 func PlayerStateAddAnimation(builder *flatbuffers.Builder, animation byte) {
 	builder.PrependByteSlot(8, animation, 0)
 }
-func PlayerStateAddAnimationFlip(builder *flatbuffers.Builder, animationFlip bool) {
-	builder.PrependBoolSlot(9, animationFlip, false)
+func PlayerStateAddFlipH(builder *flatbuffers.Builder, flipH bool) {
+	builder.PrependBoolSlot(9, flipH, false)
 }
 func PlayerStateAddAnimationSequence(builder *flatbuffers.Builder, animationSequence byte) {
 	builder.PrependByteSlot(10, animationSequence, 0)

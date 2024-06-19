@@ -17,9 +17,9 @@ type NPCState struct {
 	Position          kinematic.Vector
 	Velocity          kinematic.Vector
 	Object            *resolv.Object
+	FlipH             bool
 	IsOnGround        bool
 	Animation         NPCAnimation
-	AnimationFlip     bool
 	AnimationSequence uint8
 	ResetAnimation    bool
 	Hitpoints         int16
@@ -92,7 +92,7 @@ func (n *NPCState) Equals(other *NPCState) bool {
 		n.IsOnGround == other.IsOnGround &&
 		n.IsAttacking == other.IsAttacking &&
 		n.Animation == other.Animation &&
-		n.AnimationFlip == other.AnimationFlip &&
+		n.FlipH == other.FlipH &&
 		n.AnimationSequence == other.AnimationSequence &&
 		n.Hitpoints == other.Hitpoints
 }
@@ -108,7 +108,7 @@ func (n *NPCState) Copy() *NPCState {
 		IsAttackHitting:   n.IsAttackHitting,
 		DidAttackHit:      n.DidAttackHit,
 		Animation:         n.Animation,
-		AnimationFlip:     n.AnimationFlip,
+		FlipH:             n.FlipH,
 		AnimationSequence: n.AnimationSequence,
 		Hitpoints:         n.Hitpoints,
 	}
@@ -267,9 +267,9 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 
 	// Update the npc animation
 	if n.Velocity.X > 0 {
-		n.AnimationFlip = false
+		n.FlipH = false
 	} else if n.Velocity.X < 0 {
-		n.AnimationFlip = true
+		n.FlipH = true
 	}
 
 	// Animation
@@ -329,7 +329,7 @@ func (n *NPCState) Spawn() {
 
 	n.Hitpoints = constants.NPCHitpoints
 
-	n.AnimationFlip = n.SpawnFlip
+	n.FlipH = n.SpawnFlip
 	n.Animation = NPCAnimationIdle
 	n.AnimationSequence = 0
 	n.ResetAnimation = false
@@ -413,7 +413,7 @@ func (n *NPCState) UpdateFollowing() {
 
 	// check if the target is in front of the npc and within attack range
 	flip := 1.0
-	if n.AnimationFlip {
+	if n.FlipH {
 		flip = -1.0
 	}
 	xDistance := n.FollowTarget.Position.X - n.Position.X

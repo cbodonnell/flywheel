@@ -153,7 +153,7 @@ func (gm *GameManager) processServerEvents() {
 }
 
 func (gm *GameManager) handleConnectPlayerEvent(event *types.ConnectPlayerEvent) error {
-	playerState := types.NewPlayerState(event.CharacterID, event.CharacterName, event.CharacterPosition, event.CharacterHitpoints)
+	playerState := types.NewPlayerState(event.CharacterID, event.CharacterName, event.CharacterPosition, event.CharacterFlipH, event.CharacterHitpoints)
 	log.Debug("Client %d connected as %s", event.ClientID, event.CharacterName)
 	// add the player to the game state
 	gm.gameState.Players[event.ClientID] = playerState
@@ -298,7 +298,7 @@ func (gm *GameManager) checkPlayerCollisions(clientID uint32, playerState *types
 	}
 
 	attackHitbox.Size.X = attackHitboxWidth
-	if !playerState.AnimationFlip {
+	if !playerState.FlipH {
 		attackHitbox.Position.X += attackHitboxOffset
 	} else {
 		attackHitbox.Position.X -= attackHitboxOffset
@@ -404,7 +404,7 @@ func (gm *GameManager) checkNPCAttackHit(npcID uint32, npcState *types.NPCState)
 	}
 
 	attackHitbox.Size.X = attackHitboxWidth
-	if !npcState.AnimationFlip {
+	if !npcState.FlipH {
 		attackHitbox.Position.X += attackHitboxOffset
 	} else {
 		attackHitbox.Position.X -= attackHitboxOffset
@@ -465,7 +465,7 @@ func (gm *GameManager) checkNPCAttackHit(npcID uint32, npcState *types.NPCState)
 
 func (gm *GameManager) checkNPCLineOfSight(npcState *types.NPCState) {
 	flip := 1.0
-	if npcState.AnimationFlip {
+	if npcState.FlipH {
 		flip = -1.0
 	}
 	lineOfSight := resolv.NewLine(npcState.Position.X+constants.NPCWidth/2, npcState.Position.Y+constants.NPCHeight/2, npcState.Position.X+constants.NPCWidth/2+flip*constants.NPCLineOfSight, npcState.Position.Y+constants.NPCHeight/2)

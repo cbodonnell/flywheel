@@ -174,7 +174,7 @@ func (o *Player) Draw(screen *ebiten.Image) {
 	if o.State.AnimationSequence != o.lastDrawnAnimationSequence {
 		o.animations[o.State.Animation].Reset()
 	}
-	o.animations[o.State.Animation].Draw(screen, o.State.Position.X, o.State.Position.Y, o.State.AnimationFlip)
+	o.animations[o.State.Animation].Draw(screen, o.State.Position.X, o.State.Position.Y, o.State.FlipH)
 	o.lastDrawnAnimationSequence = o.State.AnimationSequence
 
 	// Draw Name
@@ -235,7 +235,7 @@ func (o *Player) InterpolateState(from *gametypes.PlayerState, to *gametypes.Pla
 	o.State.IsOnGround = to.IsOnGround
 	o.State.IsAttacking = to.IsAttacking
 	o.State.Animation = to.Animation
-	o.State.AnimationFlip = to.AnimationFlip
+	o.State.FlipH = to.FlipH
 	o.State.AnimationSequence = to.AnimationSequence
 	o.State.Hitpoints = to.Hitpoints
 	o.State.Object.Position.X = o.State.Position.X
@@ -251,7 +251,7 @@ func (o *Player) ExtrapolateState(from *gametypes.PlayerState, to *gametypes.Pla
 	o.State.IsOnGround = to.IsOnGround
 	o.State.IsAttacking = to.IsAttacking
 	o.State.Animation = to.Animation
-	o.State.AnimationFlip = to.AnimationFlip
+	o.State.FlipH = to.FlipH
 	o.State.AnimationSequence = to.AnimationSequence
 	o.State.Hitpoints = to.Hitpoints
 	o.State.Object.Position.X = o.State.Position.X
@@ -290,7 +290,7 @@ func (o *Player) ReconcileState(state *gametypes.PlayerState) error {
 				o.State.IsOnGround = state.IsOnGround
 				o.State.IsAttacking = state.IsAttacking
 				o.State.Animation = state.Animation
-				o.State.AnimationFlip = state.AnimationFlip
+				o.State.FlipH = state.FlipH
 				o.State.AnimationSequence = state.AnimationSequence
 				o.State.Object.Position.X = state.Position.X
 				o.State.Object.Position.Y = state.Position.Y
@@ -320,7 +320,7 @@ func (ps PreviousState) NeedsReconciliation(other *gametypes.PlayerState) bool {
 		ps.State.IsOnGround == other.IsOnGround &&
 		ps.State.IsAttacking == other.IsAttacking &&
 		ps.State.Animation == other.Animation &&
-		ps.State.AnimationFlip == other.AnimationFlip &&
+		ps.State.FlipH == other.FlipH &&
 		ps.State.AnimationSequence == other.AnimationSequence {
 		return false
 	}
