@@ -55,9 +55,11 @@ build-game:
 .PHONY: build-client
 build-client:
 	go build \
-	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
+	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}' \
+	-X 'github.com/cbodonnell/flywheel/client/network.DefaultServerHostname=${FLYWHEEL_SERVER_HOSTNAME}' \
+	-X 'github.com/cbodonnell/flywheel/client/game.DefaultAuthServerURL=${FLYWHEEL_AUTH_SERVER_URL}' \
+	-X 'github.com/cbodonnell/flywheel/client/game.DefaultAPIServerURL=${FLYWHEEL_API_SERVER_URL}'" \
 	-o ./bin/flywheel-client.exe ./cmd/client/main.go
-
 
 .PHONY: build-client-wasm
 build-client-wasm:
