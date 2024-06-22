@@ -36,7 +36,12 @@ func NewAPIServer(opts NewAPIServerOptions) *APIServer {
 
 	mux := http.NewServeMux()
 	mux.Handle("/characters", authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization")
 		switch r.Method {
+		case http.MethodOptions:
+			w.WriteHeader(http.StatusNoContent)
 		case http.MethodGet:
 			handlers.HandleListCharacters(opts.Repository)(w, r)
 		case http.MethodPost:
@@ -46,6 +51,7 @@ func NewAPIServer(opts NewAPIServerOptions) *APIServer {
 		}
 	})))
 	mux.Handle("/characters/{characterID}", authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		switch r.Method {
 		case http.MethodDelete:
 			handlers.HandleDeleteCharacter(opts.Repository)(w, r)

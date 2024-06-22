@@ -34,6 +34,7 @@ func NewWSClient(serverAddr string, messageQueue queue.Queue, clientIDChan chan<
 
 // Connect establishes a connection to the WebSocket server.
 func (c *WSClient) Connect() error {
+	log.Info("Connecting to WebSocket server at %s", c.serverAddr)
 	conn, _, err := websocket.DefaultDialer.Dial(c.serverAddr, nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %v", err)

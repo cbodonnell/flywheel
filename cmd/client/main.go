@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
 
 	"github.com/cbodonnell/flywheel/client/game"
 	clientgame "github.com/cbodonnell/flywheel/client/game"
@@ -41,7 +40,8 @@ func main() {
 	serverSettings := network.ServerSettings{
 		Hostname: *serverHostname,
 	}
-	if runtime.GOARCH == "wasm" {
+	// if runtime.GOARCH == "wasm" {
+	if true {
 		serverSettings.WSPort = network.DefaultWSServerPort
 	} else {
 		serverSettings.TCPPort = *serverTCPPort

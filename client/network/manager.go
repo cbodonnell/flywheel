@@ -92,7 +92,8 @@ func NewNetworkManager(serverSettings ServerSettings, messageQueue queue.Queue) 
 		m.udpClientErrChan = make(chan error)
 	} else if serverSettings.WSPort != 0 {
 		m.serverConnectionType = ServerConnectionTypeWS
-		wsClient := NewWSClient(fmt.Sprintf("%s:%d", serverSettings.Hostname, serverSettings.WSPort), messageQueue, clientIDChan, loginErrChan, serverTimeChan)
+		// TODO: dynamic websocket server URL
+		wsClient := NewWSClient(fmt.Sprintf("ws://127.0.0.1:%d/", serverSettings.WSPort), messageQueue, clientIDChan, loginErrChan, serverTimeChan)
 		m.wsClient = wsClient
 		m.wsClientErrChan = make(chan error)
 	} else {

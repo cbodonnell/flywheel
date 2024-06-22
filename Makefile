@@ -63,10 +63,11 @@ build-client:
 
 .PHONY: build-client-wasm
 build-client-wasm:
-	env GOOS=js GOARCH=wasm \
+	GOARCH=wasm \
+	GOOS=js \
 	go build \
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
-	-o ./bin/flywheel-client.wasm ./cmd/client/main.go
+	-o ./dist/flywheel-client.wasm ./cmd/client/main.go
 
 .PHONY: run
 run:

@@ -27,7 +27,9 @@ func HandleListCharacters(repository repositories.Repository) http.HandlerFunc {
 			return
 		}
 
+		log.Debug("listing characters with CORS!!")
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		if err := json.NewEncoder(w).Encode(characters); err != nil {
 			log.Error("failed to encode characters: %v", err)
 			http.Error(w, "Failed to encode characters", http.StatusInternalServerError)
@@ -94,6 +96,7 @@ func HandleCreateCharacter(repository repositories.Repository) http.HandlerFunc 
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		if err := json.NewEncoder(w).Encode(character); err != nil {
 			log.Error("failed to encode character: %v", err)
 			http.Error(w, "Failed to encode character", http.StatusInternalServerError)
@@ -127,5 +130,8 @@ func HandleDeleteCharacter(repository repositories.Repository) http.HandlerFunc 
 			http.Error(w, "Failed to delete character", http.StatusInternalServerError)
 			return
 		}
+
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusNoContent)
 	}
 }

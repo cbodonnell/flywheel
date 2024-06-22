@@ -35,9 +35,11 @@ const (
 
 func (c *Client) Copy() *Client {
 	copy := &Client{
-		ID:      c.ID,
-		TCPConn: c.TCPConn,
-		UserID:  c.UserID,
+		ID:             c.ID,
+		ConnectionType: c.ConnectionType,
+		TCPConn:        c.TCPConn,
+		WSConn:         c.WSConn,
+		UserID:         c.UserID,
 	}
 	if c.UDPAddress != nil {
 		copy.UDPAddress = &net.UDPAddr{

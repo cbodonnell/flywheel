@@ -49,6 +49,7 @@ func (s *WSServer) Start(ctx context.Context, disconnectHandler ControlDisconnec
 			log.Error("Failed to upgrade to WebSocket: %v", err)
 			return
 		}
+		log.Debug("New WebSocket connection from %s", conn.RemoteAddr().String())
 		go s.handleWSConnection(ctx, conn, disconnectHandler, messageHandler)
 	})
 
