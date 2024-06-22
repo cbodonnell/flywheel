@@ -99,7 +99,7 @@ func (rcv *PlayerState) Velocity(obj *Velocity) *Velocity {
 	return nil
 }
 
-func (rcv *PlayerState) IsOnGround() bool {
+func (rcv *PlayerState) FlipH() bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(14))
 	if o != 0 {
 		return rcv._tab.GetBool(o + rcv._tab.Pos)
@@ -107,11 +107,11 @@ func (rcv *PlayerState) IsOnGround() bool {
 	return false
 }
 
-func (rcv *PlayerState) MutateIsOnGround(n bool) bool {
+func (rcv *PlayerState) MutateFlipH(n bool) bool {
 	return rcv._tab.MutateBoolSlot(14, n)
 }
 
-func (rcv *PlayerState) IsAttacking() bool {
+func (rcv *PlayerState) IsOnGround() bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(16))
 	if o != 0 {
 		return rcv._tab.GetBool(o + rcv._tab.Pos)
@@ -119,23 +119,23 @@ func (rcv *PlayerState) IsAttacking() bool {
 	return false
 }
 
-func (rcv *PlayerState) MutateIsAttacking(n bool) bool {
+func (rcv *PlayerState) MutateIsOnGround(n bool) bool {
 	return rcv._tab.MutateBoolSlot(16, n)
 }
 
-func (rcv *PlayerState) Animation() byte {
+func (rcv *PlayerState) IsOnLadder() bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(18))
 	if o != 0 {
-		return rcv._tab.GetByte(o + rcv._tab.Pos)
+		return rcv._tab.GetBool(o + rcv._tab.Pos)
 	}
-	return 0
+	return false
 }
 
-func (rcv *PlayerState) MutateAnimation(n byte) bool {
-	return rcv._tab.MutateByteSlot(18, n)
+func (rcv *PlayerState) MutateIsOnLadder(n bool) bool {
+	return rcv._tab.MutateBoolSlot(18, n)
 }
 
-func (rcv *PlayerState) AnimationFlip() bool {
+func (rcv *PlayerState) IsAttacking() bool {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(20))
 	if o != 0 {
 		return rcv._tab.GetBool(o + rcv._tab.Pos)
@@ -143,11 +143,11 @@ func (rcv *PlayerState) AnimationFlip() bool {
 	return false
 }
 
-func (rcv *PlayerState) MutateAnimationFlip(n bool) bool {
+func (rcv *PlayerState) MutateIsAttacking(n bool) bool {
 	return rcv._tab.MutateBoolSlot(20, n)
 }
 
-func (rcv *PlayerState) AnimationSequence() byte {
+func (rcv *PlayerState) Animation() byte {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(22))
 	if o != 0 {
 		return rcv._tab.GetByte(o + rcv._tab.Pos)
@@ -155,12 +155,24 @@ func (rcv *PlayerState) AnimationSequence() byte {
 	return 0
 }
 
-func (rcv *PlayerState) MutateAnimationSequence(n byte) bool {
+func (rcv *PlayerState) MutateAnimation(n byte) bool {
 	return rcv._tab.MutateByteSlot(22, n)
 }
 
-func (rcv *PlayerState) Hitpoints() int16 {
+func (rcv *PlayerState) AnimationSequence() byte {
 	o := flatbuffers.UOffsetT(rcv._tab.Offset(24))
+	if o != 0 {
+		return rcv._tab.GetByte(o + rcv._tab.Pos)
+	}
+	return 0
+}
+
+func (rcv *PlayerState) MutateAnimationSequence(n byte) bool {
+	return rcv._tab.MutateByteSlot(24, n)
+}
+
+func (rcv *PlayerState) Hitpoints() int16 {
+	o := flatbuffers.UOffsetT(rcv._tab.Offset(26))
 	if o != 0 {
 		return rcv._tab.GetInt16(o + rcv._tab.Pos)
 	}
@@ -168,11 +180,11 @@ func (rcv *PlayerState) Hitpoints() int16 {
 }
 
 func (rcv *PlayerState) MutateHitpoints(n int16) bool {
-	return rcv._tab.MutateInt16Slot(24, n)
+	return rcv._tab.MutateInt16Slot(26, n)
 }
 
 func PlayerStateStart(builder *flatbuffers.Builder) {
-	builder.StartObject(11)
+	builder.StartObject(12)
 }
 func PlayerStateAddLastProcessedTimestamp(builder *flatbuffers.Builder, lastProcessedTimestamp int64) {
 	builder.PrependInt64Slot(0, lastProcessedTimestamp, 0)
@@ -189,23 +201,26 @@ func PlayerStateAddPosition(builder *flatbuffers.Builder, position flatbuffers.U
 func PlayerStateAddVelocity(builder *flatbuffers.Builder, velocity flatbuffers.UOffsetT) {
 	builder.PrependUOffsetTSlot(4, flatbuffers.UOffsetT(velocity), 0)
 }
+func PlayerStateAddFlipH(builder *flatbuffers.Builder, flipH bool) {
+	builder.PrependBoolSlot(5, flipH, false)
+}
 func PlayerStateAddIsOnGround(builder *flatbuffers.Builder, isOnGround bool) {
-	builder.PrependBoolSlot(5, isOnGround, false)
+	builder.PrependBoolSlot(6, isOnGround, false)
+}
+func PlayerStateAddIsOnLadder(builder *flatbuffers.Builder, isOnLadder bool) {
+	builder.PrependBoolSlot(7, isOnLadder, false)
 }
 func PlayerStateAddIsAttacking(builder *flatbuffers.Builder, isAttacking bool) {
-	builder.PrependBoolSlot(6, isAttacking, false)
+	builder.PrependBoolSlot(8, isAttacking, false)
 }
 func PlayerStateAddAnimation(builder *flatbuffers.Builder, animation byte) {
-	builder.PrependByteSlot(7, animation, 0)
-}
-func PlayerStateAddAnimationFlip(builder *flatbuffers.Builder, animationFlip bool) {
-	builder.PrependBoolSlot(8, animationFlip, false)
+	builder.PrependByteSlot(9, animation, 0)
 }
 func PlayerStateAddAnimationSequence(builder *flatbuffers.Builder, animationSequence byte) {
-	builder.PrependByteSlot(9, animationSequence, 0)
+	builder.PrependByteSlot(10, animationSequence, 0)
 }
 func PlayerStateAddHitpoints(builder *flatbuffers.Builder, hitpoints int16) {
-	builder.PrependInt16Slot(10, hitpoints, 0)
+	builder.PrependInt16Slot(11, hitpoints, 0)
 }
 func PlayerStateEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

@@ -14,6 +14,8 @@ const (
 	PlayerSpeed float64 = 350.0
 	// PlayerJumpSpeed is the speed at which players jump
 	PlayerJumpSpeed float64 = 850.0
+	// PlayerLadderClimbSpeed is the speed at which players climb ladders
+	PlayerLadderClimbSpeed float64 = 150.0
 	// Player Height
 	PlayerHeight float64 = 64.0
 	// Player Width

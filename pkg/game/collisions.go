@@ -17,8 +17,12 @@ func NewCollisionSpace() *resolv.Space {
 		resolv.NewObject(0, float64(spaceHeight-cellHeight), float64(spaceWidth), float64(cellHeight), types.CollisionSpaceTagLevel),
 		resolv.NewObject(0, float64(cellHeight), float64(cellWidth), float64(spaceHeight-cellHeight*2), types.CollisionSpaceTagLevel),
 		resolv.NewObject(float64(spaceWidth-cellWidth), float64(cellHeight), float64(cellWidth), float64(spaceHeight-cellHeight*2), types.CollisionSpaceTagLevel),
-		// platform
-		resolv.NewObject(float64(spaceWidth/2-cellWidth*4), float64(cellHeight*6), float64(cellWidth*8), float64(cellHeight), types.CollisionSpaceTagLevel),
+		// ladders
+		resolv.NewObject(float64(spaceWidth*3/4-constants.CellWidth/2), float64(cellHeight*6), float64(cellWidth), float64(cellHeight*13), types.CollisionSpaceTagLadder),
+		// platforms
+		resolv.NewObject(float64(spaceWidth/2-cellWidth*4), float64(cellHeight*6), float64(cellWidth*8), float64(cellHeight), types.CollisionSpaceTagPlatform),
+		resolv.NewObject(float64(spaceWidth/4-cellWidth*4), float64(cellHeight*12), float64(cellWidth*8), float64(cellHeight), types.CollisionSpaceTagPlatform),
+		resolv.NewObject(float64(spaceWidth*3/4-cellWidth*4), float64(cellHeight*18), float64(cellWidth*8), float64(cellHeight), types.CollisionSpaceTagPlatform),
 	}
 
 	for _, obj := range levelObjects {

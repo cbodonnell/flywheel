@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS players (
     timestamp BIGINT NOT NULL,
     x FLOAT NOT NULL,
     y FLOAT NOT NULL,
+    flipH BOOLEAN NOT NULL,
     hitpoints INT NOT NULL,
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
 );

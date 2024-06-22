@@ -73,6 +73,7 @@ func main() {
 	}
 
 	clientMessageQueue := queue.NewInMemoryQueue(10000)
+	// TODO: wrap these in a network manager
 	tcpServer := network.NewTCPServer(authProvider, clientManager, clientMessageQueue, *tcpPort)
 	udpServer := network.NewUDPServer(clientManager, clientMessageQueue, *udpPort)
 	go tcpServer.Start()

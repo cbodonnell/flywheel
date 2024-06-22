@@ -3,9 +3,11 @@ package types
 import "github.com/solarlune/resolv"
 
 const (
-	CollisionSpaceTagPlayer string = "player"
-	CollisionSpaceTagNPC    string = "npc"
-	CollisionSpaceTagLevel  string = "level"
+	CollisionSpaceTagPlayer   string = "player"
+	CollisionSpaceTagNPC      string = "npc"
+	CollisionSpaceTagLevel    string = "level"
+	CollisionSpaceTagPlatform string = "platform"
+	CollisionSpaceTagLadder   string = "ladder"
 )
 
 type GameState struct {

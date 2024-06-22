@@ -17,9 +17,9 @@ type NPCState struct {
 	Position          kinematic.Vector
 	Velocity          kinematic.Vector
 	Object            *resolv.Object
+	FlipH             bool
 	IsOnGround        bool
 	Animation         NPCAnimation
-	AnimationFlip     bool
 	AnimationSequence uint8
 	ResetAnimation    bool
 	Hitpoints         int16
@@ -92,7 +92,7 @@ func (n *NPCState) Equals(other *NPCState) bool {
 		n.IsOnGround == other.IsOnGround &&
 		n.IsAttacking == other.IsAttacking &&
 		n.Animation == other.Animation &&
-		n.AnimationFlip == other.AnimationFlip &&
+		n.FlipH == other.FlipH &&
 		n.AnimationSequence == other.AnimationSequence &&
 		n.Hitpoints == other.Hitpoints
 }
@@ -108,7 +108,7 @@ func (n *NPCState) Copy() *NPCState {
 		IsAttackHitting:   n.IsAttackHitting,
 		DidAttackHit:      n.DidAttackHit,
 		Animation:         n.Animation,
-		AnimationFlip:     n.AnimationFlip,
+		FlipH:             n.FlipH,
 		AnimationSequence: n.AnimationSequence,
 		Hitpoints:         n.Hitpoints,
 	}
@@ -122,17 +122,62 @@ func (n *NPCState) RespawnTime() float64 {
 // and returns whether the state has changed
 func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	previousState := n.Copy()
+	n.UpdateRespawn(deltaTime)
+	n.UpdateAttack(deltaTime)
+	n.UpdateXPosition(deltaTime)
+	n.UpdateYPosition(deltaTime)
+	n.UpdateFlipH()
+	n.UpdateFollowing()
+	n.UpdateWandering(deltaTime)
+	n.UpdateAnimation()
+	return !n.Equals(previousState)
+}
 
-	// Respawn
-	if n.IsDead() {
-		if n.RespawnTime() <= 0 {
-			n.Spawn()
-		} else {
-			n.DecrementRespawnTime(deltaTime)
-		}
+func (n *NPCState) UpdateRespawn(deltaTime float64) {
+	if !n.IsDead() {
+		return
 	}
 
-	// Attack - TODO: roll this into some kind of attack manager
+	if n.RespawnTime() > 0 {
+		n.DecrementRespawnTime(deltaTime)
+		return
+	}
+
+	n.Spawn()
+}
+
+func (n *NPCState) UpdateYPosition(deltaTime float64) {
+	vy := n.Velocity.Y
+
+	// Apply gravity
+	dy := kinematic.Displacement(vy, deltaTime, kinematic.Gravity*constants.NPCGravityMultiplier)
+	vy = kinematic.FinalVelocity(vy, deltaTime, kinematic.Gravity*constants.NPCGravityMultiplier)
+
+	// Check for collisions
+	isOnGround := false
+	if collision := n.Object.Check(0, dy, CollisionSpaceTagLevel, CollisionSpaceTagPlatform); collision != nil {
+		dy = collision.ContactWithObject(collision.Objects[0]).Y
+		vy = 0
+		isOnGround = true
+	}
+
+	// Update npc state in the Y-axis
+	n.Position.Y += dy
+	n.Velocity.Y = vy
+	n.Object.Position.Y = n.Position.Y
+	n.Object.Update()
+	n.IsOnGround = isOnGround
+}
+
+func (n *NPCState) UpdateFlipH() {
+	if n.Velocity.X > 0 {
+		n.FlipH = false
+	} else if n.Velocity.X < 0 {
+		n.FlipH = true
+	}
+}
+
+func (n *NPCState) UpdateAttack(deltaTime float64) {
 	if n.IsAttacking {
 		beforeIsAttacking := n.IsAttacking
 
@@ -169,16 +214,6 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 		}
 	}
 
-	// Following
-	if n.IsFollowing() {
-		n.UpdateFollowing()
-	}
-
-	// Wandering
-	if n.IsWandering() {
-		n.UpdateWandering(deltaTime)
-	}
-
 	if !n.IsAttacking && n.IsInAttackRange {
 		n.IsAttacking = true
 		// randomly choose an attack
@@ -195,10 +230,9 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 			n.AttackTimeLeft = constants.NPCAttack3Duration
 		}
 	}
+}
 
-	// Movement
-
-	// X-axis
+func (n *NPCState) UpdateXPosition(deltaTime float64) {
 	var dx, vx float64
 	if !n.IsAttacking && !n.IsDead() {
 		if n.IsFollowing() {
@@ -232,7 +266,7 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	}
 
 	// Check for collisions
-	if collision := n.Object.Check(dx, 0, CollisionSpaceTagLevel); collision != nil {
+	if collision := n.Object.Check(dx, 0, CollisionSpaceTagLevel, CollisionSpaceTagPlatform); collision != nil {
 		dx = collision.ContactWithObject(collision.Objects[0]).X
 		vx = 0
 	}
@@ -242,37 +276,9 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 	n.Velocity.X = vx
 	n.Object.Position.X = n.Position.X
 	n.Object.Update()
+}
 
-	// Y-axis
-	vy := n.Velocity.Y
-
-	// Apply gravity
-	dy := kinematic.Displacement(vy, deltaTime, kinematic.Gravity*constants.NPCGravityMultiplier)
-	vy = kinematic.FinalVelocity(vy, deltaTime, kinematic.Gravity*constants.NPCGravityMultiplier)
-
-	// Check for collisions
-	isOnGround := false
-	if collision := n.Object.Check(0, dy, CollisionSpaceTagLevel); collision != nil {
-		dy = collision.ContactWithObject(collision.Objects[0]).Y
-		vy = 0
-		isOnGround = true
-	}
-
-	// Update npc state in the Y-axis
-	n.Position.Y += dy
-	n.Velocity.Y = vy
-	n.Object.Position.Y = n.Position.Y
-	n.Object.Update()
-	n.IsOnGround = isOnGround
-
-	// Update the npc animation
-	if n.Velocity.X > 0 {
-		n.AnimationFlip = false
-	} else if n.Velocity.X < 0 {
-		n.AnimationFlip = true
-	}
-
-	// Animation
+func (n *NPCState) UpdateAnimation() {
 	beforeAnimation := n.Animation
 
 	if n.IsAttacking {
@@ -301,8 +307,6 @@ func (n *NPCState) Update(deltaTime float64) (changed bool) {
 		n.AnimationSequence++
 		n.ResetAnimation = false
 	}
-
-	return !n.Equals(previousState)
 }
 
 func (n *NPCState) TakeDamage(damage int16) {
@@ -329,7 +333,7 @@ func (n *NPCState) Spawn() {
 
 	n.Hitpoints = constants.NPCHitpoints
 
-	n.AnimationFlip = n.SpawnFlip
+	n.FlipH = n.SpawnFlip
 	n.Animation = NPCAnimationIdle
 	n.AnimationSequence = 0
 	n.ResetAnimation = false
@@ -383,6 +387,10 @@ func (n *NPCState) IsFollowing() bool {
 }
 
 func (n *NPCState) UpdateFollowing() {
+	if !n.IsFollowing() {
+		return
+	}
+
 	if n.IsDead() {
 		n.StopFollowing()
 		return
@@ -402,7 +410,7 @@ func (n *NPCState) UpdateFollowing() {
 	// check if the npc has a direct line of sight to the player
 	lineOfSight := resolv.NewLine(n.Position.X+constants.NPCWidth/2, n.Position.Y+constants.NPCHeight/2, n.FollowTarget.Position.X+constants.PlayerWidth/2, n.FollowTarget.Position.Y+constants.PlayerHeight/2)
 	for _, obj := range n.Object.Space.Objects() {
-		if !obj.HasTags(CollisionSpaceTagLevel) {
+		if !obj.HasTags(CollisionSpaceTagLevel) && !obj.HasTags(CollisionSpaceTagPlatform) {
 			continue
 		}
 		if contact := lineOfSight.Intersection(0, 0, obj.Shape); contact != nil {
@@ -413,7 +421,7 @@ func (n *NPCState) UpdateFollowing() {
 
 	// check if the target is in front of the npc and within attack range
 	flip := 1.0
-	if n.AnimationFlip {
+	if n.FlipH {
 		flip = -1.0
 	}
 	xDistance := n.FollowTarget.Position.X - n.Position.X
@@ -425,6 +433,10 @@ func (n *NPCState) UpdateFollowing() {
 }
 
 func (n *NPCState) UpdateWandering(deltaTime float64) {
+	if !n.IsWandering() {
+		return
+	}
+
 	if n.IsDead() {
 		n.StopWandering()
 		return

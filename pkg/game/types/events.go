@@ -7,6 +7,7 @@ type ConnectPlayerEvent struct {
 	CharacterID        int32
 	CharacterName      string
 	CharacterPosition  kinematic.Vector
+	CharacterFlipH     bool
 	CharacterHitpoints int16
 }
 

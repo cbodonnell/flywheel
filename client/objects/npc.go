@@ -59,7 +59,7 @@ func (o *NPC) Draw(screen *ebiten.Image) {
 	if o.State.AnimationSequence != o.lastDrawnAnimationSequence {
 		o.animations[o.State.Animation].Reset()
 	}
-	o.animations[o.State.Animation].Draw(screen, o.State.Position.X, o.State.Position.Y, o.State.AnimationFlip)
+	o.animations[o.State.Animation].Draw(screen, o.State.Position.X, o.State.Position.Y, o.State.FlipH)
 	o.lastDrawnAnimationSequence = o.State.AnimationSequence
 
 	if !o.State.IsDead() {
@@ -113,7 +113,7 @@ func (o *NPC) InterpolateState(from *gametypes.NPCState, to *gametypes.NPCState,
 	o.State.Velocity.Y = to.Velocity.X
 	o.State.IsOnGround = to.IsOnGround
 	o.State.Animation = to.Animation
-	o.State.AnimationFlip = to.AnimationFlip
+	o.State.FlipH = to.FlipH
 	o.State.AnimationSequence = to.AnimationSequence
 	o.State.Hitpoints = to.Hitpoints
 	o.State.Object.Position.X = o.State.Position.X
@@ -127,7 +127,7 @@ func (o *NPC) ExtrapolateState(from *gametypes.NPCState, to *gametypes.NPCState,
 	o.State.Velocity.Y = to.Velocity.Y
 	o.State.IsOnGround = to.IsOnGround
 	o.State.Animation = to.Animation
-	o.State.AnimationFlip = to.AnimationFlip
+	o.State.FlipH = to.FlipH
 	o.State.AnimationSequence = to.AnimationSequence
 	o.State.Hitpoints = to.Hitpoints
 	o.State.Object.Position.X = o.State.Position.X

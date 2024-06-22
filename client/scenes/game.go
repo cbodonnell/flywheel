@@ -17,7 +17,6 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/google/uuid"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/solarlune/resolv"
 )
 
@@ -37,12 +36,19 @@ type GameScene struct {
 	collisionSpace *resolv.Space
 	// world is the world image.
 	world *ebiten.Image
+	// cameraViewport is the current viewport.
+	cameraViewport *CameraViewport
 	// deletedObjects is a map of deleted game objects indexed by a unique identifier
 	// and the timestamp of the deletion.
 	deletedObjects map[string]int64
 
 	serverPlayerUpdateBuffers map[uint32]*ServerPlayerUpdateBuffer
 	serverNPCUpdateBuffers    map[uint32]*ServerNPCUpdateBuffer
+}
+
+type CameraViewport struct {
+	X int
+	Y int
 }
 
 type ServerPlayerUpdateBuffer struct {
@@ -69,6 +75,71 @@ func NewGameScene(networkManager *network.NetworkManager) (Scene, error) {
 		serverPlayerUpdateBuffers: make(map[uint32]*ServerPlayerUpdateBuffer),
 		serverNPCUpdateBuffers:    make(map[uint32]*ServerNPCUpdateBuffer),
 	}, nil
+}
+
+func (g *GameScene) Init() error {
+	if err := g.addLevelObjects(); err != nil {
+		return fmt.Errorf("failed to add level objects: %v", err)
+	}
+
+	return g.BaseScene.Init()
+}
+
+func (g *GameScene) addLevelObjects() error {
+	background := objects.NewLevelObject("level-background", objects.NewLevelObjectOptions{
+		X:      0,
+		Y:      0,
+		W:      float32(g.world.Bounds().Dx()),
+		H:      float32(g.world.Bounds().Dy()),
+		Color:  color.RGBA{0x80, 0x80, 0x80, 0xff}, // Gray
+		ZIndex: 0,
+	})
+	if err := g.GetRoot().AddChild(background.GetID(), background); err != nil {
+		return fmt.Errorf("failed to add background object: %v", err)
+	}
+
+	for i, obj := range g.collisionSpace.Objects() {
+		id := fmt.Sprintf("collision-space-object-%d", i)
+		var opts objects.NewLevelObjectOptions
+		if obj.HasTags(gametypes.CollisionSpaceTagLevel) {
+			opts = objects.NewLevelObjectOptions{
+				X:      float32(obj.Position.X),
+				Y:      float32(g.world.Bounds().Dy()) - float32(obj.Position.Y) - float32(obj.Size.Y),
+				W:      float32(obj.Size.X),
+				H:      float32(obj.Size.Y),
+				Color:  color.RGBA{0x8b, 0x45, 0x13, 0xff}, // Saddle Brown
+				ZIndex: 2,
+			}
+		} else if obj.HasTags(gametypes.CollisionSpaceTagPlatform) {
+			opts = objects.NewLevelObjectOptions{
+				X:      float32(obj.Position.X),
+				Y:      float32(g.world.Bounds().Dy()) - float32(obj.Position.Y) - float32(obj.Size.Y),
+				W:      float32(obj.Size.X),
+				H:      float32(obj.Size.Y),
+				Color:  color.RGBA{0xcd, 0x85, 0x3f, 0xff}, // Peruvian Brown
+				ZIndex: 3,
+			}
+		} else if obj.HasTags(gametypes.CollisionSpaceTagLadder) {
+			opts = objects.NewLevelObjectOptions{
+				X:      float32(obj.Position.X + obj.Size.X/4),
+				Y:      float32(g.world.Bounds().Dy()) - float32(obj.Position.Y) - float32(obj.Size.Y),
+				W:      float32(obj.Size.X / 2),
+				H:      float32(obj.Size.Y),
+				Color:  color.RGBA{0x5a, 0x3a, 0x22, 0xff}, // Brown
+				ZIndex: 5,
+			}
+		} else {
+			log.Warn("Unknown collision space object tags: %v", obj.Tags())
+			continue
+		}
+
+		levelObject := objects.NewLevelObject(id, opts)
+		if err := g.GetRoot().AddChild(levelObject.GetID(), levelObject); err != nil {
+			return fmt.Errorf("failed to add collision space object: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (g *GameScene) Update() error {
@@ -572,31 +643,20 @@ func (g *GameScene) Draw(screen *ebiten.Image) {
 		log.Debug("Not drawing game scene because local player object not found")
 		return
 	}
-	g.drawWorld()
+	g.BaseScene.Draw(g.world)
 	g.drawViewport(screen, localPlayer, Zoom)
 }
 
-func (g *GameScene) drawWorld() {
-	vector.DrawFilledRect(g.world, 0, 0, float32(g.world.Bounds().Dx()), float32(g.world.Bounds().Dy()), color.RGBA{0x87, 0xce, 0xeb, 0xff}, false)
-
-	for _, obj := range g.collisionSpace.Objects() {
-		if obj.HasTags(gametypes.CollisionSpaceTagLevel) {
-			levelColor := color.RGBA{0x80, 0x80, 0x80, 0xff} // Gray
-			vector.DrawFilledRect(g.world, float32(obj.Position.X), float32(g.world.Bounds().Dy())-float32(obj.Position.Y)-float32(obj.Size.Y), float32(obj.Size.X), float32(obj.Size.Y), levelColor, false)
-		}
-	}
-
-	g.BaseScene.Draw(g.world)
-}
-
 func (g *GameScene) drawViewport(screen *ebiten.Image, player *objects.Player, zoom float64) {
-	// calculate the viewport center based on the player position
+	// TODO: test out camera smoothing
+	// calculate the viewport center based on the player position and the viewport center
 	vx, vy := int(player.State.Position.X+constants.PlayerWidth/2), g.world.Bounds().Dy()-int(player.State.Position.Y)-int(constants.PlayerHeight/2)
+	g.cameraViewport = &CameraViewport{X: vx, Y: vy}
 
 	// calculate the viewport bounds based on the zoom level
 	zoomFactor := 1.0 / (zoom * 2)
-	minX, maxX := float64(vx)-float64(screen.Bounds().Dx())*zoomFactor, float64(vx)+float64(screen.Bounds().Dx())*zoomFactor
-	minY, maxY := float64(vy)-float64(screen.Bounds().Dy())*zoomFactor, float64(vy)+float64(screen.Bounds().Dy())*zoomFactor
+	minX, maxX := float64(g.cameraViewport.X)-float64(screen.Bounds().Dx())*zoomFactor, float64(g.cameraViewport.X)+float64(screen.Bounds().Dx())*zoomFactor
+	minY, maxY := float64(g.cameraViewport.Y)-float64(screen.Bounds().Dy())*zoomFactor, float64(g.cameraViewport.Y)+float64(screen.Bounds().Dy())*zoomFactor
 
 	// clamp the viewport to the world bounds
 	if minX < 0 {
