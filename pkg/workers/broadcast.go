@@ -11,7 +11,7 @@ import (
 )
 
 type BroadcastMessageWorker struct {
-	clientManager        *network.ClientManager
+	networkManager       *network.NetworkManager
 	broadcastMessageChan <-chan BroadcastMessage
 }
 
@@ -21,13 +21,13 @@ type BroadcastMessage struct {
 }
 
 type NewBroadcastMessageWorkerOptions struct {
-	ClientManager        *network.ClientManager
+	NetworkManager       *network.NetworkManager
 	BroadcastMessageChan <-chan BroadcastMessage
 }
 
 func NewBroadcastMessageWorker(opts NewBroadcastMessageWorkerOptions) *BroadcastMessageWorker {
 	return &BroadcastMessageWorker{
-		clientManager:        opts.ClientManager,
+		networkManager:       opts.NetworkManager,
 		broadcastMessageChan: opts.BroadcastMessageChan,
 	}
 }
@@ -82,8 +82,8 @@ func (w *BroadcastMessageWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *BroadcastMessageWorker) handleServerPlayerConnect(msg BroadcastMessage) error {
-	playerConnect, ok := msg.Message.(*messages.ServerPlayerConnect)
+func (w *BroadcastMessageWorker) handleServerPlayerConnect(b BroadcastMessage) error {
+	playerConnect, ok := b.Message.(*messages.ServerPlayerConnect)
 	if !ok {
 		return fmt.Errorf("failed to cast server player connect message")
 	}
@@ -93,25 +93,18 @@ func (w *BroadcastMessageWorker) handleServerPlayerConnect(msg BroadcastMessage)
 		return fmt.Errorf("failed to marshal player state: %v", err)
 	}
 
-	for _, client := range w.clientManager.GetClients() {
-		msg := &messages.Message{
-			ClientID: 0,
-			Type:     messages.MessageTypeServerPlayerConnect,
-			Payload:  payload,
-		}
-
-		err := network.WriteMessageToTCP(client.TCPConn, msg)
-		if err != nil {
-			log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	msg := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerPlayerConnect,
+		Payload:  payload,
 	}
+	w.networkManager.SendReliableMessageToAll(msg)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerPlayerDisconnect(msg BroadcastMessage) error {
-	playerDisconnect, ok := msg.Message.(*messages.ServerPlayerDisconnect)
+func (w *BroadcastMessageWorker) handleServerPlayerDisconnect(b BroadcastMessage) error {
+	playerDisconnect, ok := b.Message.(*messages.ServerPlayerDisconnect)
 	if !ok {
 		return fmt.Errorf("failed to cast server player disconnect message")
 	}
@@ -121,25 +114,18 @@ func (w *BroadcastMessageWorker) handleServerPlayerDisconnect(msg BroadcastMessa
 		return fmt.Errorf("failed to marshal player disconnect message: %v", err)
 	}
 
-	for _, client := range w.clientManager.GetClients() {
-		msg := &messages.Message{
-			ClientID: 0,
-			Type:     messages.MessageTypeServerPlayerDisconnect,
-			Payload:  payload,
-		}
-
-		err := network.WriteMessageToTCP(client.TCPConn, msg)
-		if err != nil {
-			log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	msg := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerPlayerDisconnect,
+		Payload:  payload,
 	}
+	w.networkManager.SendReliableMessageToAll(msg)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerGameUpdate(msg BroadcastMessage) error {
-	serverGameUpdate, ok := msg.Message.(*messages.ServerGameUpdate)
+func (w *BroadcastMessageWorker) handleServerGameUpdate(b BroadcastMessage) error {
+	serverGameUpdate, ok := b.Message.(*messages.ServerGameUpdate)
 	if !ok {
 		return fmt.Errorf("failed to cast server game update message")
 	}
@@ -149,30 +135,18 @@ func (w *BroadcastMessageWorker) handleServerGameUpdate(msg BroadcastMessage) er
 		return fmt.Errorf("failed to serialize game state: %v", err)
 	}
 
-	for _, client := range w.clientManager.GetClients() {
-		message := &messages.Message{
-			ClientID: 0,
-			Type:     messages.MessageTypeServerGameUpdate,
-			Payload:  payload,
-		}
-
-		if client.UDPAddress == nil {
-			log.Trace("Client %d does not have a UDP address", client.ID)
-			continue
-		}
-
-		err := network.WriteMessageToUDP(w.clientManager.GetUDPConn(), client.UDPAddress, message)
-		if err != nil {
-			log.Error("Failed to write message to UDP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	message := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerGameUpdate,
+		Payload:  payload,
 	}
+	w.networkManager.SendUnreliableMessageToAll(message)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerPlayerUpdate(msg BroadcastMessage) error {
-	playerUpdate, ok := msg.Message.(*messages.ServerPlayerUpdate)
+func (w *BroadcastMessageWorker) handleServerPlayerUpdate(b BroadcastMessage) error {
+	playerUpdate, ok := b.Message.(*messages.ServerPlayerUpdate)
 	if !ok {
 		return fmt.Errorf("failed to cast server player update message")
 	}
@@ -182,30 +156,18 @@ func (w *BroadcastMessageWorker) handleServerPlayerUpdate(msg BroadcastMessage) 
 		return fmt.Errorf("failed to serialize player state: %v", err)
 	}
 
-	for _, client := range w.clientManager.GetClients() {
-		message := &messages.Message{
-			ClientID: 0,
-			Type:     messages.MessageTypeServerPlayerUpdate,
-			Payload:  payload,
-		}
-
-		if client.UDPAddress == nil {
-			log.Trace("Client %d does not have a UDP address", client.ID)
-			continue
-		}
-
-		err := network.WriteMessageToUDP(w.clientManager.GetUDPConn(), client.UDPAddress, message)
-		if err != nil {
-			log.Error("Failed to write message to UDP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	message := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerPlayerUpdate,
+		Payload:  payload,
 	}
+	w.networkManager.SendUnreliableMessageToAll(message)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerNPCUpdate(msg BroadcastMessage) error {
-	npcUpdate, ok := msg.Message.(*messages.ServerNPCUpdate)
+func (w *BroadcastMessageWorker) handleServerNPCUpdate(b BroadcastMessage) error {
+	npcUpdate, ok := b.Message.(*messages.ServerNPCUpdate)
 	if !ok {
 		return fmt.Errorf("failed to cast server NPC update message")
 	}
@@ -215,30 +177,18 @@ func (w *BroadcastMessageWorker) handleServerNPCUpdate(msg BroadcastMessage) err
 		return fmt.Errorf("failed to serialize NPC state: %v", err)
 	}
 
-	for _, client := range w.clientManager.GetClients() {
-		message := &messages.Message{
-			ClientID: 0,
-			Type:     messages.MessageTypeServerNPCUpdate,
-			Payload:  payload,
-		}
-
-		if client.UDPAddress == nil {
-			log.Trace("Client %d does not have a UDP address", client.ID)
-			continue
-		}
-
-		err := network.WriteMessageToUDP(w.clientManager.GetUDPConn(), client.UDPAddress, message)
-		if err != nil {
-			log.Error("Failed to write message to UDP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	message := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerNPCUpdate,
+		Payload:  payload,
 	}
+	w.networkManager.SendUnreliableMessageToAll(message)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerNPCHit(msg BroadcastMessage) error {
-	npcHit, ok := msg.Message.(*messages.ServerNPCHit)
+func (w *BroadcastMessageWorker) handleServerNPCHit(b BroadcastMessage) error {
+	npcHit, ok := b.Message.(*messages.ServerNPCHit)
 	if !ok {
 		return fmt.Errorf("failed to cast server NPC hit message")
 	}
@@ -248,25 +198,18 @@ func (w *BroadcastMessageWorker) handleServerNPCHit(msg BroadcastMessage) error 
 		return fmt.Errorf("failed to marshal NPC hit message: %v", err)
 	}
 
-	for _, client := range w.clientManager.GetClients() {
-		msg := &messages.Message{
-			ClientID: 0,
-			Type:     messages.MessageTypeServerNPCHit,
-			Payload:  payload,
-		}
-
-		err := network.WriteMessageToTCP(client.TCPConn, msg)
-		if err != nil {
-			log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	msg := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerNPCHit,
+		Payload:  payload,
 	}
+	w.networkManager.SendReliableMessageToAll(msg)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerNPCKill(msg BroadcastMessage) error {
-	npcKill, ok := msg.Message.(*messages.ServerNPCKill)
+func (w *BroadcastMessageWorker) handleServerNPCKill(b BroadcastMessage) error {
+	npcKill, ok := b.Message.(*messages.ServerNPCKill)
 	if !ok {
 		return fmt.Errorf("failed to cast server NPC kill message")
 	}
@@ -276,25 +219,18 @@ func (w *BroadcastMessageWorker) handleServerNPCKill(msg BroadcastMessage) error
 		return fmt.Errorf("failed to marshal NPC kill message: %v", err)
 	}
 
-	for _, client := range w.clientManager.GetClients() {
-		msg := &messages.Message{
-			ClientID: 0,
-			Type:     messages.MessageTypeServerNPCKill,
-			Payload:  payload,
-		}
-
-		err := network.WriteMessageToTCP(client.TCPConn, msg)
-		if err != nil {
-			log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	msg := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerNPCKill,
+		Payload:  payload,
 	}
+	w.networkManager.SendReliableMessageToAll(msg)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerPlayerHit(msg BroadcastMessage) error {
-	playerHit, ok := msg.Message.(*messages.ServerPlayerHit)
+func (w *BroadcastMessageWorker) handleServerPlayerHit(b BroadcastMessage) error {
+	playerHit, ok := b.Message.(*messages.ServerPlayerHit)
 	if !ok {
 		return fmt.Errorf("failed to cast server player hit message")
 	}
@@ -304,25 +240,18 @@ func (w *BroadcastMessageWorker) handleServerPlayerHit(msg BroadcastMessage) err
 		return fmt.Errorf("failed to marshal player hit message: %v", err)
 	}
 
-	for _, client := range w.clientManager.GetClients() {
-		msg := &messages.Message{
-			ClientID: 0, // ClientID 0 means the message is from the server
-			Type:     messages.MessageTypeServerPlayerHit,
-			Payload:  payload,
-		}
-
-		err := network.WriteMessageToTCP(client.TCPConn, msg)
-		if err != nil {
-			log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	msg := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerPlayerHit,
+		Payload:  payload,
 	}
+	w.networkManager.SendReliableMessageToAll(msg)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerPlayerKill(msg BroadcastMessage) error {
-	playerKill, ok := msg.Message.(*messages.ServerPlayerKill)
+func (w *BroadcastMessageWorker) handleServerPlayerKill(b BroadcastMessage) error {
+	playerKill, ok := b.Message.(*messages.ServerPlayerKill)
 	if !ok {
 		return fmt.Errorf("failed to cast server player kill message")
 	}
@@ -332,19 +261,12 @@ func (w *BroadcastMessageWorker) handleServerPlayerKill(msg BroadcastMessage) er
 		return fmt.Errorf("failed to marshal player kill message: %v", err)
 	}
 
-	for _, client := range w.clientManager.GetClients() {
-		msg := &messages.Message{
-			ClientID: 0,
-			Type:     messages.MessageTypeServerPlayerKill,
-			Payload:  payload,
-		}
-
-		err := network.WriteMessageToTCP(client.TCPConn, msg)
-		if err != nil {
-			log.Error("Failed to write message to TCP connection for client %d: %v", client.ID, err)
-			continue
-		}
+	msg := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerPlayerKill,
+		Payload:  payload,
 	}
+	w.networkManager.SendReliableMessageToAll(msg)
 
 	return nil
 }

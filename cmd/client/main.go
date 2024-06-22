@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/cbodonnell/flywheel/client/game"
 	clientgame "github.com/cbodonnell/flywheel/client/game"
@@ -39,9 +40,14 @@ func main() {
 
 	serverSettings := network.ServerSettings{
 		Hostname: *serverHostname,
-		TCPPort:  *serverTCPPort,
-		UDPPort:  *serverUDPPort,
 	}
+	if runtime.GOARCH == "wasm" {
+		serverSettings.WSPort = network.DefaultWSServerPort
+	} else {
+		serverSettings.TCPPort = *serverTCPPort
+		serverSettings.UDPPort = *serverUDPPort
+	}
+
 	serverMessageQueue := queue.NewInMemoryQueue(1024)
 	networkManager, err := network.NewNetworkManager(serverSettings, serverMessageQueue)
 	if err != nil {

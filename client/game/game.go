@@ -53,7 +53,7 @@ type GameAPI struct {
 	URL string
 }
 
-const (
+var (
 	DefaultAuthServerURL = "http://localhost:8080"
 	DefaultAPIServerURL  = "http://localhost:9090"
 )

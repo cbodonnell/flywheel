@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"net"
 	"sync"
+
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -16,10 +18,35 @@ const (
 
 // Client represents a connected client
 type Client struct {
-	ID         uint32
-	TCPConn    net.Conn
-	UDPAddress *net.UDPAddr
-	UserID     string
+	ID             uint32
+	ConnectionType ClientConnectionType
+	TCPConn        net.Conn
+	WSConn         *websocket.Conn
+	UDPAddress     *net.UDPAddr
+	UserID         string
+}
+
+type ClientConnectionType int
+
+const (
+	ClientConnectionTypeTCPUDP ClientConnectionType = iota
+	ClientConnectionTypeWebSocket
+)
+
+func (c *Client) Copy() *Client {
+	copy := &Client{
+		ID:      c.ID,
+		TCPConn: c.TCPConn,
+		UserID:  c.UserID,
+	}
+	if c.UDPAddress != nil {
+		copy.UDPAddress = &net.UDPAddr{
+			IP:   c.UDPAddress.IP,
+			Port: c.UDPAddress.Port,
+			Zone: c.UDPAddress.Zone,
+		}
+	}
+	return copy
 }
 
 // ConnectionEvent represents an event that happened to a client
@@ -44,11 +71,9 @@ type ClientConnectData struct {
 
 // ClientManager manages connected clients
 type ClientManager struct {
-	clients     map[uint32]*Client
-	clientUIDs  map[string]uint32
-	clientsLock sync.RWMutex
-	// UDP connection for broadcasting to clients
-	udpConn             *net.UDPConn
+	clients             map[uint32]*Client
+	clientUIDs          map[string]uint32
+	clientsLock         sync.RWMutex
 	connectionEventChan chan<- ConnectionEvent
 }
 
@@ -61,43 +86,30 @@ func NewClientManager(connectionEventChan chan<- ConnectionEvent) *ClientManager
 	}
 }
 
-// SetUDPConn sets the UDP listener connection for all clients
-func (cm *ClientManager) SetUDPConn(conn *net.UDPConn) {
-	cm.udpConn = conn
-}
-
-// GetUDPConn returns the UDP listener connection for all clients
-func (cm *ClientManager) GetUDPConn() *net.UDPConn {
-	if cm.udpConn == nil {
-		panic("UDP connection is not set on ClientManager")
-	}
-	return cm.udpConn
-}
-
 // GetClients returns a slice with a copy of all connected clients.
 func (cm *ClientManager) GetClients() []*Client {
 	cm.clientsLock.RLock()
 	defer cm.clientsLock.RUnlock()
 	clients := make([]*Client, 0, len(cm.clients))
 	for _, client := range cm.clients {
-		copy := &Client{
-			ID:      client.ID,
-			TCPConn: client.TCPConn,
-		}
-		if client.UDPAddress != nil {
-			copy.UDPAddress = &net.UDPAddr{
-				IP:   client.UDPAddress.IP,
-				Port: client.UDPAddress.Port,
-				Zone: client.UDPAddress.Zone,
-			}
-		}
-		clients = append(clients, copy)
+		clients = append(clients, client.Copy())
 	}
 	return clients
 }
 
+// GetClient returns a client by its ID
+func (cm *ClientManager) GetClient(clientID uint32) (*Client, error) {
+	cm.clientsLock.RLock()
+	defer cm.clientsLock.RUnlock()
+	client, ok := cm.clients[clientID]
+	if !ok {
+		return nil, fmt.Errorf("client %d not found", clientID)
+	}
+	return client.Copy(), nil
+}
+
 // ConnectClient adds a new client to the manager and returns its ID
-func (cm *ClientManager) ConnectClient(tcpConn net.Conn, userID string, characterID int32) (uint32, error) {
+func (cm *ClientManager) ConnectClient(tcpConn net.Conn, wsConn *websocket.Conn, userID string, characterID int32) (uint32, error) {
 	cm.clientsLock.Lock()
 	defer cm.clientsLock.Unlock()
 
@@ -109,10 +121,22 @@ func (cm *ClientManager) ConnectClient(tcpConn net.Conn, userID string, characte
 	if err != nil {
 		return 0, fmt.Errorf("failed to generate a unique ID: %v", err)
 	}
+
+	var connectionType ClientConnectionType
+	if tcpConn != nil {
+		connectionType = ClientConnectionTypeTCPUDP
+	} else if wsConn != nil {
+		connectionType = ClientConnectionTypeWebSocket
+	} else {
+		return 0, fmt.Errorf("neither TCP nor WebSocket connection provided")
+	}
+
 	client := &Client{
-		ID:      clientID,
-		TCPConn: tcpConn,
-		UserID:  userID,
+		ID:             clientID,
+		ConnectionType: connectionType,
+		TCPConn:        tcpConn,
+		WSConn:         wsConn,
+		UserID:         userID,
 	}
 	cm.clients[clientID] = client
 	cm.clientUIDs[userID] = clientID
@@ -137,6 +161,19 @@ func (cm *ClientManager) GetClientIDByTCPConn(conn net.Conn) uint32 {
 	defer cm.clientsLock.RUnlock()
 	for _, client := range cm.clients {
 		if client.TCPConn == conn {
+			return client.ID
+		}
+	}
+	return 0
+}
+
+// GetClientIDByWSConn returns the ID of a client by its WebSocket connection.
+// Returns 0 if the client is not found
+func (cm *ClientManager) GetClientIDByWSConn(conn *websocket.Conn) uint32 {
+	cm.clientsLock.RLock()
+	defer cm.clientsLock.RUnlock()
+	for _, client := range cm.clients {
+		if client.WSConn == conn {
 			return client.ID
 		}
 	}

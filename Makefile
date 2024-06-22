@@ -58,6 +58,14 @@ build-client:
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
 	-o ./bin/flywheel-client.exe ./cmd/client/main.go
 
+
+.PHONY: build-client-wasm
+build-client-wasm:
+	env GOOS=js GOARCH=wasm \
+	go build \
+	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
+	-o ./bin/flywheel-client.wasm ./cmd/client/main.go
+
 .PHONY: run
 run:
 	FLYWHEEL_FIREBASE_PROJECT_ID=${FLYWHEEL_FIREBASE_PROJECT_ID} \

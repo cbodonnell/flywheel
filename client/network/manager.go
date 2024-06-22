@@ -14,21 +14,25 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/queue"
 )
 
-const (
+var (
 	DefaultServerHostname = "localhost"
 	DefaultServerTCPPort  = 8888
 	DefaultServerUDPPort  = 8889
+	DefaultWSServerPort   = 8890
 )
 
 // NetworkManager represents a network manager.
 type NetworkManager struct {
-	serverSettings     ServerSettings
-	serverMessageQueue queue.Queue
+	serverSettings       ServerSettings
+	serverMessageQueue   queue.Queue
+	serverConnectionType ServerConnectionType
 
 	tcpClient        *TCPClient
 	tcpClientErrChan chan error
 	udpClient        *UDPClient
 	udpClientErrChan chan error
+	wsClient         *WSClient
+	wsClientErrChan  chan error
 	cancelClientCtx  context.CancelFunc
 
 	clientWaitGroup sync.WaitGroup
@@ -51,7 +55,15 @@ type ServerSettings struct {
 	Hostname string
 	TCPPort  int
 	UDPPort  int
+	WSPort   int
 }
+
+type ServerConnectionType int
+
+const (
+	ServerConnectionTypeTCPUDP ServerConnectionType = iota
+	ServerConnectionTypeWS
+)
 
 // NewNetworkManager creates a new network manager.
 func NewNetworkManager(serverSettings ServerSettings, messageQueue queue.Queue) (*NetworkManager, error) {
@@ -59,23 +71,35 @@ func NewNetworkManager(serverSettings ServerSettings, messageQueue queue.Queue) 
 	loginErrChan := make(chan error)
 	serverTimeChan := make(chan *messages.ServerSyncTime)
 
-	tcpClient := NewTCPClient(fmt.Sprintf("%s:%d", serverSettings.Hostname, serverSettings.TCPPort), messageQueue, clientIDChan, loginErrChan, serverTimeChan)
-	udpClient, err := NewUDPClient(fmt.Sprintf("%s:%d", serverSettings.Hostname, serverSettings.UDPPort), messageQueue)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create UDP client: %v", err)
-	}
-
-	return &NetworkManager{
+	m := &NetworkManager{
 		serverSettings:     serverSettings,
 		serverMessageQueue: messageQueue,
-		tcpClient:          tcpClient,
-		tcpClientErrChan:   make(chan error),
-		udpClient:          udpClient,
-		udpClientErrChan:   make(chan error),
 		clientIDChan:       clientIDChan,
 		loginErrChan:       loginErrChan,
 		serverTimeChan:     serverTimeChan,
-	}, nil
+	}
+
+	if serverSettings.TCPPort != 0 && serverSettings.UDPPort != 0 {
+		tcpClient := NewTCPClient(fmt.Sprintf("%s:%d", serverSettings.Hostname, serverSettings.TCPPort), messageQueue, clientIDChan, loginErrChan, serverTimeChan)
+		udpClient, err := NewUDPClient(fmt.Sprintf("%s:%d", serverSettings.Hostname, serverSettings.UDPPort), messageQueue)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create UDP client: %v", err)
+		}
+		m.serverConnectionType = ServerConnectionTypeTCPUDP
+		m.tcpClient = tcpClient
+		m.tcpClientErrChan = make(chan error)
+		m.udpClient = udpClient
+		m.udpClientErrChan = make(chan error)
+	} else if serverSettings.WSPort != 0 {
+		m.serverConnectionType = ServerConnectionTypeWS
+		wsClient := NewWSClient(fmt.Sprintf("%s:%d", serverSettings.Hostname, serverSettings.WSPort), messageQueue, clientIDChan, loginErrChan, serverTimeChan)
+		m.wsClient = wsClient
+		m.wsClientErrChan = make(chan error)
+	} else {
+		return nil, fmt.Errorf("no valid server ports provided")
+	}
+
+	return m, nil
 }
 
 // Start starts the network manager.
@@ -83,18 +107,35 @@ func (m *NetworkManager) Start(token string, characterID int32) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancelClientCtx = cancel
 
-	if err := m.tcpClient.Connect(); err != nil {
-		return fmt.Errorf("failed to start TCP client: %v", err)
-	}
-
-	m.clientWaitGroup.Add(1)
-	go func(ctx context.Context) {
-		defer m.clientWaitGroup.Done()
-		if err := m.tcpClient.HandleMessages(ctx); err != nil {
-			// TODO: find a way to do this without channels (maybe a flag w/ mutex?)
-			m.tcpClientErrChan <- err
+	switch m.serverConnectionType {
+	case ServerConnectionTypeTCPUDP:
+		if err := m.tcpClient.Connect(); err != nil {
+			return fmt.Errorf("failed to start TCP client: %v", err)
 		}
-	}(ctx)
+
+		m.clientWaitGroup.Add(1)
+		go func(ctx context.Context) {
+			defer m.clientWaitGroup.Done()
+			if err := m.tcpClient.HandleMessages(ctx); err != nil {
+				// TODO: find a way to do this without channels (maybe a flag w/ mutex?)
+				m.tcpClientErrChan <- err
+			}
+		}(ctx)
+	case ServerConnectionTypeWS:
+		if err := m.wsClient.Connect(); err != nil {
+			return fmt.Errorf("failed to start WebSocket client: %v", err)
+		}
+
+		m.clientWaitGroup.Add(1)
+		go func(ctx context.Context) {
+			defer m.clientWaitGroup.Done()
+			if err := m.wsClient.HandleMessages(ctx); err != nil {
+				m.wsClientErrChan <- err
+			}
+		}(ctx)
+	default:
+		return fmt.Errorf("unknown server connection type %d", m.serverConnectionType)
+	}
 
 	if err := m.login(token, characterID); err != nil {
 		if strings.Contains(err.Error(), "is already connected") {
@@ -109,21 +150,23 @@ func (m *NetworkManager) Start(token string, characterID int32) error {
 		return fmt.Errorf("failed to start time sync: %v", err)
 	}
 
-	if err := m.udpClient.Connect(); err != nil {
-		return fmt.Errorf("failed to start UDP client: %v", err)
-	}
-
-	m.clientWaitGroup.Add(1)
-	go func(ctx context.Context) {
-		defer m.clientWaitGroup.Done()
-		if err := m.udpClient.HandleMessages(ctx); err != nil {
-			// TODO: find a way to do this without channels (maybe a flag w/ mutex?)
-			m.udpClientErrChan <- err
+	if m.serverConnectionType == ServerConnectionTypeTCPUDP {
+		if err := m.udpClient.Connect(); err != nil {
+			return fmt.Errorf("failed to start UDP client: %v", err)
 		}
-	}(ctx)
 
-	if err := m.pingUDP(); err != nil {
-		return fmt.Errorf("failed to ping UDP: %v", err)
+		m.clientWaitGroup.Add(1)
+		go func(ctx context.Context) {
+			defer m.clientWaitGroup.Done()
+			if err := m.udpClient.HandleMessages(ctx); err != nil {
+				// TODO: find a way to do this without channels (maybe a flag w/ mutex?)
+				m.udpClientErrChan <- err
+			}
+		}(ctx)
+
+		if err := m.pingUDP(); err != nil {
+			return fmt.Errorf("failed to ping UDP: %v", err)
+		}
 	}
 
 	m.isConnected = true
@@ -266,8 +309,15 @@ func (m *NetworkManager) Stop() error {
 	}
 	m.cancelClientCtx()
 
-	m.tcpClient.Close()
-	m.udpClient.Close()
+	switch m.serverConnectionType {
+	case ServerConnectionTypeTCPUDP:
+		m.tcpClient.Close()
+		m.udpClient.Close()
+	case ServerConnectionTypeWS:
+		m.wsClient.Close()
+	default:
+		return fmt.Errorf("unknown server connection type %d", m.serverConnectionType)
+	}
 
 	log.Debug("Waiting for clients to stop")
 	m.clientWaitGroup.Wait()
@@ -325,9 +375,23 @@ func (m *NetworkManager) ClientID() uint32 {
 }
 
 func (m *NetworkManager) SendReliableMessage(msg *messages.Message) error {
-	return m.tcpClient.SendMessage(msg)
+	switch m.serverConnectionType {
+	case ServerConnectionTypeTCPUDP:
+		return m.tcpClient.SendMessage(msg)
+	case ServerConnectionTypeWS:
+		return m.wsClient.SendMessage(msg)
+	default:
+		return fmt.Errorf("unknown server connection type %d", m.serverConnectionType)
+	}
 }
 
 func (m *NetworkManager) SendUnreliableMessage(msg *messages.Message) error {
-	return m.udpClient.SendMessage(msg)
+	switch m.serverConnectionType {
+	case ServerConnectionTypeTCPUDP:
+		return m.udpClient.SendMessage(msg)
+	case ServerConnectionTypeWS:
+		return m.wsClient.SendMessage(msg)
+	default:
+		return fmt.Errorf("unknown server connection type %d", m.serverConnectionType)
+	}
 }
