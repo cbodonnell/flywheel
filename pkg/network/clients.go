@@ -6,7 +6,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/gorilla/websocket"
+	"nhooyr.io/websocket"
 )
 
 const (

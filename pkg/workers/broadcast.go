@@ -40,39 +40,39 @@ func (w *BroadcastMessageWorker) Start(ctx context.Context) {
 		case msg := <-w.broadcastMessageChan:
 			switch msg.Type {
 			case messages.MessageTypeServerPlayerConnect:
-				if err := w.handleServerPlayerConnect(msg); err != nil {
+				if err := w.handleServerPlayerConnect(ctx, msg); err != nil {
 					log.Error("Failed to handle server player connect message: %v", err)
 				}
 			case messages.MessageTypeServerPlayerDisconnect:
-				if err := w.handleServerPlayerDisconnect(msg); err != nil {
+				if err := w.handleServerPlayerDisconnect(ctx, msg); err != nil {
 					log.Error("Failed to handle server player disconnect message: %v", err)
 				}
 			case messages.MessageTypeServerGameUpdate:
-				if err := w.handleServerGameUpdate(msg); err != nil {
+				if err := w.handleServerGameUpdate(ctx, msg); err != nil {
 					log.Error("Failed to handle server game update message: %v", err)
 				}
 			case messages.MessageTypeServerPlayerUpdate:
-				if err := w.handleServerPlayerUpdate(msg); err != nil {
+				if err := w.handleServerPlayerUpdate(ctx, msg); err != nil {
 					log.Error("Failed to handle server player update message: %v", err)
 				}
 			case messages.MessageTypeServerNPCUpdate:
-				if err := w.handleServerNPCUpdate(msg); err != nil {
+				if err := w.handleServerNPCUpdate(ctx, msg); err != nil {
 					log.Error("Failed to handle server NPC update message: %v", err)
 				}
 			case messages.MessageTypeServerNPCHit:
-				if err := w.handleServerNPCHit(msg); err != nil {
+				if err := w.handleServerNPCHit(ctx, msg); err != nil {
 					log.Error("Failed to handle server NPC hit message: %v", err)
 				}
 			case messages.MessageTypeServerNPCKill:
-				if err := w.handleServerNPCKill(msg); err != nil {
+				if err := w.handleServerNPCKill(ctx, msg); err != nil {
 					log.Error("Failed to handle server NPC kill message: %v", err)
 				}
 			case messages.MessageTypeServerPlayerHit:
-				if err := w.handleServerPlayerHit(msg); err != nil {
+				if err := w.handleServerPlayerHit(ctx, msg); err != nil {
 					log.Error("Failed to handle server player hit message: %v", err)
 				}
 			case messages.MessageTypeServerPlayerKill:
-				if err := w.handleServerPlayerKill(msg); err != nil {
+				if err := w.handleServerPlayerKill(ctx, msg); err != nil {
 					log.Error("Failed to handle server player kill message: %v", err)
 				}
 			default:
@@ -82,7 +82,7 @@ func (w *BroadcastMessageWorker) Start(ctx context.Context) {
 	}
 }
 
-func (w *BroadcastMessageWorker) handleServerPlayerConnect(b BroadcastMessage) error {
+func (w *BroadcastMessageWorker) handleServerPlayerConnect(ctx context.Context, b BroadcastMessage) error {
 	playerConnect, ok := b.Message.(*messages.ServerPlayerConnect)
 	if !ok {
 		return fmt.Errorf("failed to cast server player connect message")
@@ -98,12 +98,12 @@ func (w *BroadcastMessageWorker) handleServerPlayerConnect(b BroadcastMessage) e
 		Type:     messages.MessageTypeServerPlayerConnect,
 		Payload:  payload,
 	}
-	w.networkManager.SendReliableMessageToAll(msg)
+	w.networkManager.SendReliableMessageToAll(ctx, msg)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerPlayerDisconnect(b BroadcastMessage) error {
+func (w *BroadcastMessageWorker) handleServerPlayerDisconnect(ctx context.Context, b BroadcastMessage) error {
 	playerDisconnect, ok := b.Message.(*messages.ServerPlayerDisconnect)
 	if !ok {
 		return fmt.Errorf("failed to cast server player disconnect message")
@@ -119,12 +119,12 @@ func (w *BroadcastMessageWorker) handleServerPlayerDisconnect(b BroadcastMessage
 		Type:     messages.MessageTypeServerPlayerDisconnect,
 		Payload:  payload,
 	}
-	w.networkManager.SendReliableMessageToAll(msg)
+	w.networkManager.SendReliableMessageToAll(ctx, msg)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerGameUpdate(b BroadcastMessage) error {
+func (w *BroadcastMessageWorker) handleServerGameUpdate(ctx context.Context, b BroadcastMessage) error {
 	serverGameUpdate, ok := b.Message.(*messages.ServerGameUpdate)
 	if !ok {
 		return fmt.Errorf("failed to cast server game update message")
@@ -140,12 +140,12 @@ func (w *BroadcastMessageWorker) handleServerGameUpdate(b BroadcastMessage) erro
 		Type:     messages.MessageTypeServerGameUpdate,
 		Payload:  payload,
 	}
-	w.networkManager.SendUnreliableMessageToAll(message)
+	w.networkManager.SendUnreliableMessageToAll(ctx, message)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerPlayerUpdate(b BroadcastMessage) error {
+func (w *BroadcastMessageWorker) handleServerPlayerUpdate(ctx context.Context, b BroadcastMessage) error {
 	playerUpdate, ok := b.Message.(*messages.ServerPlayerUpdate)
 	if !ok {
 		return fmt.Errorf("failed to cast server player update message")
@@ -161,12 +161,12 @@ func (w *BroadcastMessageWorker) handleServerPlayerUpdate(b BroadcastMessage) er
 		Type:     messages.MessageTypeServerPlayerUpdate,
 		Payload:  payload,
 	}
-	w.networkManager.SendUnreliableMessageToAll(message)
+	w.networkManager.SendUnreliableMessageToAll(ctx, message)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerNPCUpdate(b BroadcastMessage) error {
+func (w *BroadcastMessageWorker) handleServerNPCUpdate(ctx context.Context, b BroadcastMessage) error {
 	npcUpdate, ok := b.Message.(*messages.ServerNPCUpdate)
 	if !ok {
 		return fmt.Errorf("failed to cast server NPC update message")
@@ -182,12 +182,12 @@ func (w *BroadcastMessageWorker) handleServerNPCUpdate(b BroadcastMessage) error
 		Type:     messages.MessageTypeServerNPCUpdate,
 		Payload:  payload,
 	}
-	w.networkManager.SendUnreliableMessageToAll(message)
+	w.networkManager.SendUnreliableMessageToAll(ctx, message)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerNPCHit(b BroadcastMessage) error {
+func (w *BroadcastMessageWorker) handleServerNPCHit(ctx context.Context, b BroadcastMessage) error {
 	npcHit, ok := b.Message.(*messages.ServerNPCHit)
 	if !ok {
 		return fmt.Errorf("failed to cast server NPC hit message")
@@ -203,12 +203,12 @@ func (w *BroadcastMessageWorker) handleServerNPCHit(b BroadcastMessage) error {
 		Type:     messages.MessageTypeServerNPCHit,
 		Payload:  payload,
 	}
-	w.networkManager.SendReliableMessageToAll(msg)
+	w.networkManager.SendReliableMessageToAll(ctx, msg)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerNPCKill(b BroadcastMessage) error {
+func (w *BroadcastMessageWorker) handleServerNPCKill(ctx context.Context, b BroadcastMessage) error {
 	npcKill, ok := b.Message.(*messages.ServerNPCKill)
 	if !ok {
 		return fmt.Errorf("failed to cast server NPC kill message")
@@ -224,12 +224,12 @@ func (w *BroadcastMessageWorker) handleServerNPCKill(b BroadcastMessage) error {
 		Type:     messages.MessageTypeServerNPCKill,
 		Payload:  payload,
 	}
-	w.networkManager.SendReliableMessageToAll(msg)
+	w.networkManager.SendReliableMessageToAll(ctx, msg)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerPlayerHit(b BroadcastMessage) error {
+func (w *BroadcastMessageWorker) handleServerPlayerHit(ctx context.Context, b BroadcastMessage) error {
 	playerHit, ok := b.Message.(*messages.ServerPlayerHit)
 	if !ok {
 		return fmt.Errorf("failed to cast server player hit message")
@@ -245,12 +245,12 @@ func (w *BroadcastMessageWorker) handleServerPlayerHit(b BroadcastMessage) error
 		Type:     messages.MessageTypeServerPlayerHit,
 		Payload:  payload,
 	}
-	w.networkManager.SendReliableMessageToAll(msg)
+	w.networkManager.SendReliableMessageToAll(ctx, msg)
 
 	return nil
 }
 
-func (w *BroadcastMessageWorker) handleServerPlayerKill(b BroadcastMessage) error {
+func (w *BroadcastMessageWorker) handleServerPlayerKill(ctx context.Context, b BroadcastMessage) error {
 	playerKill, ok := b.Message.(*messages.ServerPlayerKill)
 	if !ok {
 		return fmt.Errorf("failed to cast server player kill message")
@@ -266,7 +266,7 @@ func (w *BroadcastMessageWorker) handleServerPlayerKill(b BroadcastMessage) erro
 		Type:     messages.MessageTypeServerPlayerKill,
 		Payload:  payload,
 	}
-	w.networkManager.SendReliableMessageToAll(msg)
+	w.networkManager.SendReliableMessageToAll(ctx, msg)
 
 	return nil
 }

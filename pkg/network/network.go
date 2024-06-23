@@ -11,7 +11,7 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
-	"github.com/gorilla/websocket"
+	"nhooyr.io/websocket"
 )
 
 type NetworkManager struct {
@@ -90,17 +90,17 @@ func (n *NetworkManager) handleControlMessage(ctx context.Context, tcpConn net.C
 		clientID, err := n.handleClientLogin(ctx, tcpConn, wsConn, message)
 		if err != nil {
 			log.Error("Failed to handle client login: %v", err)
-			if err := n.sendServerLoginFailure(clientID, err.Error()); err != nil {
+			if err := n.sendServerLoginFailure(ctx, clientID, err.Error()); err != nil {
 				log.Error("Failed to send server login failure: %v", err)
 			}
 			return
 		}
 		log.Info("Client %d connected", clientID)
-		if err := n.sendServerLoginSuccess(clientID); err != nil {
+		if err := n.sendServerLoginSuccess(ctx, clientID); err != nil {
 			log.Error("Failed to send server login success: %v", err)
 		}
 	case messages.MessageTypeClientSyncTime:
-		if err := n.handleClientSyncTime(message); err != nil {
+		if err := n.handleClientSyncTime(ctx, message); err != nil {
 			log.Error("Failed to handle client sync time: %v", err)
 		}
 	default:
@@ -130,7 +130,7 @@ func (n *NetworkManager) handleClientLogin(ctx context.Context, tcpConn net.Conn
 	return clientID, nil
 }
 
-func (n *NetworkManager) sendServerLoginSuccess(clientID uint32) error {
+func (n *NetworkManager) sendServerLoginSuccess(ctx context.Context, clientID uint32) error {
 	serverLoginSuccess := &messages.ServerLoginSuccess{
 		ClientID: clientID,
 	}
@@ -146,14 +146,14 @@ func (n *NetworkManager) sendServerLoginSuccess(clientID uint32) error {
 		Payload:  payload,
 	}
 
-	if err := n.SendReliableMessageToClient(clientID, msg); err != nil {
+	if err := n.SendReliableMessageToClient(ctx, clientID, msg); err != nil {
 		return fmt.Errorf("failed to send server login success: %v", err)
 	}
 
 	return nil
 }
 
-func (n *NetworkManager) sendServerLoginFailure(clientID uint32, reason string) error {
+func (n *NetworkManager) sendServerLoginFailure(ctx context.Context, clientID uint32, reason string) error {
 	serverLoginFailure := &messages.ServerLoginFailure{
 		Reason: reason,
 	}
@@ -169,14 +169,14 @@ func (n *NetworkManager) sendServerLoginFailure(clientID uint32, reason string) 
 		Payload:  payload,
 	}
 
-	if err := n.SendReliableMessageToClient(clientID, msg); err != nil {
+	if err := n.SendReliableMessageToClient(ctx, clientID, msg); err != nil {
 		return fmt.Errorf("failed to send server login failure: %v", err)
 	}
 
 	return nil
 }
 
-func (n *NetworkManager) handleClientSyncTime(message *messages.Message) error {
+func (n *NetworkManager) handleClientSyncTime(ctx context.Context, message *messages.Message) error {
 	clientSyncTime := &messages.ClientSyncTime{}
 	if err := json.Unmarshal(message.Payload, clientSyncTime); err != nil {
 		return fmt.Errorf("failed to unmarshal client sync time: %v", err)
@@ -198,7 +198,7 @@ func (n *NetworkManager) handleClientSyncTime(message *messages.Message) error {
 		Payload:  payload,
 	}
 
-	if err := n.SendReliableMessageToClient(message.ClientID, msg); err != nil {
+	if err := n.SendReliableMessageToClient(ctx, message.ClientID, msg); err != nil {
 		return fmt.Errorf("failed to send server sync time: %v", err)
 	}
 
@@ -218,7 +218,7 @@ func (n *NetworkManager) handleGameMessage(ctx context.Context, addr *net.UDPAdd
 
 	switch message.Type {
 	case messages.MessageTypeClientPing:
-		if err := n.handleClientPing(message.ClientID, addr); err != nil {
+		if err := n.handleClientPing(ctx, message.ClientID, addr); err != nil {
 			log.Error("Failed to handle client ping: %v", err)
 		}
 	default:
@@ -228,7 +228,7 @@ func (n *NetworkManager) handleGameMessage(ctx context.Context, addr *net.UDPAdd
 	}
 }
 
-func (n *NetworkManager) handleClientPing(clientID uint32, addr *net.UDPAddr) error {
+func (n *NetworkManager) handleClientPing(ctx context.Context, clientID uint32, addr *net.UDPAddr) error {
 	m := &messages.Message{
 		ClientID: 0,
 		Type:     messages.MessageTypeServerPong,
@@ -237,22 +237,22 @@ func (n *NetworkManager) handleClientPing(clientID uint32, addr *net.UDPAddr) er
 
 	n.ClientManager.SetUDPAddress(clientID, addr)
 
-	if err := n.SendUnreliableMessageToClient(clientID, m); err != nil {
+	if err := n.SendUnreliableMessageToClient(ctx, clientID, m); err != nil {
 		return fmt.Errorf("failed to write pong message to client: %v", err)
 	}
 
 	return nil
 }
 
-func (n *NetworkManager) SendUnreliableMessageToAll(msg *messages.Message) {
+func (n *NetworkManager) SendUnreliableMessageToAll(ctx context.Context, msg *messages.Message) {
 	for _, client := range n.ClientManager.GetClients() {
-		if err := n.sendUnreliableMessageToClient(client, msg); err != nil {
+		if err := n.sendUnreliableMessageToClient(ctx, client, msg); err != nil {
 			log.Error("Failed to send unreliable message to client %d: %v", client.ID, err)
 		}
 	}
 }
 
-func (n *NetworkManager) sendUnreliableMessageToClient(client *Client, msg *messages.Message) error {
+func (n *NetworkManager) sendUnreliableMessageToClient(ctx context.Context, client *Client, msg *messages.Message) error {
 	switch client.ConnectionType {
 	case ClientConnectionTypeTCPUDP:
 		if client.UDPAddress == nil {
@@ -263,7 +263,7 @@ func (n *NetworkManager) sendUnreliableMessageToClient(client *Client, msg *mess
 			return fmt.Errorf("failed to write message to UDP connection for client %d: %v", client.ID, err)
 		}
 	case ClientConnectionTypeWebSocket:
-		if err := WriteMessageToWS(client.WSConn, msg); err != nil {
+		if err := WriteMessageToWS(ctx, client.WSConn, msg); err != nil {
 			return fmt.Errorf("failed to write message to WebSocket connection for client %d: %v", client.ID, err)
 		}
 	default:
@@ -273,35 +273,35 @@ func (n *NetworkManager) sendUnreliableMessageToClient(client *Client, msg *mess
 	return nil
 }
 
-func (n *NetworkManager) SendUnreliableMessageToClient(clientID uint32, msg *messages.Message) error {
+func (n *NetworkManager) SendUnreliableMessageToClient(ctx context.Context, clientID uint32, msg *messages.Message) error {
 	client, err := n.ClientManager.GetClient(clientID)
 	if err != nil {
 		return fmt.Errorf("failed to get client %d: %v", clientID, err)
 	}
 
-	if err := n.sendUnreliableMessageToClient(client, msg); err != nil {
+	if err := n.sendUnreliableMessageToClient(ctx, client, msg); err != nil {
 		return fmt.Errorf("failed to send unreliable message to client %d: %v", clientID, err)
 	}
 
 	return nil
 }
 
-func (n *NetworkManager) SendReliableMessageToAll(msg *messages.Message) {
+func (n *NetworkManager) SendReliableMessageToAll(ctx context.Context, msg *messages.Message) {
 	for _, client := range n.ClientManager.GetClients() {
-		if err := n.sendReliableMessageToClient(client, msg); err != nil {
+		if err := n.sendReliableMessageToClient(ctx, client, msg); err != nil {
 			log.Error("Failed to send reliable message to client %d: %v", client.ID, err)
 		}
 	}
 }
 
-func (n *NetworkManager) sendReliableMessageToClient(client *Client, msg *messages.Message) error {
+func (n *NetworkManager) sendReliableMessageToClient(ctx context.Context, client *Client, msg *messages.Message) error {
 	switch client.ConnectionType {
 	case ClientConnectionTypeTCPUDP:
 		if err := WriteMessageToTCP(client.TCPConn, msg); err != nil {
 			return fmt.Errorf("failed to write message to TCP connection for client %d: %v", client.ID, err)
 		}
 	case ClientConnectionTypeWebSocket:
-		if err := WriteMessageToWS(client.WSConn, msg); err != nil {
+		if err := WriteMessageToWS(ctx, client.WSConn, msg); err != nil {
 			return fmt.Errorf("failed to write message to WebSocket connection for client %d: %v", client.ID, err)
 		}
 	default:
@@ -311,13 +311,13 @@ func (n *NetworkManager) sendReliableMessageToClient(client *Client, msg *messag
 	return nil
 }
 
-func (n *NetworkManager) SendReliableMessageToClient(clientID uint32, msg *messages.Message) error {
+func (n *NetworkManager) SendReliableMessageToClient(ctx context.Context, clientID uint32, msg *messages.Message) error {
 	client, err := n.ClientManager.GetClient(clientID)
 	if err != nil {
 		return fmt.Errorf("failed to get client %d: %v", clientID, err)
 	}
 
-	if err := n.sendReliableMessageToClient(client, msg); err != nil {
+	if err := n.sendReliableMessageToClient(ctx, client, msg); err != nil {
 		return fmt.Errorf("failed to send reliable message to client %d: %v", clientID, err)
 	}
 

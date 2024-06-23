@@ -93,7 +93,7 @@ func NewNetworkManager(serverSettings ServerSettings, messageQueue queue.Queue) 
 	} else if serverSettings.WSPort != 0 {
 		m.serverConnectionType = ServerConnectionTypeWS
 		// TODO: dynamic websocket server URL
-		wsClient := NewWSClient(fmt.Sprintf("ws://127.0.0.1:%d/", serverSettings.WSPort), messageQueue, clientIDChan, loginErrChan, serverTimeChan)
+		wsClient := NewWSClient(fmt.Sprintf("ws://localhost:%d", serverSettings.WSPort), messageQueue, clientIDChan, loginErrChan, serverTimeChan)
 		m.wsClient = wsClient
 		m.wsClientErrChan = make(chan error)
 	} else {
@@ -123,7 +123,7 @@ func (m *NetworkManager) Start(token string, characterID int32) error {
 			}
 		}(ctx)
 	case ServerConnectionTypeWS:
-		if err := m.wsClient.Connect(); err != nil {
+		if err := m.wsClient.Connect(ctx); err != nil {
 			return fmt.Errorf("failed to start WebSocket client: %v", err)
 		}
 
@@ -131,6 +131,7 @@ func (m *NetworkManager) Start(token string, characterID int32) error {
 		go func(ctx context.Context) {
 			defer m.clientWaitGroup.Done()
 			if err := m.wsClient.HandleMessages(ctx); err != nil {
+				log.Debug("Sending error to WS client error channel")
 				m.wsClientErrChan <- err
 			}
 		}(ctx)
@@ -367,6 +368,10 @@ func (m *NetworkManager) TCPClientErrChan() <-chan error {
 
 func (m *NetworkManager) UDPClientErrChan() <-chan error {
 	return m.udpClientErrChan
+}
+
+func (m *NetworkManager) WSClientErrChan() <-chan error {
+	return m.wsClientErrChan
 }
 
 func (m *NetworkManager) ClientID() uint32 {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
-	"github.com/gorilla/websocket"
+	"nhooyr.io/websocket"
 )
 
 // WSServer represents a WebSocket server.
@@ -35,26 +35,25 @@ func NewWSServer(opts NewWSServerOptions) *WSServer {
 	}
 }
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
-
 // Start starts the WebSocket server.
 func (s *WSServer) Start(ctx context.Context, disconnectHandler ControlDisconnectHandler, messageHandler ControlMessageHandler) {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+			OriginPatterns: []string{"*"}, // TODO: restrict origins all around once this is working
+		})
 		if err != nil {
-			log.Error("Failed to upgrade to WebSocket: %v", err)
+			log.Error("Failed to accept WebSocket connection: %v", err)
 			return
 		}
-		log.Debug("New WebSocket connection from %s", conn.RemoteAddr().String())
-		go s.handleWSConnection(ctx, conn, disconnectHandler, messageHandler)
+
+		go s.handleWSConnection(ctx, c, disconnectHandler, messageHandler)
 	})
 
 	addr := fmt.Sprintf(":%d", s.port)
-	server := &http.Server{Addr: addr, Handler: nil}
+	server := &http.Server{
+		Addr:    addr,
+		Handler: handler,
+	}
 
 	go func() {
 		<-ctx.Done()
@@ -86,16 +85,18 @@ func (s *WSServer) handleWSConnection(ctx context.Context, conn *websocket.Conn,
 	defer func() {
 		cancel()
 		disconnectHandler(nil, conn)
-		conn.Close()
+		conn.Close(websocket.StatusNormalClosure, "")
 	}()
 
 	for {
-		message, err := ReadMessageFromWS(conn)
+		message, err := ReadMessageFromWS(ctx, conn)
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Error("Error reading WebSocket message from %s: %v", conn.RemoteAddr().String(), err)
+			if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
+				log.Trace("WebSocket connection closed by client")
+				return
 			}
-			log.Trace("Connection closed for %s", conn.RemoteAddr().String())
+
+			log.Error("Failed to read message from WebSocket connection: %v", err)
 			return
 		}
 
@@ -104,13 +105,13 @@ func (s *WSServer) handleWSConnection(ctx context.Context, conn *websocket.Conn,
 }
 
 // WriteMessageToWS writes a Message to a WebSocket connection
-func WriteMessageToWS(conn *websocket.Conn, msg *messages.Message) error {
+func WriteMessageToWS(ctx context.Context, conn *websocket.Conn, msg *messages.Message) error {
 	b, err := messages.SerializeMessage(msg)
 	if err != nil {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}
 
-	if err := conn.WriteMessage(websocket.BinaryMessage, b); err != nil {
+	if err := conn.Write(ctx, websocket.MessageBinary, b); err != nil {
 		return fmt.Errorf("failed to write message to WebSocket connection: %v", err)
 	}
 
@@ -118,8 +119,8 @@ func WriteMessageToWS(conn *websocket.Conn, msg *messages.Message) error {
 }
 
 // ReadMessageFromWS reads a Message from a WebSocket connection
-func ReadMessageFromWS(conn *websocket.Conn) (*messages.Message, error) {
-	_, message, err := conn.ReadMessage()
+func ReadMessageFromWS(ctx context.Context, conn *websocket.Conn) (*messages.Message, error) {
+	_, message, err := conn.Read(ctx)
 	if err != nil {
 		return nil, err
 	}

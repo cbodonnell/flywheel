@@ -8,7 +8,7 @@ import (
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
 	"github.com/cbodonnell/flywheel/pkg/queue"
-	"github.com/gorilla/websocket"
+	"nhooyr.io/websocket"
 )
 
 // WSClient represents a WebSocket client.
@@ -33,9 +33,9 @@ func NewWSClient(serverAddr string, messageQueue queue.Queue, clientIDChan chan<
 }
 
 // Connect establishes a connection to the WebSocket server.
-func (c *WSClient) Connect() error {
+func (c *WSClient) Connect(ctx context.Context) error {
 	log.Info("Connecting to WebSocket server at %s", c.serverAddr)
-	conn, _, err := websocket.DefaultDialer.Dial(c.serverAddr, nil)
+	conn, _, err := websocket.Dial(ctx, c.serverAddr, nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %v", err)
 	}
@@ -45,28 +45,28 @@ func (c *WSClient) Connect() error {
 
 // HandleMessages handles incoming messages from the WebSocket server.
 func (c *WSClient) HandleMessages(ctx context.Context) error {
-	defer c.conn.Close()
+	defer c.conn.Close(websocket.StatusNormalClosure, "client closed connection")
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
-		}
-
-		_, message, err := c.conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Error("Error reading WebSocket message from %s: %v", c.conn.RemoteAddr().String(), err)
+			_, message, err := c.conn.Read(ctx)
+			if err != nil {
+				if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
+					log.Info("WebSocket server closed")
+					return nil
+				}
+				log.Error("Failed to read message from WebSocket connection: %v", err)
+				return err
 			}
-			log.Trace("Connection closed for %s", c.conn.RemoteAddr().String())
-			return err
-		}
 
-		go func() {
-			if err := c.handleMessage(message); err != nil {
-				log.Error("Failed to handle message: %v", err)
-			}
-		}()
+			go func() {
+				if err := c.handleMessage(message); err != nil {
+					log.Error("Failed to handle message: %v", err)
+				}
+			}()
+		}
 	}
 }
 
@@ -128,7 +128,7 @@ func (c *WSClient) Close() error {
 		log.Warn("WebSocket connection is already closed")
 		return nil
 	}
-	return c.conn.Close()
+	return c.conn.Close(websocket.StatusNormalClosure, "")
 }
 
 // SendMessage sends a message to the WebSocket server.
@@ -138,8 +138,7 @@ func (c *WSClient) SendMessage(msg *messages.Message) error {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}
 
-	// TODO: fix `panic: concurrent write to websocket connection`
-	if err := c.conn.WriteMessage(websocket.BinaryMessage, b); err != nil {
+	if err := c.conn.Write(context.TODO(), websocket.MessageBinary, b); err != nil {
 		return fmt.Errorf("failed to write message to WebSocket connection: %v", err)
 	}
 
