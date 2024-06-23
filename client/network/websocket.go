@@ -138,6 +138,7 @@ func (c *WSClient) SendMessage(msg *messages.Message) error {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}
 
+	// TODO: fix `panic: concurrent write to websocket connection`
 	if err := c.conn.WriteMessage(websocket.BinaryMessage, b); err != nil {
 		return fmt.Errorf("failed to write message to WebSocket connection: %v", err)
 	}

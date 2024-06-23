@@ -59,6 +59,7 @@ services:
     ports:
       - 8888:8888/tcp
       - 8889:8889/udp
+      - 8890:8890/tcp # websocket
     networks:
       - flywheel-network
     depends_on:
