@@ -52,53 +52,79 @@ func NewNetworkManager(options NewNetworkManagerOptions) *NetworkManager {
 }
 
 func (n *NetworkManager) Start(ctx context.Context) {
-	go n.TCPServer.Start(ctx, n.handleControlDisconnect, n.handleControlMessage)
-	go n.UDPServer.Start(ctx, n.handleGameMessage)
-	go n.WSServer.Start(ctx, n.handleControlDisconnect, n.handleControlMessage)
+	loginChan := make(chan *LoginEvent)
+	logoutChan := make(chan *LogoutEvent)
+	pingChan := make(chan *PingEvent)
+	messageChan := make(chan *messages.Message)
+
+	go n.TCPServer.Start(ctx, messageChan, loginChan, logoutChan)
+	go n.UDPServer.Start(ctx, messageChan, pingChan)
+	go n.WSServer.Start(ctx, messageChan, loginChan, logoutChan)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case loginEvent := <-loginChan:
+			n.handleLoginEvent(ctx, loginEvent)
+		case logoutEvent := <-logoutChan:
+			n.handleLogoutEvent(ctx, logoutEvent)
+		case pingEvent := <-pingChan:
+			n.handlePingEvent(ctx, pingEvent)
+		case message := <-messageChan:
+			n.handleMessage(ctx, message)
+		}
+	}
 }
 
-type ControlDisconnectHandler func(tcpConn net.Conn, wsConn *websocket.Conn)
+type LoginEvent struct {
+	TCPConn net.Conn
+	WSConn  *websocket.Conn
+	Message *messages.Message
+}
 
-func (n *NetworkManager) handleControlDisconnect(conn net.Conn, wsConn *websocket.Conn) {
-	clientID := n.ClientManager.GetClientIDByTCPConn(conn)
-	if clientID != 0 {
-		n.ClientManager.DisconnectClient(clientID)
-		log.Info("Client %d disconnected", clientID)
+func (n *NetworkManager) handleLoginEvent(ctx context.Context, loginEvent *LoginEvent) {
+	clientID, err := n.handleClientLogin(ctx, loginEvent.TCPConn, loginEvent.WSConn, loginEvent.Message)
+	if err != nil {
+		log.Error("Failed to handle client login: %v", err)
+		if err := n.sendServerLoginFailure(ctx, clientID, err.Error()); err != nil {
+			log.Error("Failed to send server login failure: %v", err)
+		}
+		return
+	}
+	log.Info("Client %d connected", clientID)
+	if err := n.sendServerLoginSuccess(ctx, clientID); err != nil {
+		log.Error("Failed to send server login success: %v", err)
+	}
+}
+
+type LogoutEvent struct {
+	TCPConn net.Conn
+	WSConn  *websocket.Conn
+}
+
+func (n *NetworkManager) handleLogoutEvent(_ context.Context, logoutEvent *LogoutEvent) {
+	var clientID uint32
+	if logoutEvent.TCPConn != nil {
+		clientID = n.ClientManager.GetClientIDByTCPConn(logoutEvent.TCPConn)
+	} else if logoutEvent.WSConn != nil {
+		clientID = n.ClientManager.GetClientIDByWSConn(logoutEvent.WSConn)
+	} else {
+		log.Warn("Received logout event with no connection")
 		return
 	}
 
-	clientID = n.ClientManager.GetClientIDByWSConn(wsConn)
-	if clientID != 0 {
-		n.ClientManager.DisconnectClient(clientID)
-		log.Info("Client %d disconnected", clientID)
-		return
-	}
-
-	log.Warn("Unknown client disconnected")
+	n.ClientManager.DisconnectClient(clientID)
+	log.Info("Client %d disconnected", clientID)
 }
 
-type ControlMessageHandler func(ctx context.Context, tcpConn net.Conn, wsConn *websocket.Conn, message *messages.Message)
-
-func (n *NetworkManager) handleControlMessage(ctx context.Context, tcpConn net.Conn, wsConn *websocket.Conn, message *messages.Message) {
-	if message.ClientID == 0 && message.Type != messages.MessageTypeClientLogin {
-		log.Warn("Received message from unknown client that is not a login message")
+func (n *NetworkManager) handleMessage(ctx context.Context, message *messages.Message) {
+	if !n.ClientManager.Exists(message.ClientID) {
+		log.Warn("Received message from %d, but client is not connected", message.ClientID)
 		return
 	}
 
 	switch message.Type {
-	case messages.MessageTypeClientLogin:
-		clientID, err := n.handleClientLogin(ctx, tcpConn, wsConn, message)
-		if err != nil {
-			log.Error("Failed to handle client login: %v", err)
-			if err := n.sendServerLoginFailure(ctx, clientID, err.Error()); err != nil {
-				log.Error("Failed to send server login failure: %v", err)
-			}
-			return
-		}
-		log.Info("Client %d connected", clientID)
-		if err := n.sendServerLoginSuccess(ctx, clientID); err != nil {
-			log.Error("Failed to send server login success: %v", err)
-		}
 	case messages.MessageTypeClientSyncTime:
 		if err := n.handleClientSyncTime(ctx, message); err != nil {
 			log.Error("Failed to handle client sync time: %v", err)
@@ -176,6 +202,25 @@ func (n *NetworkManager) sendServerLoginFailure(ctx context.Context, clientID ui
 	return nil
 }
 
+type PingEvent struct {
+	Addr    *net.UDPAddr
+	Message *messages.Message
+}
+
+func (n *NetworkManager) handlePingEvent(ctx context.Context, pingEvent *PingEvent) {
+	m := &messages.Message{
+		ClientID: 0,
+		Type:     messages.MessageTypeServerPong,
+		Payload:  nil,
+	}
+
+	n.ClientManager.SetUDPAddress(pingEvent.Message.ClientID, pingEvent.Addr)
+
+	if err := n.SendUnreliableMessageToClient(ctx, pingEvent.Message.ClientID, m); err != nil {
+		log.Error("Failed to send server pong: %v", err)
+	}
+}
+
 func (n *NetworkManager) handleClientSyncTime(ctx context.Context, message *messages.Message) error {
 	clientSyncTime := &messages.ClientSyncTime{}
 	if err := json.Unmarshal(message.Payload, clientSyncTime); err != nil {
@@ -200,45 +245,6 @@ func (n *NetworkManager) handleClientSyncTime(ctx context.Context, message *mess
 
 	if err := n.SendReliableMessageToClient(ctx, message.ClientID, msg); err != nil {
 		return fmt.Errorf("failed to send server sync time: %v", err)
-	}
-
-	return nil
-}
-
-func (n *NetworkManager) handleGameMessage(ctx context.Context, addr *net.UDPAddr, message *messages.Message) {
-	if message.ClientID == 0 {
-		log.Warn("Received UDP message from unknown client, ignoring")
-		return
-	}
-
-	if !n.ClientManager.Exists(message.ClientID) {
-		log.Warn("Received UDP message from %d, but client is not connected", message.ClientID)
-		return
-	}
-
-	switch message.Type {
-	case messages.MessageTypeClientPing:
-		if err := n.handleClientPing(ctx, message.ClientID, addr); err != nil {
-			log.Error("Failed to handle client ping: %v", err)
-		}
-	default:
-		if err := n.MessageQueue.Enqueue(message); err != nil {
-			log.Error("Failed to enqueue message: %v", err)
-		}
-	}
-}
-
-func (n *NetworkManager) handleClientPing(ctx context.Context, clientID uint32, addr *net.UDPAddr) error {
-	m := &messages.Message{
-		ClientID: 0,
-		Type:     messages.MessageTypeServerPong,
-		Payload:  nil,
-	}
-
-	n.ClientManager.SetUDPAddress(clientID, addr)
-
-	if err := n.SendUnreliableMessageToClient(ctx, clientID, m); err != nil {
-		return fmt.Errorf("failed to write pong message to client: %v", err)
 	}
 
 	return nil

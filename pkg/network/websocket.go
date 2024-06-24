@@ -36,9 +36,9 @@ func NewWSServer(opts NewWSServerOptions) *WSServer {
 }
 
 // Start starts the WebSocket server.
-func (s *WSServer) Start(ctx context.Context, disconnectHandler ControlDisconnectHandler, messageHandler ControlMessageHandler) {
+func (s *WSServer) Start(ctx context.Context, messageChan chan<- *messages.Message, loginChan chan<- *LoginEvent, logoutChan chan<- *LogoutEvent) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 			OriginPatterns: []string{"*"}, // TODO: restrict origins all around once this is working
 		})
 		if err != nil {
@@ -46,7 +46,7 @@ func (s *WSServer) Start(ctx context.Context, disconnectHandler ControlDisconnec
 			return
 		}
 
-		go s.handleWSConnection(ctx, c, disconnectHandler, messageHandler)
+		go s.handleWSConnection(ctx, conn, messageChan, loginChan, logoutChan)
 	})
 
 	addr := fmt.Sprintf(":%d", s.port)
@@ -80,11 +80,13 @@ func (s *WSServer) Start(ctx context.Context, disconnectHandler ControlDisconnec
 }
 
 // handleWSConnection handles a WebSocket connection.
-func (s *WSServer) handleWSConnection(ctx context.Context, conn *websocket.Conn, disconnectHandler ControlDisconnectHandler, messageHandler ControlMessageHandler) {
+func (s *WSServer) handleWSConnection(ctx context.Context, conn *websocket.Conn, messageChan chan<- *messages.Message, loginChan chan<- *LoginEvent, logoutChan chan<- *LogoutEvent) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
-		disconnectHandler(nil, conn)
+		logoutChan <- &LogoutEvent{
+			WSConn: conn,
+		}
 		conn.Close(websocket.StatusNormalClosure, "")
 	}()
 
@@ -100,7 +102,20 @@ func (s *WSServer) handleWSConnection(ctx context.Context, conn *websocket.Conn,
 			return
 		}
 
-		messageHandler(ctx, nil, conn, message)
+		if message.ClientID != 0 {
+			messageChan <- message
+			continue
+		}
+
+		if message.Type == messages.MessageTypeClientLogin {
+			loginChan <- &LoginEvent{
+				WSConn:  conn,
+				Message: message,
+			}
+			continue
+		}
+
+		log.Warn("Received a %s message from an unknown client", message.Type)
 	}
 }
 

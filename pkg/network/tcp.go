@@ -26,7 +26,7 @@ func NewTCPServer(opts NewTCPServerOptions) *TCPServer {
 }
 
 // Start starts the TCP server.
-func (s *TCPServer) Start(ctx context.Context, disconnectHandler ControlDisconnectHandler, messageHandler ControlMessageHandler) {
+func (s *TCPServer) Start(ctx context.Context, messageChan chan<- *messages.Message, loginChan chan<- *LoginEvent, logoutChan chan<- *LogoutEvent) {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", s.port))
 	if err != nil {
 		log.Error("Failed to resolve TCP address: %v", err)
@@ -53,32 +53,52 @@ func (s *TCPServer) Start(ctx context.Context, disconnectHandler ControlDisconne
 				continue
 			}
 
-			go s.handleTCPConnection(ctx, conn, disconnectHandler, messageHandler)
+			go s.handleTCPConnection(ctx, conn, messageChan, loginChan, logoutChan)
 		}
 	}
 }
 
 // handleTCPConnection handles a TCP connection.
-func (s *TCPServer) handleTCPConnection(ctx context.Context, conn net.Conn, disconnectHandler ControlDisconnectHandler, messageHandler ControlMessageHandler) {
+func (s *TCPServer) handleTCPConnection(ctx context.Context, conn net.Conn, messageChan chan<- *messages.Message, loginChan chan<- *LoginEvent, logoutChan chan<- *LogoutEvent) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
-		disconnectHandler(conn, nil)
+		logoutChan <- &LogoutEvent{
+			TCPConn: conn,
+		}
 		conn.Close()
 	}()
 
 	for {
-		message, err := ReadMessageFromTCP(conn)
-		if err != nil {
-			if _, ok := err.(*ErrConnectionClosed); ok {
-				log.Trace("Connection closed for %s", conn.RemoteAddr().String())
-				return
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			message, err := ReadMessageFromTCP(conn)
+			if err != nil {
+				if _, ok := err.(*ErrConnectionClosed); ok {
+					log.Trace("Connection closed for %s", conn.RemoteAddr().String())
+					return
+				}
+				log.Error("Error reading TCP message from %s: %v", conn.RemoteAddr().String(), err)
+				continue
 			}
-			log.Error("Error reading TCP message from %s: %v", conn.RemoteAddr().String(), err)
-			continue
-		}
 
-		messageHandler(ctx, conn, nil, message)
+			if message.ClientID != 0 {
+				messageChan <- message
+				continue
+			}
+
+			if message.Type == messages.MessageTypeClientLogin {
+				loginChan <- &LoginEvent{
+					TCPConn: conn,
+					Message: message,
+				}
+				continue
+			}
+
+			log.Warn("Received a %s message from an unknown client", message.Type)
+		}
 	}
 }
 

@@ -27,10 +27,8 @@ func NewUDPServer(opts NewUDPServerOptions) *UDPServer {
 	}
 }
 
-type GameMessageHandler func(ctx context.Context, addr *net.UDPAddr, message *messages.Message)
-
 // Start starts the UDP server.
-func (s *UDPServer) Start(ctx context.Context, messageHandler GameMessageHandler) {
+func (s *UDPServer) Start(ctx context.Context, messageChan chan<- *messages.Message, pingChan chan<- *PingEvent) {
 	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", s.port))
 	if err != nil {
 		log.Error("Failed to resolve UDP address: %v", err)
@@ -57,7 +55,20 @@ func (s *UDPServer) Start(ctx context.Context, messageHandler GameMessageHandler
 				continue
 			}
 
-			messageHandler(ctx, addr, message)
+			if message.ClientID == 0 {
+				log.Warn("Received UDP message from an unknown client")
+				continue
+			}
+
+			if message.Type == messages.MessageTypeClientPing {
+				pingChan <- &PingEvent{
+					Addr:    addr,
+					Message: message,
+				}
+				continue
+			}
+
+			messageChan <- message
 		}
 	}
 }
