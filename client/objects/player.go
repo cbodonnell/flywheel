@@ -279,9 +279,9 @@ func (o *Player) ReconcileState(state *gametypes.PlayerState) error {
 			foundPreviousState = true
 			if ps.NeedsReconciliation(state) {
 				// TODO: investigate reconciliation upon death and respawn
-				log.Warn("Reconciling player state at timestamp %d for %s", state.LastProcessedTimestamp, o.ID)
-				log.Warn("Client state: %v", ps.State)
-				log.Warn("Server state: %v", state)
+				log.Debug("Reconciling player state at timestamp %d for %s", state.LastProcessedTimestamp, o.ID)
+				log.Debug("Client state: %v", ps.State)
+				log.Debug("Server state: %v", state)
 				// apply the server state
 				o.State.Position.X = state.Position.X
 				o.State.Position.Y = state.Position.Y
