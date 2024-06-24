@@ -7,10 +7,11 @@ import (
 	"net/http"
 
 	"github.com/cbodonnell/flywheel/pkg/api/handlers"
-	"github.com/cbodonnell/flywheel/pkg/api/middleware"
 	authproviders "github.com/cbodonnell/flywheel/pkg/auth/providers"
 	"github.com/cbodonnell/flywheel/pkg/log"
+	"github.com/cbodonnell/flywheel/pkg/middleware"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
+	"github.com/gorilla/mux"
 )
 
 type APIServer struct {
@@ -25,6 +26,7 @@ type TLSConfig struct {
 
 type NewAPIServerOptions struct {
 	Port         int
+	AllowOrigin  string
 	TLS          *TLSConfig
 	AuthProvider authproviders.AuthProvider
 	Repository   repositories.Repository
@@ -32,36 +34,20 @@ type NewAPIServerOptions struct {
 
 // NewAPIServer creates a new http.Server for handling API requests
 func NewAPIServer(opts NewAPIServerOptions) *APIServer {
-	authMiddleware := middleware.NewAuthMiddleware(opts.AuthProvider, opts.Repository)
+	r := mux.NewRouter()
 
-	mux := http.NewServeMux()
-	mux.Handle("/characters", authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization")
-		switch r.Method {
-		case http.MethodOptions:
-			w.WriteHeader(http.StatusNoContent)
-		case http.MethodGet:
-			handlers.HandleListCharacters(opts.Repository)(w, r)
-		case http.MethodPost:
-			handlers.HandleCreateCharacter(opts.Repository)(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})))
-	mux.Handle("/characters/{characterID}", authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		switch r.Method {
-		case http.MethodDelete:
-			handlers.HandleDeleteCharacter(opts.Repository)(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})))
+	r.HandleFunc("/characters", handlers.HandleListCharacters(opts.Repository)).Methods(http.MethodGet, http.MethodOptions)
+	r.HandleFunc("/characters", handlers.HandleCreateCharacter(opts.Repository)).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/characters/{characterID}", handlers.HandleDeleteCharacter(opts.Repository)).Methods(http.MethodDelete, http.MethodOptions)
+
+	corsMiddleware := middleware.NewCORSMiddleware(opts.AllowOrigin)
+	optionsMiddleware := middleware.NewOptionsMiddleware()
+	authMiddleware := middleware.NewAuthMiddleware(opts.AuthProvider, opts.Repository)
+	r.Use(corsMiddleware, optionsMiddleware, authMiddleware)
+
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", opts.Port),
-		Handler: mux,
+		Handler: r,
 	}
 	return &APIServer{
 		server: server,

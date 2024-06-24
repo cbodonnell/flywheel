@@ -14,6 +14,7 @@ import (
 
 func main() {
 	port := flag.Int("port", 8080, "port to listen on")
+	allowOrigin := flag.String("allow-origin", "localhost", "comma-separated list of allowed origins")
 	logLevel := flag.String("log-level", "info", "Log level")
 	flag.Parse()
 
@@ -34,8 +35,9 @@ func main() {
 		panic("FLYWHEEL_FIREBASE_API_KEY environment variable must be set")
 	}
 	authServerOpts := auth.NewAuthServerOptions{
-		Port:    *port,
-		Handler: authhandlers.NewFirebaseAuthHandler(firebaseApiKey),
+		Port:        *port,
+		AllowOrigin: *allowOrigin,
+		Handler:     authhandlers.NewFirebaseAuthHandler(firebaseApiKey),
 	}
 	tlsCertFile := os.Getenv("FLYWHEEL_AUTH_TLS_CERT_FILE")
 	tlsKeyFile := os.Getenv("FLYWHEEL_AUTH_TLS_KEY_FILE")

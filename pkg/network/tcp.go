@@ -78,7 +78,7 @@ func (s *TCPServer) handleTCPConnection(ctx context.Context, conn net.Conn, disc
 			continue
 		}
 
-		go messageHandler(ctx, conn, nil, message)
+		messageHandler(ctx, conn, nil, message)
 	}
 }
 

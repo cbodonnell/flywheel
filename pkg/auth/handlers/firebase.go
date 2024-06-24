@@ -254,7 +254,6 @@ func (s *FirebaseAuthHandler) HandleLogin() func(w http.ResponseWriter, r *http.
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Access-Control-Allow-Origin", "*") // TODO: CORS :/
 		if err := json.NewEncoder(w).Encode(responsePayload); err != nil {
 			log.Error("error encoding response: %v", err)
 			http.Error(w, "error encoding response", http.StatusInternalServerError)

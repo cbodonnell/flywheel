@@ -76,7 +76,8 @@ run:
 	go run \
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
 	./cmd/server/main.go \
-	-log-level=debug
+	-log-level=debug \
+	-allow-origin=${FLYWHEEL_ALLOW_ORIGIN}
 
 .PHONY: run-client
 run-client:

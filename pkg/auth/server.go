@@ -8,6 +8,8 @@ import (
 
 	"github.com/cbodonnell/flywheel/pkg/auth/handlers"
 	"github.com/cbodonnell/flywheel/pkg/log"
+	"github.com/cbodonnell/flywheel/pkg/middleware"
+	"github.com/gorilla/mux"
 )
 
 type AuthServer struct {
@@ -21,21 +23,28 @@ type TLSConfig struct {
 }
 
 type NewAuthServerOptions struct {
-	Port    int
-	Handler handlers.AuthHandler
-	TLS     *TLSConfig
+	Port        int
+	AllowOrigin string
+	Handler     handlers.AuthHandler
+	TLS         *TLSConfig
 }
 
 // NewAuthServer creates a new http.Server for handling authentication requests
 func NewAuthServer(opts NewAuthServerOptions) *AuthServer {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/register", opts.Handler.HandleRegister())
-	mux.HandleFunc("/login", opts.Handler.HandleLogin())
-	mux.HandleFunc("/refresh", opts.Handler.HandleRefresh())
-	mux.HandleFunc("/delete", opts.Handler.HandleDelete())
+	r := mux.NewRouter()
+
+	r.HandleFunc("/register", opts.Handler.HandleRegister()).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/login", opts.Handler.HandleLogin()).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/refresh", opts.Handler.HandleRefresh()).Methods(http.MethodPost, http.MethodOptions)
+	r.HandleFunc("/delete", opts.Handler.HandleDelete()).Methods(http.MethodPost, http.MethodOptions)
+
+	corsMiddleware := middleware.NewCORSMiddleware(opts.AllowOrigin)
+	optionsMiddleware := middleware.NewOptionsMiddleware()
+	r.Use(corsMiddleware, optionsMiddleware)
+
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", opts.Port),
-		Handler: mux,
+		Handler: r,
 	}
 	return &AuthServer{
 		server: server,

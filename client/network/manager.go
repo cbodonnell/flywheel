@@ -92,8 +92,7 @@ func NewNetworkManager(serverSettings ServerSettings, messageQueue queue.Queue) 
 		m.udpClientErrChan = make(chan error)
 	} else if serverSettings.WSPort != 0 {
 		m.serverConnectionType = ServerConnectionTypeWS
-		// TODO: dynamic websocket server URL
-		wsClient := NewWSClient(fmt.Sprintf("ws://localhost:%d", serverSettings.WSPort), messageQueue, clientIDChan, loginErrChan, serverTimeChan)
+		wsClient := NewWSClient(fmt.Sprintf("ws://%s:%d", serverSettings.Hostname, serverSettings.WSPort), messageQueue, clientIDChan, loginErrChan, serverTimeChan)
 		m.wsClient = wsClient
 		m.wsClientErrChan = make(chan error)
 	} else {
@@ -131,7 +130,6 @@ func (m *NetworkManager) Start(token string, characterID int32) error {
 		go func(ctx context.Context) {
 			defer m.clientWaitGroup.Done()
 			if err := m.wsClient.HandleMessages(ctx); err != nil {
-				log.Debug("Sending error to WS client error channel")
 				m.wsClientErrChan <- err
 			}
 		}(ctx)
@@ -161,7 +159,6 @@ func (m *NetworkManager) Start(token string, characterID int32) error {
 		go func(ctx context.Context) {
 			defer m.clientWaitGroup.Done()
 			if err := m.udpClient.HandleMessages(ctx); err != nil {
-				// TODO: find a way to do this without channels (maybe a flag w/ mutex?)
 				m.udpClientErrChan <- err
 			}
 		}(ctx)

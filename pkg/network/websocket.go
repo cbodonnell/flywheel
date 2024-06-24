@@ -100,7 +100,7 @@ func (s *WSServer) handleWSConnection(ctx context.Context, conn *websocket.Conn,
 			return
 		}
 
-		go messageHandler(ctx, nil, conn, message)
+		messageHandler(ctx, nil, conn, message)
 	}
 }
 

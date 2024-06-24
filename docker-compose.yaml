@@ -23,7 +23,7 @@ services:
     build:
       context: .
       dockerfile: ./deploy/Dockerfile.auth
-    command: ["./flywheel-auth", "-log-level", "debug"]
+    command: ["./flywheel-auth", "-log-level", "debug", "-allow-origin", "${FLYWHEEL_ALLOW_ORIGIN:-http://localhost:3000}"]
     environment:
       FLYWHEEL_FIREBASE_API_KEY: ${FLYWHEEL_FIREBASE_API_KEY}
     ports:
@@ -36,7 +36,7 @@ services:
     build:
       context: .
       dockerfile: ./deploy/Dockerfile.api
-    command: ["./flywheel-api", "-log-level", "debug"]
+    command: ["./flywheel-api", "-log-level", "debug", "-allow-origin", "${FLYWHEEL_ALLOW_ORIGIN:-http://localhost:3000}"]
     environment:
       FLYWHEEL_DATABASE_URL: ${FLYWHEEL_DATABASE_URL:-postgresql://flywheel_user:password@flywheel-db:5432/flywheel_db}
       FLYWHEEL_FIREBASE_PROJECT_ID: ${FLYWHEEL_FIREBASE_PROJECT_ID}

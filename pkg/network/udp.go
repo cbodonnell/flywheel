@@ -57,7 +57,7 @@ func (s *UDPServer) Start(ctx context.Context, messageHandler GameMessageHandler
 				continue
 			}
 
-			go messageHandler(ctx, addr, message)
+			messageHandler(ctx, addr, message)
 		}
 	}
 }

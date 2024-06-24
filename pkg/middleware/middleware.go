@@ -21,11 +21,6 @@ const (
 func NewAuthMiddleware(authProvider authproviders.AuthProvider, repository repositories.Repository) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodOptions {
-				next.ServeHTTP(w, r)
-				return
-			}
-
 			bearerToken, err := parseBearerToken(r)
 			if err != nil {
 				log.Error("failed to parse bearer token: %v", err)
@@ -71,10 +66,24 @@ func parseBearerToken(r *http.Request) (string, error) {
 	return parts[1], nil
 }
 
-func NewCORSMiddleware() func(next http.Handler) http.Handler {
+func NewCORSMiddleware(allowOrigin string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func NewOptionsMiddleware() func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
 			next.ServeHTTP(w, r)
 		})
 	}
