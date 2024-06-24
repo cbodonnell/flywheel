@@ -1,2 +1,20 @@
 <!DOCTYPE html>
-<iframe src="main.html" width="640" height="480"></iframe>
+<html>
+    <head>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+            }
+            iframe {
+                width: 100vw;
+                height: 100vh;
+                border: none;
+            }
+        </style>
+    </head>
+    <body style="display: flex; justify-content: center; align-items: center;">
+        <iframe id="iframe" src="main.html" width="640" height="480" frameBorder="0"></iframe>
+    </body>
+</html>
