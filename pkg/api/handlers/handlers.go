@@ -27,7 +27,6 @@ func HandleListCharacters(repository repositories.Repository) http.HandlerFunc {
 			return
 		}
 
-		log.Debug("listing characters with CORS!!")
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		if err := json.NewEncoder(w).Encode(characters); err != nil {

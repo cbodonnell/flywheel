@@ -138,6 +138,7 @@ func (c *WSClient) SendMessage(msg *messages.Message) error {
 		return fmt.Errorf("failed to serialize message: %v", err)
 	}
 
+	// TODO: can we use a context here?
 	if err := c.conn.Write(context.TODO(), websocket.MessageBinary, b); err != nil {
 		return fmt.Errorf("failed to write message to WebSocket connection: %v", err)
 	}
