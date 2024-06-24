@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
@@ -55,6 +56,9 @@ func (c *WSClient) HandleMessages(ctx context.Context) error {
 			if err != nil {
 				if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
 					log.Info("WebSocket server closed")
+					return nil
+				} else if strings.Contains(err.Error(), "context canceled") {
+					log.Info("WebSocket connection closed by client")
 					return nil
 				}
 				log.Error("Failed to read message from WebSocket connection: %v", err)
