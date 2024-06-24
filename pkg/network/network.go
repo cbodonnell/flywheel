@@ -86,7 +86,6 @@ type LoginEvent struct {
 func (n *NetworkManager) handleLoginEvent(ctx context.Context, loginEvent *LoginEvent) {
 	clientID, err := n.handleClientLogin(ctx, loginEvent.TCPConn, loginEvent.WSConn, loginEvent.Message)
 	if err != nil {
-		log.Error("Failed to handle client login: %v", err)
 		if err := n.sendServerLoginFailure(ctx, clientID, err.Error()); err != nil {
 			log.Error("Failed to send server login failure: %v", err)
 		}
