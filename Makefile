@@ -124,6 +124,10 @@ run-client-remote-automation:
 	-automation-email=${FLYWHEEL_AUTOMATION_EMAIL} \
 	-automation-password=${FLYWHEEL_AUTOMATION_PASSWORD}
 
+.PHONY: run-client-web
+run-client-web:
+	python3 -m http.server -d ./dist/
+
 .PHONY: container
 container:
 	docker build \
