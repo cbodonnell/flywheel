@@ -80,7 +80,6 @@ func (c *WSClient) handleMessage(b []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to deserialize message: %v", err)
 	}
-	log.Trace("Received message from WebSocket server of type %s", msg.Type)
 
 	switch msg.Type {
 	case messages.MessageTypeServerLoginSuccess:

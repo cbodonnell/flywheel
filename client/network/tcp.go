@@ -33,6 +33,7 @@ func NewTCPClient(serverAddr string, messageQueue queue.Queue, clientIDChan chan
 }
 
 func (c *TCPClient) Connect() error {
+	log.Info("Connecting to TCP server at %s", c.serverAddr)
 	conn, err := net.Dial("tcp", c.serverAddr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %v", err)
@@ -74,7 +75,6 @@ func (c *TCPClient) handleMessage(b []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to deserialize message: %v", err)
 	}
-	log.Trace("Received message from TCP server of type %s", msg.Type)
 
 	switch msg.Type {
 	case messages.MessageTypeServerLoginSuccess:

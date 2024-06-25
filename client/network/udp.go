@@ -32,6 +32,7 @@ func NewUDPClient(serverAddr string, messageQueue queue.Queue) (*UDPClient, erro
 
 // Connect starts the UDP client.
 func (c *UDPClient) Connect() error {
+	log.Info("Connecting to UDP server at %s", c.serverAddr.String())
 	conn, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		return fmt.Errorf("failed to listen on UDP address: %v", err)
@@ -73,7 +74,6 @@ func (c *UDPClient) handleMessage(b []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to deserialize message: %v", err)
 	}
-	log.Trace("Received message from UDP server of type %s", msg.Type)
 
 	switch msg.Type {
 	case messages.MessageTypeServerPong:
