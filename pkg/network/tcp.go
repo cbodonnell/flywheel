@@ -77,7 +77,6 @@ func (s *TCPServer) handleTCPConnection(ctx context.Context, conn net.Conn, mess
 			message, err := ReadMessageFromTCP(conn)
 			if err != nil {
 				if _, ok := err.(*ErrConnectionClosed); ok {
-					log.Trace("Connection closed for %s", conn.RemoteAddr().String())
 					return
 				}
 				log.Error("Error reading TCP message from %s: %v", conn.RemoteAddr().String(), err)
