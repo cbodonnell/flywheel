@@ -30,7 +30,8 @@ type NewNetworkManagerOptions struct {
 	TCPPort       int
 	UDPPort       int
 	WSPort        int
-	WSServerTLS   *TLSConfig
+	WSTLS         *TLSConfig
+	WSAllowOrigin string
 }
 
 func NewNetworkManager(options NewNetworkManagerOptions) *NetworkManager {
@@ -45,8 +46,9 @@ func NewNetworkManager(options NewNetworkManagerOptions) *NetworkManager {
 			Port: options.UDPPort,
 		}),
 		WSServer: NewWSServer(NewWSServerOptions{
-			Port: options.WSPort,
-			TLS:  options.WSServerTLS,
+			Port:        options.WSPort,
+			TLS:         options.WSTLS,
+			AllowOrigin: options.WSAllowOrigin,
 		}),
 	}
 }

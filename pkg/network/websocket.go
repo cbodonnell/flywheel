@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
@@ -13,8 +15,9 @@ import (
 
 // WSServer represents a WebSocket server.
 type WSServer struct {
-	port int
-	tls  *TLSConfig
+	port       int
+	tls        *TLSConfig
+	acceptOpts *websocket.AcceptOptions
 }
 
 type TLSConfig struct {
@@ -23,24 +26,39 @@ type TLSConfig struct {
 }
 
 type NewWSServerOptions struct {
-	Port int
-	TLS  *TLSConfig
+	Port        int
+	TLS         *TLSConfig
+	AllowOrigin string
 }
 
 // NewWSServer creates a new WebSocket server.
 func NewWSServer(opts NewWSServerOptions) *WSServer {
+	acceptOpts := &websocket.AcceptOptions{
+		CompressionMode: websocket.CompressionContextTakeover,
+	}
+	if opts.AllowOrigin != "" {
+		origins := strings.Split(opts.AllowOrigin, ",")
+		for _, origin := range origins {
+			u, err := url.Parse(origin)
+			if err != nil {
+				log.Warn("Failed to parse origin URL: %v", err)
+				continue
+			}
+			acceptOpts.OriginPatterns = append(acceptOpts.OriginPatterns, u.Host)
+		}
+	}
+
 	return &WSServer{
-		port: opts.Port,
-		tls:  opts.TLS,
+		port:       opts.Port,
+		tls:        opts.TLS,
+		acceptOpts: acceptOpts,
 	}
 }
 
 // Start starts the WebSocket server.
 func (s *WSServer) Start(ctx context.Context, messageChan chan<- *messages.Message, loginChan chan<- *LoginEvent, logoutChan chan<- *LogoutEvent) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-			OriginPatterns: []string{"*"}, // TODO: restrict origins all around once this is working
-		})
+		conn, err := websocket.Accept(w, r, s.acceptOpts)
 		if err != nil {
 			log.Error("Failed to accept WebSocket connection: %v", err)
 			return

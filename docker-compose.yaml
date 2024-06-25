@@ -52,7 +52,7 @@ services:
     build:
       context: .
       dockerfile: ./deploy/Dockerfile.game
-    command: ["./flywheel-game", "-log-level", "debug"]
+    command: ["./flywheel-game", "-log-level", "debug", "-ws-allow-origin", "${FLYWHEEL_ALLOW_ORIGIN:-http://localhost:3000}"]
     environment:
       FLYWHEEL_DATABASE_URL: ${FLYWHEEL_DATABASE_URL:-postgresql://flywheel_user:password@flywheel-db:5432/flywheel_db}
       FLYWHEEL_FIREBASE_PROJECT_ID: ${FLYWHEEL_FIREBASE_PROJECT_ID}

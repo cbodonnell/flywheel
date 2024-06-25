@@ -25,10 +25,11 @@ func main() {
 	tcpPort := flag.Int("tcp-port", 8888, "TCP port to listen on")
 	udpPort := flag.Int("udp-port", 8889, "UDP port to listen on")
 	wsPort := flag.Int("ws-port", 8890, "WebSocket port to listen on")
+	wsAllowOrigin := flag.String("ws-allow-origin", "http://localhost:3000", "comma-separated list of allowed origins for the websocket server")
 	authPort := flag.Int("auth-port", 8080, "Auth server port")
-	authAllowOrigin := flag.String("auth-allow-origin", "localhost", "comma-separated list of allowed origins for the auth server")
+	authAllowOrigin := flag.String("auth-allow-origin", "http://localhost:3000", "comma-separated list of allowed origins for the auth server")
 	apiPort := flag.Int("api-port", 9090, "API server port")
-	apiAllowOrigin := flag.String("api-allow-origin", "localhost", "comma-separated list of allowed origins for the api server")
+	apiAllowOrigin := flag.String("api-allow-origin", "http://localhost:3000", "comma-separated list of allowed origins for the api server")
 	logLevel := flag.String("log-level", "info", "Log level")
 	flag.Parse()
 
@@ -84,11 +85,12 @@ func main() {
 		TCPPort:       *tcpPort,
 		UDPPort:       *udpPort,
 		WSPort:        *wsPort,
+		WSAllowOrigin: *wsAllowOrigin,
 	}
 	wsTLSCertFile := os.Getenv("FLYWHEEL_WS_TLS_CERT_FILE")
 	wsTLSKeyFile := os.Getenv("FLYWHEEL_WS_TLS_KEY_FILE")
 	if wsTLSCertFile != "" && wsTLSKeyFile != "" {
-		networkManagerOpts.WSServerTLS = &network.TLSConfig{
+		networkManagerOpts.WSTLS = &network.TLSConfig{
 			CertFile: wsTLSCertFile,
 			KeyFile:  wsTLSKeyFile,
 		}
