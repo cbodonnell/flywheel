@@ -67,7 +67,7 @@ build-client-wasm:
 	GOOS=js \
 	go build \
 	-ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=${VERSION}'" \
-	-o ./dist/flywheel-client.wasm ./cmd/client/main.go
+	-o ./web/dist/flywheel-client.wasm ./cmd/client/main.go
 
 .PHONY: run
 run:
@@ -127,7 +127,7 @@ run-client-remote-automation:
 
 .PHONY: run-client-web
 run-client-web:
-	python3 -m http.server -d ./dist/
+	python3 -m http.server -d ./web/dist/
 
 .PHONY: container
 container:

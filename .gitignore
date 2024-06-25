@@ -1,6 +1,6 @@
 # compiled output
 bin/
-dist/
+web/dist/
 
 # database files
 .db/
