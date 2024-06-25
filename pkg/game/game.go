@@ -241,7 +241,6 @@ func (gm *GameManager) handleClientPlayerUpdate(message *messages.Message) error
 	playerState := gm.gameState.Players[message.ClientID]
 
 	if playerState.LastProcessedTimestamp > clientPlayerUpdate.Timestamp {
-		// TODO: investigate why this happens with the websocket client
 		log.Warn("Client %d sent an outdated player update", message.ClientID)
 		return nil
 	}
