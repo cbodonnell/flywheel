@@ -94,7 +94,6 @@ func (s *WSServer) handleWSConnection(ctx context.Context, conn *websocket.Conn,
 		message, err := ReadMessageFromWS(ctx, conn)
 		if err != nil {
 			if websocket.CloseStatus(err) == websocket.StatusNormalClosure {
-				log.Trace("WebSocket connection closed by client")
 				return
 			}
 
