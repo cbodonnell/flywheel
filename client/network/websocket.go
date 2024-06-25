@@ -114,6 +114,7 @@ func (c *WSClient) handleMessage(b []byte) error {
 		messages.MessageTypeServerPlayerUpdate,
 		messages.MessageTypeServerNPCUpdate:
 		if err := c.messageQueue.Enqueue(msg); err != nil {
+			// TODO: this can fill queue if client stops consuming messages (suspend, etc.)
 			return fmt.Errorf("failed to enqueue message: %v", err)
 		}
 	case messages.MessageTypeServerPong:
