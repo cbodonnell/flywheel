@@ -2,7 +2,14 @@
 # `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 $Env:GOOS = 'js'
 $Env:GOARCH = 'wasm'
-go build -ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=wasm-test'" -o ./web/dist/flywheel-client.wasm ./cmd/client/main.go
+$version = git rev-parse --short HEAD
+if (git status --porcelain) {
+    $version = $version + "-dirty"
+}
+
+echo "Building version $version"
+
+go build -ldflags="-X 'github.com/cbodonnell/flywheel/pkg/version.version=$version'" -o ./web/dist/flywheel-client.wasm ./cmd/client/main.go
 Remove-Item Env:GOOS
 Remove-Item Env:GOARCH
 
