@@ -2,38 +2,32 @@ package network
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
-	"time"
 
-	authproviders "github.com/cbodonnell/flywheel/pkg/auth/providers"
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
-	"github.com/cbodonnell/flywheel/pkg/queue"
 )
 
 // TCPServer represents a TCP server.
 type TCPServer struct {
-	AuthProvider  authproviders.AuthProvider
-	ClientManager *ClientManager
-	MessageQueue  queue.Queue
-	Port          int
+	port int
+}
+
+type NewTCPServerOptions struct {
+	Port int
 }
 
 // NewTCPServer creates a new TCP server.
-func NewTCPServer(authProvider authproviders.AuthProvider, clientManager *ClientManager, messageQueue queue.Queue, port int) *TCPServer {
+func NewTCPServer(opts NewTCPServerOptions) *TCPServer {
 	return &TCPServer{
-		AuthProvider:  authProvider,
-		ClientManager: clientManager,
-		MessageQueue:  messageQueue,
-		Port:          port,
+		port: opts.Port,
 	}
 }
 
 // Start starts the TCP server.
-func (s *TCPServer) Start() {
-	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", s.Port))
+func (s *TCPServer) Start(ctx context.Context, messageChan chan<- *messages.Message, loginChan chan<- *LoginEvent, logoutChan chan<- *LogoutEvent) {
+	tcpAddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", s.port))
 	if err != nil {
 		log.Error("Failed to resolve TCP address: %v", err)
 		return
@@ -49,165 +43,62 @@ func (s *TCPServer) Start() {
 	defer tcpListener.Close()
 
 	for {
-		conn, err := tcpListener.Accept()
-		if err != nil {
-			log.Error("Failed to accept TCP connection: %v", err)
-			continue
-		}
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			conn, err := tcpListener.Accept()
+			if err != nil {
+				log.Error("Failed to accept TCP connection: %v", err)
+				continue
+			}
 
-		go s.handleTCPConnection(conn)
+			go s.handleTCPConnection(ctx, conn, messageChan, loginChan, logoutChan)
+		}
 	}
 }
 
 // handleTCPConnection handles a TCP connection.
-func (s *TCPServer) handleTCPConnection(conn net.Conn) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	var connectedClientID uint32 // set after login
-
+func (s *TCPServer) handleTCPConnection(ctx context.Context, conn net.Conn, messageChan chan<- *messages.Message, loginChan chan<- *LoginEvent, logoutChan chan<- *LogoutEvent) {
+	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
-		if connectedClientID != 0 {
-			s.ClientManager.DisconnectClient(connectedClientID)
+		logoutChan <- &LogoutEvent{
+			TCPConn: conn,
 		}
 		conn.Close()
-		log.Info("Client %d disconnected", connectedClientID)
 	}()
 
 	for {
-		message, err := ReadMessageFromTCP(conn)
-		if err != nil {
-			if _, ok := err.(*ErrConnectionClosed); ok {
-				log.Trace("Connection closed for client %d: %v", connectedClientID, err)
-				return
-			}
-			log.Error("Error reading TCP message from client %d: %v", connectedClientID, err)
-			continue
-		}
-
-		if message.ClientID == 0 && message.Type != messages.MessageTypeClientLogin {
-			log.Warn("Received message from unknown client that is not a login message")
-			continue
-		}
-
-		switch message.Type {
-		case messages.MessageTypeClientLogin:
-			clientID, err := s.handleClientLogin(ctx, conn, message)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			message, err := ReadMessageFromTCP(conn)
 			if err != nil {
-				log.Error("Failed to handle client login: %v", err)
-				if err := sendServerLoginFailure(conn, err.Error()); err != nil {
-					log.Error("Failed to send server login failure: %v", err)
+				if _, ok := err.(*ErrConnectionClosed); ok {
+					return
+				}
+				log.Error("Error reading TCP message from %s: %v", conn.RemoteAddr().String(), err)
+				continue
+			}
+
+			if message.ClientID != 0 {
+				messageChan <- message
+				continue
+			}
+
+			if message.Type == messages.MessageTypeClientLogin {
+				loginChan <- &LoginEvent{
+					TCPConn: conn,
+					Message: message,
 				}
 				continue
 			}
-			connectedClientID = clientID
-			log.Info("Client %d connected", connectedClientID)
-			if err := sendServerLoginSuccess(conn, clientID); err != nil {
-				log.Error("Failed to send server login success: %v", err)
-				continue
-			}
-		case messages.MessageTypeClientSyncTime:
-			if err := s.handleClientSyncTime(conn, message); err != nil {
-				log.Error("Failed to handle client sync time: %v", err)
-			}
-		default:
-			if err := s.MessageQueue.Enqueue(message); err != nil {
-				log.Error("Failed to enqueue message: %v", err)
-			}
+
+			log.Warn("Received a %s message from an unknown client", message.Type)
 		}
 	}
-}
-
-func sendServerLoginSuccess(conn net.Conn, clientID uint32) error {
-	serverLoginSuccess := &messages.ServerLoginSuccess{
-		ClientID: clientID,
-	}
-
-	payload, err := json.Marshal(serverLoginSuccess)
-	if err != nil {
-		return fmt.Errorf("failed to marshal server login success: %v", err)
-	}
-
-	msg := &messages.Message{
-		ClientID: 0,
-		Type:     messages.MessageTypeServerLoginSuccess,
-		Payload:  payload,
-	}
-	if err := WriteMessageToTCP(conn, msg); err != nil {
-		return fmt.Errorf("failed to send server login success: %v", err)
-	}
-
-	return nil
-}
-
-func sendServerLoginFailure(conn net.Conn, reason string) error {
-	serverLoginFailure := &messages.ServerLoginFailure{
-		Reason: reason,
-	}
-
-	payload, err := json.Marshal(serverLoginFailure)
-	if err != nil {
-		return fmt.Errorf("failed to marshal server login failure: %v", err)
-	}
-
-	msg := &messages.Message{
-		ClientID: 0,
-		Type:     messages.MessageTypeServerLoginFailure,
-		Payload:  payload,
-	}
-	if err := WriteMessageToTCP(conn, msg); err != nil {
-		return fmt.Errorf("failed to send server login failure: %v", err)
-	}
-
-	return nil
-}
-
-// handleClientLogin handles a client login message.
-func (s *TCPServer) handleClientLogin(ctx context.Context, conn net.Conn, message *messages.Message) (uint32, error) {
-	clientLogin := &messages.ClientLogin{}
-	if err := json.Unmarshal(message.Payload, clientLogin); err != nil {
-		return 0, fmt.Errorf("failed to unmarshal client login: %v", err)
-	}
-
-	token, err := s.AuthProvider.VerifyToken(ctx, clientLogin.Token)
-	if err != nil {
-		return 0, fmt.Errorf("failed to verify token: %v", err)
-	}
-
-	clientID, err := s.ClientManager.ConnectClient(conn, token.UID, clientLogin.CharacterID)
-	if err != nil {
-		return 0, fmt.Errorf("failed to connect client: %v", err)
-	}
-
-	return clientID, nil
-}
-
-func (s *TCPServer) handleClientSyncTime(conn net.Conn, message *messages.Message) error {
-	clientSyncTime := &messages.ClientSyncTime{}
-	if err := json.Unmarshal(message.Payload, clientSyncTime); err != nil {
-		return fmt.Errorf("failed to unmarshal client sync time: %v", err)
-	}
-
-	serverSyncTime := &messages.ServerSyncTime{
-		Timestamp:       time.Now().UnixMilli(),
-		ClientTimestamp: clientSyncTime.Timestamp,
-	}
-
-	payload, err := json.Marshal(serverSyncTime)
-	if err != nil {
-		return fmt.Errorf("failed to marshal server sync time: %v", err)
-	}
-
-	msg := &messages.Message{
-		ClientID: 0,
-		Type:     messages.MessageTypeServerSyncTime,
-		Payload:  payload,
-	}
-	if err := WriteMessageToTCP(conn, msg); err != nil {
-		return fmt.Errorf("failed to send server sync time: %v", err)
-	}
-
-	return nil
 }
 
 // WriteMessageToTCP writes a Message to a TCP connection

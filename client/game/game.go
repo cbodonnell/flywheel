@@ -53,7 +53,7 @@ type GameAPI struct {
 	URL string
 }
 
-const (
+var (
 	DefaultAuthServerURL = "http://localhost:8080"
 	DefaultAPIServerURL  = "http://localhost:9090"
 )
@@ -609,6 +609,8 @@ func (g *Game) checkNetworkManagerErrors() error {
 		return fmt.Errorf("TCP client error: %v", err)
 	case err := <-g.networkManager.UDPClientErrChan():
 		return fmt.Errorf("UDP client error: %v", err)
+	case err := <-g.networkManager.WSClientErrChan():
+		return fmt.Errorf("WS client error: %v", err)
 	default:
 		return nil
 	}

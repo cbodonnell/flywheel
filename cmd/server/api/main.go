@@ -16,6 +16,7 @@ import (
 
 func main() {
 	port := flag.Int("port", 9090, "port to listen on")
+	allowOrigin := flag.String("allow-origin", "http://localhost:3000", "comma-separated list of allowed origins")
 	logLevel := flag.String("log-level", "info", "Log level")
 	flag.Parse()
 
@@ -69,6 +70,7 @@ func main() {
 
 	apiServerOpts := api.NewAPIServerOptions{
 		Port:         *port,
+		AllowOrigin:  *allowOrigin,
 		AuthProvider: authProvider,
 		Repository:   repository,
 	}

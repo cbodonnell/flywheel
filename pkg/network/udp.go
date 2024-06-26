@@ -1,33 +1,35 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"net"
 
 	"github.com/cbodonnell/flywheel/pkg/log"
 	"github.com/cbodonnell/flywheel/pkg/messages"
-	"github.com/cbodonnell/flywheel/pkg/queue"
 )
 
 // UDPServer represents a UDP server.
 type UDPServer struct {
-	ClientManager *ClientManager
-	MessageQueue  queue.Queue
-	Port          int
+	port int
+	conn *net.UDPConn
+}
+
+// NewUDPServerOptions represents the options for creating a new UDP server.
+type NewUDPServerOptions struct {
+	Port int
 }
 
 // NewUDPServer creates a new UDP server.
-func NewUDPServer(clientManager *ClientManager, messageQueue queue.Queue, port int) *UDPServer {
+func NewUDPServer(opts NewUDPServerOptions) *UDPServer {
 	return &UDPServer{
-		ClientManager: clientManager,
-		MessageQueue:  messageQueue,
-		Port:          port,
+		port: opts.Port,
 	}
 }
 
 // Start starts the UDP server.
-func (s *UDPServer) Start() {
-	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", s.Port))
+func (s *UDPServer) Start(ctx context.Context, messageChan chan<- *messages.Message, pingChan chan<- *PingEvent) {
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", s.port))
 	if err != nil {
 		log.Error("Failed to resolve UDP address: %v", err)
 		return
@@ -35,57 +37,48 @@ func (s *UDPServer) Start() {
 
 	log.Info("UDP server listening on %s", udpAddr.String())
 
-	udpConn, err := net.ListenUDP("udp", udpAddr)
+	s.conn, err = net.ListenUDP("udp", udpAddr)
 	if err != nil {
 		log.Error("Failed to listen on UDP address: %v", err)
 		return
 	}
-	defer udpConn.Close()
-
-	s.ClientManager.SetUDPConn(udpConn)
+	defer s.conn.Close()
 
 	for {
-		message, addr, err := ReadMessageFromUDP(udpConn)
-		if err != nil {
-			log.Error("Failed to read message from UDP connection: %v", err)
-			continue
-		}
-
-		if message.ClientID == 0 {
-			log.Warn("Received UDP message from unknown client, ignoring")
-			continue
-		}
-
-		if !s.ClientManager.Exists(message.ClientID) {
-			log.Warn("Received UDP message from %d, but client is not connected", message.ClientID)
-			continue
-		}
-
-		switch message.Type {
-		case messages.MessageTypeClientPing:
-			if err := s.handleClientPing(message, udpConn, addr); err != nil {
-				log.Error("Failed to handle client ping: %v", err)
-			}
+		select {
+		case <-ctx.Done():
+			return
 		default:
-			if err := s.MessageQueue.Enqueue(message); err != nil {
-				log.Error("Failed to enqueue message: %v", err)
+			message, addr, err := ReadMessageFromUDP(s.conn)
+			if err != nil {
+				log.Error("Failed to read message from UDP connection: %v", err)
+				continue
 			}
+
+			if message.ClientID == 0 {
+				log.Warn("Received UDP message from an unknown client")
+				continue
+			}
+
+			if message.Type == messages.MessageTypeClientPing {
+				pingChan <- &PingEvent{
+					Addr:    addr,
+					Message: message,
+				}
+				continue
+			}
+
+			messageChan <- message
 		}
 	}
 }
 
-func (s *UDPServer) handleClientPing(msg *messages.Message, udpConn *net.UDPConn, addr *net.UDPAddr) error {
-	s.ClientManager.SetUDPAddress(msg.ClientID, addr)
-	m := &messages.Message{
-		ClientID: 0,
-		Type:     messages.MessageTypeServerPong,
-		Payload:  nil,
-	}
-	if err := WriteMessageToUDP(udpConn, addr, m); err != nil {
-		return fmt.Errorf("failed to write pong message to client: %v", err)
+func (s *UDPServer) GetUDPConn() *net.UDPConn {
+	if s.conn == nil {
+		panic("UDP server not started")
 	}
 
-	return nil
+	return s.conn
 }
 
 // WriteMessageToUDP writes a Message to a UDP connection

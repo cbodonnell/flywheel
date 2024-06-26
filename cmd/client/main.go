@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/cbodonnell/flywheel/client/game"
 	clientgame "github.com/cbodonnell/flywheel/client/game"
@@ -39,15 +40,20 @@ func main() {
 
 	serverSettings := network.ServerSettings{
 		Hostname: *serverHostname,
-		TCPPort:  *serverTCPPort,
-		UDPPort:  *serverUDPPort,
 	}
+	if runtime.GOARCH == "wasm" {
+		serverSettings.WSPort = network.DefaultWSServerPort
+	} else {
+		serverSettings.TCPPort = *serverTCPPort
+		serverSettings.UDPPort = *serverUDPPort
+	}
+
 	serverMessageQueue := queue.NewInMemoryQueue(1024)
 	networkManager, err := network.NewNetworkManager(serverSettings, serverMessageQueue)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create network manager: %v", err))
 	}
-	log.Info("Configured for game server %s ports %d (TCP) and %d (UDP)", serverSettings.Hostname, serverSettings.TCPPort, serverSettings.UDPPort)
+	log.Info("Configured for game server %s", serverSettings.Hostname)
 	log.Info("Configured for auth server %s", *authServerURL)
 
 	gameOpts := clientgame.NewGameOptions{

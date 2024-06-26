@@ -6,10 +6,11 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/cbodonnell/flywheel/pkg/api/middleware"
 	"github.com/cbodonnell/flywheel/pkg/log"
+	"github.com/cbodonnell/flywheel/pkg/middleware"
 	"github.com/cbodonnell/flywheel/pkg/repositories"
 	"github.com/cbodonnell/flywheel/pkg/repositories/models"
+	"github.com/gorilla/mux"
 )
 
 func HandleListCharacters(repository repositories.Repository) http.HandlerFunc {
@@ -110,7 +111,7 @@ func HandleDeleteCharacter(repository repositories.Repository) http.HandlerFunc 
 			http.Error(w, "Failed to get user from context", http.StatusInternalServerError)
 			return
 		}
-		characterID, err := strconv.Atoi(r.PathValue("characterID"))
+		characterID, err := strconv.Atoi(mux.Vars(r)["characterID"])
 		if err != nil {
 			log.Error("failed to parse characterID: %v", err)
 			http.Error(w, "Failed to parse characterID", http.StatusBadRequest)
